@@ -9,6 +9,7 @@
       "onAutoForward": "openBrowser"
     }
   },
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && echo '✅ Claude Code installed! Run: claude' ",
   "postStartCommand": "cd ${containerWorkspaceFolder} && python3 -m http.server 8080 &",
   "customizations": {
     "vscode": {
