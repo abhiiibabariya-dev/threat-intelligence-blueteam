@@ -113,6 +113,7 @@
                 <div class="nav-items hidden" id="section-tools">
                     <a href="#" onclick="loadPage('fetcher')" class="nav-link">├─ Threat Intel Fetcher</a>
                     <a href="#" onclick="loadPage('rulegen')" class="nav-link">├─ SIEM Rule Generator</a>
+                    <a href="#" onclick="loadRuleBuilder()" class="nav-link">├─ Rule Builder</a>
                     <a href="#" onclick="loadPage('ioc')" class="nav-link">├─ IOC Management</a>
                     <a href="#" onclick="loadPage('mitre')" class="nav-link">└─ MITRE ATT&CK Map</a>
                 </div>
@@ -215,6 +216,12 @@
                         <div class="card-title">Use Case Library</div>
                         <div class="card-desc">100+ detection use cases mapped to MITRE ATT&CK</div>
                         <div class="card-tag">BLUE TEAM</div>
+                    </div>
+                    <div class="hack-card" onclick="loadRuleBuilder()">
+                        <div class="card-icon">⧉</div>
+                        <div class="card-title">Rule Builder</div>
+                        <div class="card-desc">Drag-and-drop visual SIEM rule & use case builder</div>
+                        <div class="card-tag">TOOL</div>
                     </div>
                 </div>
 
