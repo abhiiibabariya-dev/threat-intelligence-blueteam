@@ -1,0 +1,15 @@
+tasks:
+  - name: BlueShell Web Server
+    init: echo "BlueShell ready!"
+    command: python3 -m http.server 8080
+
+ports:
+  - port: 8080
+    onOpen: open-browser
+    visibility: public
+    name: BlueShell Web App
+
+vscode:
+  extensions:
+    - ms-python.python
+    - ritwickdey.LiveServer
