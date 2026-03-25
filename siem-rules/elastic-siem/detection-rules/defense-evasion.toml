@@ -1,0 +1,436 @@
+# =============================================================================
+# Elastic SIEM Detection Rules: Defense Evasion
+# MITRE ATT&CK Tactic: TA0005 (Defense Evasion)
+# Format: Elastic detection-rules TOML schema
+# =============================================================================
+
+
+# =============================================================================
+# Rule 1: Process Injection
+# =============================================================================
+
+[rule]
+name = "Process Injection via CreateRemoteThread or NtWriteVirtualMemory"
+description = """
+Detects indicators of process injection techniques including CreateRemoteThread,
+NtWriteVirtualMemory, and QueueUserAPC calls into remote processes. Process
+injection allows adversaries to execute code in the address space of another
+process to evade defenses and elevate privileges.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "eql"
+license = "Elastic License v2"
+risk_score = 80
+rule_id = "def-evasion-001"
+severity = "high"
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*", "logs-windows.sysmon_operational-*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Tactic: Privilege Escalation",
+    "Data Source: Sysmon",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+any where
+(
+  /* Sysmon Event ID 8: CreateRemoteThread */
+  (event.code == "8" and
+   not process.executable : (
+     "C:\\Windows\\System32\\*",
+     "C:\\Program Files\\*",
+     "C:\\Program Files (x86)\\*"
+   ) and
+   not process.name : ("csrss.exe", "lsass.exe", "services.exe", "svchost.exe")) or
+
+  /* Sysmon Event ID 10: Process access with suspicious rights */
+  (event.code == "10" and
+   winlog.event_data.GrantedAccess : ("0x1f0fff", "0x1f3fff", "0x143a", "0x1fffff") and
+   not process.executable : (
+     "C:\\Windows\\System32\\svchost.exe",
+     "C:\\Windows\\System32\\csrss.exe",
+     "C:\\Program Files\\*\\MsMpEng.exe"
+   ) and
+   not winlog.event_data.TargetImage : "*\\lsass.exe") or
+
+  /* Process hollowing / PE injection indicators */
+  (event.type == "start" and
+   process.pe.original_file_name != null and
+   process.name != null and
+   process.pe.original_file_name != process.name and
+   process.executable : ("C:\\Users\\*", "C:\\Temp\\*", "C:\\ProgramData\\*"))
+)
+'''
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+  [[rule.threat.technique]]
+  id = "T1055"
+  name = "Process Injection"
+    [[rule.threat.technique.subtechnique]]
+    id = "T1055.001"
+    name = "Dynamic-link Library Injection"
+    [[rule.threat.technique.subtechnique]]
+    id = "T1055.003"
+    name = "Thread Execution Hijacking"
+    [[rule.threat.technique.subtechnique]]
+    id = "T1055.012"
+    name = "Process Hollowing"
+
+  [rule.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"
+
+
+# =============================================================================
+# Rule 2: Timestomping Detection
+# =============================================================================
+
+[rule_2]
+name = "File Creation Time Modification (Timestomping)"
+description = """
+Detects modification of file creation timestamps using tools or APIs. Adversaries
+use timestomping to make malicious files blend in with legitimate system files
+by altering their MAC (Modified, Accessed, Created) timestamps.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "eql"
+license = "Elastic License v2"
+risk_score = 60
+rule_id = "def-evasion-002"
+severity = "medium"
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*", "logs-windows.sysmon_operational-*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Data Source: Sysmon",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+any where
+(
+  /* Sysmon Event ID 2: File creation time changed */
+  (event.code == "2" and
+   not process.executable : (
+     "C:\\Windows\\System32\\*",
+     "C:\\Windows\\SysWOW64\\*",
+     "C:\\Program Files\\*",
+     "C:\\Program Files (x86)\\*",
+     "C:\\Windows\\explorer.exe",
+     "C:\\Windows\\Installer\\*"
+   ) and
+   not process.name : ("OneDrive.exe", "chrome.exe", "msedge.exe", "firefox.exe",
+                        "msiexec.exe", "TiWorker.exe", "TrustedInstaller.exe")) or
+
+  /* PowerShell timestomping commands */
+  (event.type == "start" and
+   process.name : ("powershell.exe", "pwsh.exe") and
+   process.command_line : (
+     "*.CreationTime*=*",
+     "*.LastWriteTime*=*",
+     "*.LastAccessTime*=*",
+     "*Set-ItemProperty*CreationTime*",
+     "*[IO.File]::SetCreationTime*",
+     "*[IO.File]::SetLastWriteTime*"
+   )) or
+
+  /* Known timestomping tools */
+  (event.type == "start" and
+   process.command_line : ("*timestomp*", "*NtSetInformationFile*"))
+)
+'''
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+  [[rule_2.threat.technique]]
+  id = "T1070"
+  name = "Indicator Removal"
+    [[rule_2.threat.technique.subtechnique]]
+    id = "T1070.006"
+    name = "Timestomp"
+
+  [rule_2.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"
+
+
+# =============================================================================
+# Rule 3: Indicator Removal (Log Clearing and Evidence Destruction)
+# =============================================================================
+
+[rule_3]
+name = "Security Log Clearing or Evidence Destruction"
+description = """
+Detects clearing of Windows event logs, deletion of system logs, or removal of
+forensic artifacts. Adversaries clear logs to remove evidence of their activities
+and hinder incident response investigations.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "kuery"
+license = "Elastic License v2"
+risk_score = 85
+rule_id = "def-evasion-003"
+severity = "high"
+type = "query"
+index = ["winlogbeat-*", "logs-endpoint.events.*", "logs-windows.*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Data Source: Windows Security",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+(
+  event.code:"1102" or
+  event.code:"104" or
+  (event.category:"process" and event.type:"start" and (
+    (process.name:"wevtutil.exe" and process.args:("cl" or "clear-log")) or
+    (process.name:("powershell.exe" or "pwsh.exe") and
+     process.command_line:("*Clear-EventLog*" or "*Remove-EventLog*" or
+                           "*wevtutil*cl*" or "*.evtx*")) or
+    (process.name:"fsutil.exe" and process.args:"usn" and process.args:"deletejournal") or
+    (process.name:"cipher.exe" and process.args:"/w*") or
+    (process.name:("del" or "erase" or "Remove-Item") and
+     process.command_line:("*\\Security.evtx*" or "*\\System.evtx*" or
+                           "*\\PowerShell*.evtx*" or "*\\Sysmon*.evtx*"))
+  ))
+)
+'''
+
+[[rule_3.threat]]
+framework = "MITRE ATT&CK"
+  [[rule_3.threat.technique]]
+  id = "T1070"
+  name = "Indicator Removal"
+    [[rule_3.threat.technique.subtechnique]]
+    id = "T1070.001"
+    name = "Clear Windows Event Logs"
+
+  [rule_3.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"
+
+
+# =============================================================================
+# Rule 4: Masquerading - Suspicious Process Name or Location
+# =============================================================================
+
+[rule_4]
+name = "Process Masquerading as System Binary"
+description = """
+Detects executables masquerading as legitimate Windows system binaries by running
+from unexpected locations. Legitimate system processes (svchost.exe, csrss.exe,
+lsass.exe, etc.) should only execute from specific system directories. Execution
+from user-writable paths indicates masquerading.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "eql"
+license = "Elastic License v2"
+risk_score = 75
+rule_id = "def-evasion-004"
+severity = "high"
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*", "logs-windows.sysmon_operational-*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Data Source: Sysmon",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+process where event.type == "start" and
+(
+  /* svchost.exe should only run from System32/SysWOW64 */
+  (process.name : "svchost.exe" and not
+   process.executable : ("C:\\Windows\\System32\\svchost.exe",
+                          "C:\\Windows\\SysWOW64\\svchost.exe")) or
+
+  /* csrss.exe should only run from System32 */
+  (process.name : "csrss.exe" and not
+   process.executable : "C:\\Windows\\System32\\csrss.exe") or
+
+  /* lsass.exe should only run from System32 */
+  (process.name : "lsass.exe" and not
+   process.executable : "C:\\Windows\\System32\\lsass.exe") or
+
+  /* services.exe should only run from System32 */
+  (process.name : "services.exe" and not
+   process.executable : "C:\\Windows\\System32\\services.exe") or
+
+  /* smss.exe should only run from System32 */
+  (process.name : "smss.exe" and not
+   process.executable : "C:\\Windows\\System32\\smss.exe") or
+
+  /* winlogon.exe should only run from System32 */
+  (process.name : "winlogon.exe" and not
+   process.executable : "C:\\Windows\\System32\\winlogon.exe") or
+
+  /* taskhostw.exe should only run from System32 */
+  (process.name : "taskhostw.exe" and not
+   process.executable : "C:\\Windows\\System32\\taskhostw.exe") or
+
+  /* explorer.exe running from non-standard location */
+  (process.name : "explorer.exe" and not
+   process.executable : ("C:\\Windows\\explorer.exe",
+                          "C:\\Windows\\SysWOW64\\explorer.exe"))
+)
+'''
+
+[[rule_4.threat]]
+framework = "MITRE ATT&CK"
+  [[rule_4.threat.technique]]
+  id = "T1036"
+  name = "Masquerading"
+    [[rule_4.threat.technique.subtechnique]]
+    id = "T1036.003"
+    name = "Rename System Utilities"
+    [[rule_4.threat.technique.subtechnique]]
+    id = "T1036.005"
+    name = "Match Legitimate Name or Location"
+
+  [rule_4.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"
+
+
+# =============================================================================
+# Rule 5: AMSI Bypass Attempt
+# =============================================================================
+
+[rule_5]
+name = "AMSI (Antimalware Scan Interface) Bypass Attempt"
+description = """
+Detects attempts to bypass or disable the Windows Antimalware Scan Interface
+(AMSI), which is used by security products to scan scripts and memory content.
+Adversaries bypass AMSI to execute malicious scripts without detection by
+patching the AmsiScanBuffer function or modifying AMSI provider settings.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "kuery"
+license = "Elastic License v2"
+risk_score = 80
+rule_id = "def-evasion-005"
+severity = "high"
+type = "query"
+index = ["winlogbeat-*", "logs-endpoint.events.*", "logs-windows.powershell_operational-*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Data Source: PowerShell",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+(event.category:"process" and event.type:"start" and
+ process.name:("powershell.exe" or "pwsh.exe") and
+ process.command_line:(
+   "*AmsiScanBuffer*" or
+   "*amsiInitFailed*" or
+   "*AmsiUtils*" or
+   "*Disable-WindowsOptionalFeature*AMSI*" or
+   "*Set-MpPreference*-DisableRealtimeMonitoring*$true*" or
+   "*[Ref].Assembly.GetType*AMSIUtils*" or
+   "*System.Management.Automation.AmsiUtils*" or
+   "*amsi.dll*VirtualProtect*" or
+   "*Bypass*-MpPreference*"
+ )
+) or
+(event.code:"4104" and
+ powershell.file.script_block_text:(
+   "*AmsiScanBuffer*" or
+   "*amsiInitFailed*" or
+   "*[Runtime.InteropServices.Marshal]*" and "*amsi*" or
+   "*SetValue*HKLM*SOFTWARE*Policies*AMSI*"
+ )
+)
+'''
+
+[[rule_5.threat]]
+framework = "MITRE ATT&CK"
+  [[rule_5.threat.technique]]
+  id = "T1562"
+  name = "Impair Defenses"
+    [[rule_5.threat.technique.subtechnique]]
+    id = "T1562.001"
+    name = "Disable or Modify Tools"
+
+  [rule_5.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"
+
+
+# =============================================================================
+# Rule 6: DLL Side-Loading Detection
+# =============================================================================
+
+[rule_6]
+name = "Potential DLL Side-Loading via Unsigned DLL in Trusted Application"
+description = """
+Detects potential DLL side-loading where a trusted, signed application loads an
+unsigned or suspicious DLL from a non-standard directory. Adversaries abuse
+trusted applications to load malicious DLLs for code execution while evading
+application whitelisting.
+"""
+author = ["Threat Intelligence Blue Team"]
+date = "2026-03-24"
+language = "eql"
+license = "Elastic License v2"
+risk_score = 65
+rule_id = "def-evasion-006"
+severity = "medium"
+type = "eql"
+index = ["logs-endpoint.events.*"]
+tags = [
+    "OS: Windows",
+    "Use Case: Threat Detection",
+    "Tactic: Defense Evasion",
+    "Data Source: Elastic Endpoint",
+]
+
+query = '''
+library where
+  dll.code_signature.exists == false and
+  process.code_signature.status == "trusted" and
+  not dll.path : (
+    "C:\\Windows\\System32\\*",
+    "C:\\Windows\\SysWOW64\\*",
+    "C:\\Windows\\WinSxS\\*",
+    "C:\\Program Files\\*",
+    "C:\\Program Files (x86)\\*"
+  ) and
+  not dll.name : ("*.tmp", "*.nls") and
+  process.executable : (
+    "C:\\Program Files\\*",
+    "C:\\Program Files (x86)\\*",
+    "C:\\Windows\\System32\\*"
+  )
+'''
+
+[[rule_6.threat]]
+framework = "MITRE ATT&CK"
+  [[rule_6.threat.technique]]
+  id = "T1574"
+  name = "Hijack Execution Flow"
+    [[rule_6.threat.technique.subtechnique]]
+    id = "T1574.002"
+    name = "DLL Side-Loading"
+
+  [rule_6.threat.tactic]
+  id = "TA0005"
+  name = "Defense Evasion"

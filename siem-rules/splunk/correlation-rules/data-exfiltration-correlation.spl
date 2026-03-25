@@ -1,0 +1,133 @@
+` ===================================================================
+` Splunk Correlation Rule: Data Exfiltration Detection
+` ===================================================================
+` Description:  Correlates large data transfers with suspicious process
+`               activity. Includes DNS tunneling, unusual uploads, and
+`               cloud storage exfiltration patterns.
+` MITRE ATT&CK: T1048 (Exfiltration Over Alternative Protocol)
+`   Sub-techniques: T1048.003 (DNS), T1567 (Web Service), T1041 (C2 Channel)
+` Severity:     High
+` Data Sources: Network Traffic, DNS, Proxy, Endpoint
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Search 1: DNS Tunneling Detection (High Entropy Subdomains)
+` ---------------------------------------------------------------------------
+index=dns sourcetype=dns
+| eval subdomain=mvindex(split(query, "."), 0)
+| eval subdomain_len=len(subdomain)
+| eval query_len=len(query)
+| where subdomain_len > 30 OR query_len > 60
+| stats count as QueryCount,
+        dc(query) as UniqueQueries,
+        avg(subdomain_len) as AvgSubdomainLen,
+        max(subdomain_len) as MaxSubdomainLen,
+        values(query) as SampleQueries
+    by src_ip, query_type
+| where QueryCount > 100 AND UniqueQueries > 50
+| eval DataEstimateMB=round((QueryCount * AvgSubdomainLen) / 1048576, 2)
+| eval AlertName="DNS Tunneling Detected"
+| eval Severity="High"
+| eval MITREAttack="T1048.003"
+| table _time, AlertName, src_ip, QueryCount, UniqueQueries,
+        AvgSubdomainLen, MaxSubdomainLen, DataEstimateMB, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 2: Unusual Outbound Data Volume (Baseline Deviation)
+` ---------------------------------------------------------------------------
+index=network sourcetype=firewall action=allowed direction=outbound
+| bin _time span=1h
+| stats sum(bytes_out) as TotalBytesOut,
+        dc(dest_ip) as UniqueDestinations,
+        values(dest_ip) as TopDestinations
+    by src_ip, _time
+| eventstats avg(TotalBytesOut) as AvgBytesOut,
+        stdev(TotalBytesOut) as StdevBytesOut
+    by src_ip
+| eval Threshold=AvgBytesOut + (3 * StdevBytesOut)
+| where TotalBytesOut > Threshold AND TotalBytesOut > 104857600
+| eval TotalMB=round(TotalBytesOut/1048576, 1)
+| eval AvgMB=round(AvgBytesOut/1048576, 1)
+| eval DeviationFactor=round(TotalBytesOut/AvgBytesOut, 1)
+| eval AlertName="Unusual Outbound Data Volume"
+| eval Severity=case(DeviationFactor > 10, "Critical", DeviationFactor > 5, "High", 1=1, "Medium")
+| eval MITREAttack="T1048"
+
+` ---------------------------------------------------------------------------
+` Search 3: Cloud Storage Upload Exfiltration
+` ---------------------------------------------------------------------------
+index=proxy sourcetype=proxy
+| where dest IN ("*.dropbox.com", "*.drive.google.com", "*.onedrive.live.com",
+    "*.mega.nz", "*.box.com", "*.wetransfer.com", "*.sendspace.com",
+    "*.mediafire.com", "*.file.io", "*.transfer.sh")
+| where http_method IN ("POST", "PUT", "PATCH")
+| stats sum(bytes_out) as TotalUploaded,
+        count as UploadCount,
+        dc(dest) as UniqueServices,
+        values(dest) as Services,
+        earliest(_time) as FirstUpload,
+        latest(_time) as LastUpload
+    by src_ip, user
+| where TotalUploaded > 52428800
+| eval UploadedMB=round(TotalUploaded/1048576, 1)
+| eval AlertName="Data Upload to Cloud Storage Service"
+| eval Severity=case(UploadedMB > 500, "Critical", UploadedMB > 100, "High", 1=1, "Medium")
+| eval MITREAttack="T1567"
+| table _time, AlertName, src_ip, user, UploadedMB, UploadCount,
+        UniqueServices, Services, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 4: Staged Data + Exfiltration Correlation
+` Detects file staging (compression/archival) followed by large transfer
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4688
+    (NewProcessName="*\\rar.exe" OR NewProcessName="*\\7z.exe"
+    OR NewProcessName="*\\zip.exe" OR NewProcessName="*\\tar.exe"
+    OR CommandLine="*Compress-Archive*")
+| rename SubjectUserName as user, ComputerName as src
+| eval StagingTime=_time
+| join type=inner user src [
+    search index=network sourcetype=firewall direction=outbound bytes_out > 10485760
+    | rename src_ip as src
+    | eval TransferTime=_time
+]
+| where TransferTime > StagingTime AND (TransferTime - StagingTime) < 3600
+| eval TimeBetween_min=round((TransferTime - StagingTime)/60, 1)
+| eval AlertName="Data Staging Followed by Large Transfer"
+| eval Severity="Critical"
+| eval MITREAttack="T1560,T1048"
+
+` ---------------------------------------------------------------------------
+` Search 5: Email-based Exfiltration (Large Attachments)
+` ---------------------------------------------------------------------------
+index=email sourcetype=mail
+| where attachment_size > 10485760
+| where NOT match(recipient, "@(yourdomain\.com|yourdomain\.org)")
+| stats sum(attachment_size) as TotalAttachmentBytes,
+        count as EmailCount,
+        dc(recipient) as UniqueRecipients,
+        values(recipient) as Recipients,
+        values(attachment_name) as Attachments
+    by sender
+| where TotalAttachmentBytes > 52428800
+| eval TotalMB=round(TotalAttachmentBytes/1048576, 1)
+| eval AlertName="Large Email Attachment Exfiltration"
+| eval Severity="High"
+| eval MITREAttack="T1048.002"
+
+` ---------------------------------------------------------------------------
+` Search 6: Protocol Tunneling Exfiltration (ICMP, DNS, HTTP)
+` ---------------------------------------------------------------------------
+index=network sourcetype=firewall
+| where protocol IN ("icmp", "dns") AND bytes_out > 1024
+| stats sum(bytes_out) as TotalBytes,
+        count as PacketCount,
+        avg(bytes_out) as AvgPacketSize,
+        dc(dest_ip) as UniqueDestinations
+    by src_ip, protocol, _time span=1h
+| where (protocol="icmp" AND TotalBytes > 102400)
+    OR (protocol="dns" AND TotalBytes > 1048576)
+| eval TotalKB=round(TotalBytes/1024, 1)
+| eval AlertName="Protocol Tunneling Exfiltration"
+| eval Severity="High"
+| eval MITREAttack="T1048.003"

@@ -1,0 +1,36 @@
+# Securonix Spotter Queries - Data Exfiltration
+# MITRE ATT&CK Tactic: TA0010
+
+# SQ-EX-001: DNS Tunneling Detection (T1048.001)
+index = activity AND categoryobject = "DNS"
+| where len(objectname) > 50 AND resourcecustomfield1 IN ("TXT", "NULL", "CNAME")
+| stats count() as query_count, avg(len(objectname)) as avg_query_length by sourceaddress
+| where query_count > 20 AND avg_query_length > 40
+| fields sourceaddress, query_count, avg_query_length
+
+# SQ-EX-002: Cloud Storage Exfiltration (T1567.002)
+index = activity AND categoryobject = "Process"
+| where sourceprocessname IN ("rclone.exe", "megasync.exe", "gdrive.exe") AND bytesout > 104857600
+| fields datetime, accountname, devicename, sourceprocessname, bytesout
+
+# SQ-EX-003: Large Outbound Data Transfer (T1041)
+index = activity AND categoryobject = "Network Connection" AND categoryoutcome = "Allow"
+| where bytesout > 524288000 AND destinationzone = "External"
+| fields datetime, sourceaddress, destinationaddress, bytesout, destinationport
+
+# SQ-EX-004: Email Exfiltration (T1048.003)
+index = activity AND categoryobject = "Email" AND categoryoutcome = "Sent"
+| where recipientaddress NOT MATCHES ".*@company\\.com" AND resourcecustomfield3 > 0
+| stats count() as emails, sum(resourcecustomfield4) as total_size by accountname
+| where emails > 10 OR total_size > 52428800
+| fields accountname, emails, total_size
+
+# SQ-EX-005: Data Staging - Archive Creation (T1560.001)
+index = activity AND categoryobject = "Process"
+| where resourcecustomfield2 MATCHES ".*(7z a|rar a|zip -r|Compress-Archive|tar czf).*"
+| fields datetime, accountname, devicename, resourcecustomfield2
+
+# SQ-EX-006: FTP/SFTP Outbound Transfer (T1048.003)
+index = activity AND destinationport IN (20, 21, 22) AND categoryoutcome = "Allow"
+| where bytesout > 10485760
+| fields datetime, sourceaddress, destinationaddress, bytesout, accountname

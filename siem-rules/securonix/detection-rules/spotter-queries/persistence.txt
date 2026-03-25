@@ -1,0 +1,31 @@
+# Securonix Spotter Queries - Persistence
+# MITRE ATT&CK Tactic: TA0003
+
+# SQ-PER-001: Registry Run Key (T1547.001)
+index = activity AND categoryobject = "Registry" AND categoryoutcome = "Modified"
+| where objectname MATCHES ".*\\\\CurrentVersion\\\\Run.*"
+| fields datetime, accountname, devicename, objectname, resourcecustomfield2
+
+# SQ-PER-002: Scheduled Task Created (T1053.005)
+index = activity AND baseeventid = "4698"
+| fields datetime, accountname, devicename, resourcecustomfield1, resourcecustomfield2
+
+# SQ-PER-003: Suspicious Service Installation (T1543.003)
+index = activity AND baseeventid = "7045"
+| where resourcecustomfield2 MATCHES ".*(cmd|powershell|mshta|wscript|\\\\temp\\\\|\\\\appdata\\\\).*"
+| fields datetime, accountname, devicename, resourcecustomfield1, resourcecustomfield2
+
+# SQ-PER-004: New Local Admin Account (T1136.001)
+index = activity AND baseeventid IN ("4720", "4732")
+| where resourcecustomfield1 MATCHES "(?i).*administrator.*"
+| fields datetime, accountname, devicename, resourcecustomfield1, resourcecustomfield2
+
+# SQ-PER-005: WMI Event Subscription (T1546.003)
+index = activity AND categoryobject = "Process"
+| where resourcecustomfield2 MATCHES ".*(__EventFilter|__EventConsumer|ActiveScriptEventConsumer).*"
+| fields datetime, accountname, devicename, resourcecustomfield2
+
+# SQ-PER-006: SSH Key Backdoor (T1098.004)
+index = activity AND categoryobject = "File" AND categoryoutcome = "Modified"
+| where objectname CONTAINS ".ssh/authorized_keys"
+| fields datetime, accountname, devicename, objectname

@@ -1,0 +1,85 @@
+<!-- Wazuh Detection Rules: Command and Control -->
+<!-- MITRE ATT&CK Tactic: TA0011 - Command and Control -->
+<!-- Rule IDs: 100215-100229 -->
+
+<group name="command_and_control,mitre_ta0011,">
+
+  <!-- T1071.001 - Web-based C2 Communication -->
+  <rule id="100215" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(Invoke-WebRequest|wget|curl|Net\.WebClient|WebRequest).*(-Headers|-UserAgent|hidden|bypass)</field>
+    <description>C2: Suspicious web request with evasion flags - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1071.001</id>
+    </mitre>
+    <group>c2_communication,web_c2,</group>
+  </rule>
+
+  <!-- T1071.004 - DNS Tunneling -->
+  <rule id="100216" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(iodine|dnscat|dns2tcp|dnscapy|Invoke-DNSExfiltration)</field>
+    <description>C2: DNS tunneling tool detected - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1071.004</id>
+    </mitre>
+    <group>dns_tunneling,c2,</group>
+  </rule>
+
+  <!-- T1105 - Ingress Tool Transfer -->
+  <rule id="100217" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(certutil.*-urlcache|bitsadmin.*\/transfer|Invoke-WebRequest.*-OutFile|wget.*-O\s|curl.*-o\s)</field>
+    <description>C2: Tool download via LOLBAS - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+    <group>tool_transfer,lolbas,</group>
+  </rule>
+
+  <!-- T1572 - Protocol Tunneling -->
+  <rule id="100218" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(plink|chisel|ngrok|cloudflared|socat|ssh\s+-[RLD]|netsh\s+interface\s+portproxy)</field>
+    <description>C2: Network tunneling tool detected - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1572</id>
+    </mitre>
+    <group>tunneling,proxy,</group>
+  </rule>
+
+  <!-- T1219 - Remote Access Tools -->
+  <rule id="100219" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)(teamviewer|anydesk|screenconnect|logmein|ammyy|rustdesk|meshagent).*\.exe$</field>
+    <description>C2: Remote access tool execution - $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+    <group>remote_access_tool,</group>
+  </rule>
+
+  <!-- T1090.001 - Internal Proxy -->
+  <rule id="100220" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(netsh\s+interface\s+portproxy\s+add|ssh.*-D\s+\d+|proxy.*socks|socat\s+tcp-listen)</field>
+    <description>C2: Internal proxy/port forwarding configured - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1090.001</id>
+    </mitre>
+    <group>proxy,port_forwarding,</group>
+  </rule>
+
+  <!-- T1573.002 - Encrypted Channel: Asymmetric Cryptography -->
+  <rule id="100221" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)(ncat|nc|netcat)\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(--ssl|-e\s+cmd|-e\s+powershell|-e\s+/bin)</field>
+    <description>C2: Netcat with shell or encryption flags - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1573.002</id>
+    </mitre>
+    <group>reverse_shell,netcat,critical,</group>
+  </rule>
+
+</group>

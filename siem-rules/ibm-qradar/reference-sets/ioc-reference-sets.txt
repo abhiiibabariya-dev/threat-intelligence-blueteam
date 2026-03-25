@@ -1,0 +1,217 @@
+# =============================================================================
+# IBM QRadar Reference Sets for IOC Management
+# =============================================================================
+# Description:  Instructions and API calls for creating and managing QRadar
+#               reference sets used in correlation rules and threat detection.
+# =============================================================================
+
+# =====================================================
+# 1. CREATING REFERENCE SETS VIA REST API
+# =====================================================
+
+# --- Malicious IP Addresses ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Malicious_IPs",
+    "element_type": "IP",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "90 days"
+  }'
+
+# --- Malicious Domains ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Malicious_Domains",
+    "element_type": "ALNIC",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "90 days"
+  }'
+
+# --- Malicious File Hashes (SHA256) ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Malicious_Hashes_SHA256",
+    "element_type": "ALNIC",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "180 days"
+  }'
+
+# --- Malicious URLs ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Malicious_URLs",
+    "element_type": "ALNIC",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "30 days"
+  }'
+
+# --- Compromised Accounts ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Compromised_Accounts",
+    "element_type": "ALNIC",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "72 hours"
+  }'
+
+# --- Brute Force Source IPs ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Brute_Force_IPs",
+    "element_type": "IP",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "24 hours"
+  }'
+
+# --- Compromised Hosts ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "Compromised_Hosts",
+    "element_type": "IP",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "168 hours"
+  }'
+
+# --- TOR Exit Nodes ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "TOR_Exit_Nodes",
+    "element_type": "IP",
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "7 days"
+  }'
+
+# --- VIP/Executive Accounts (no TTL - manually managed) ---
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/sets" \
+  -d '{
+    "name": "VIP_Accounts",
+    "element_type": "ALNIC"
+  }'
+
+# =====================================================
+# 2. ADDING ENTRIES TO REFERENCE SETS
+# =====================================================
+
+# Add single IP to Malicious_IPs
+curl -X POST -H "SEC: <api_token>" \
+  "https://<qradar_host>/api/reference_data/sets/Malicious_IPs" \
+  -d "value=192.168.1.100&source=ThreatFeed-AlienVault"
+
+# Bulk add IPs from file
+while IFS= read -r ip; do
+  curl -s -X POST -H "SEC: <api_token>" \
+    "https://<qradar_host>/api/reference_data/sets/Malicious_IPs" \
+    -d "value=${ip}&source=BulkImport"
+done < malicious_ips.txt
+
+# Add hash to reference set
+curl -X POST -H "SEC: <api_token>" \
+  "https://<qradar_host>/api/reference_data/sets/Malicious_Hashes_SHA256" \
+  -d "value=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&source=MalwareAnalysis"
+
+# =====================================================
+# 3. REFERENCE TABLES (Key-Value Pairs)
+# =====================================================
+
+# Create a reference table for IP reputation with metadata
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/tables" \
+  -d '{
+    "name": "IP_Reputation",
+    "element_type": "ALNIC",
+    "outer_key_label": "IP Address",
+    "key_name_types": {
+      "reputation_score": "NUM",
+      "threat_category": "ALNIC",
+      "source": "ALNIC",
+      "first_seen": "DATE",
+      "last_seen": "DATE",
+      "confidence": "NUM"
+    },
+    "timeout_type": "LAST_SEEN",
+    "time_to_live": "90 days"
+  }'
+
+# Add entry to reference table
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/tables/IP_Reputation" \
+  -d '{
+    "outer_key": "10.0.0.50",
+    "inner_key": "reputation_score",
+    "value": "85"
+  }'
+
+# =====================================================
+# 4. REFERENCE MAPS FOR ENRICHMENT
+# =====================================================
+
+# Create a map for user-to-department mapping (context enrichment)
+curl -X POST -H "SEC: <api_token>" -H "Content-Type: application/json" \
+  "https://<qradar_host>/api/reference_data/maps" \
+  -d '{
+    "name": "User_Department_Map",
+    "element_type": "ALNIC",
+    "key_label": "Username"
+  }'
+
+# =====================================================
+# 5. USING REFERENCE SETS IN AQL QUERIES
+# =====================================================
+
+# Check if source IP is in Malicious_IPs reference set
+# SELECT * FROM events
+# WHERE sourceIP IN (SELECT * FROM reference_data.sets WHERE set_name = 'Malicious_IPs')
+# LAST 24 HOURS
+
+# Check if destination domain matches threat intel
+# SELECT * FROM events
+# WHERE "URL" IN (SELECT * FROM reference_data.sets WHERE set_name = 'Malicious_Domains')
+# LAST 24 HOURS
+
+# Enrich events with IP reputation data
+# SELECT sourceip,
+#        REFERENCETABLE('IP_Reputation', sourceip, 'reputation_score') AS reputation,
+#        REFERENCETABLE('IP_Reputation', sourceip, 'threat_category') AS category
+# FROM events
+# WHERE sourceip IN (SELECT * FROM reference_data.sets WHERE set_name = 'Malicious_IPs')
+# LAST 24 HOURS
+
+# =====================================================
+# 6. AUTOMATED FEED MANAGEMENT (Cron Scripts)
+# =====================================================
+
+# Script: /opt/qradar/scripts/update_threat_feeds.sh
+# Schedule: 0 */4 * * * (every 4 hours)
+#
+# #!/bin/bash
+# API_TOKEN="your_api_token"
+# QRADAR_HOST="your_qradar_host"
+#
+# # Download latest AlienVault OTX pulse IPs
+# curl -s -H "X-OTX-API-KEY: ${OTX_KEY}" \
+#   "https://otx.alienvault.com/api/v1/indicators/export?type=IPv4" \
+#   | jq -r '.[]' | while read ip; do
+#     curl -s -X POST -H "SEC: ${API_TOKEN}" \
+#       "https://${QRADAR_HOST}/api/reference_data/sets/Malicious_IPs" \
+#       -d "value=${ip}&source=AlienVault-OTX"
+# done
+#
+# # Download TOR exit nodes
+# curl -s "https://check.torproject.org/torbulkexitlist" | while read ip; do
+#   curl -s -X POST -H "SEC: ${API_TOKEN}" \
+#     "https://${QRADAR_HOST}/api/reference_data/sets/TOR_Exit_Nodes" \
+#     -d "value=${ip}&source=TorProject"
+# done
+#
+# # Purge expired entries
+# curl -s -X DELETE -H "SEC: ${API_TOKEN}" \
+#   "https://${QRADAR_HOST}/api/reference_data/sets/Malicious_IPs?purge_only=true"

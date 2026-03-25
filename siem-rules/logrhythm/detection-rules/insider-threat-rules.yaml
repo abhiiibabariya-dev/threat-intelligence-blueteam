@@ -1,0 +1,62 @@
+# LogRhythm - Insider Threat Detection Rules
+---
+rules:
+  - rule_name: "LR-IT-001: Off-Hours Data Access"
+    rule_type: trend
+    severity: medium
+    risk_rating: 6
+    mitre: [T1078]
+    filter: {classification: "Resource Access", time_of_day: "outside_business_hours"}
+    trend: {direction: increasing, time_window_days: 7, minimum_increase_percent: 150, group_by: [login]}
+    actions: [create_alarm]
+
+  - rule_name: "LR-IT-002: Bulk File Download"
+    rule_type: statistical
+    severity: high
+    risk_rating: 8
+    mitre: [T1074.001]
+    filter: {classification: "File Access", access_type: "Read"}
+    statistical: {field: object_name, calculation: distinct_count, time_window_seconds: 3600, standard_deviations: 4, group_by: [login]}
+    actions: [create_alarm, add_to_list: "Data Hoarding Watch"]
+
+  - rule_name: "LR-IT-003: Email to Personal Account"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1048.003]
+    filter: {classification: "Email Sent", recipient_domain_any: [gmail.com, yahoo.com, hotmail.com, protonmail.com], has_attachment: true}
+    threshold: {count: 5, time_window_seconds: 3600, group_by: [sender]}
+    actions: [create_alarm]
+
+  - rule_name: "LR-IT-004: USB Large Data Transfer"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1052.001]
+    filter: {device_type: "Removable Storage", bytes_out_greater_than: 52428800}
+    threshold: {count: 1, time_window_seconds: 300}
+    actions: [create_alarm, smartresponse: "Block USB"]
+
+  - rule_name: "LR-IT-005: Privilege Abuse After Hours"
+    rule_type: behavioral
+    severity: high
+    risk_rating: 8
+    mitre: [T1078.002]
+    behavioral_sequence:
+      - step: 1
+        classification: "Privilege Elevation"
+        time_of_day: "outside_business_hours"
+      - step: 2
+        classification: "Resource Access"
+        filter: {resource_sensitivity: "high"}
+        time_after_previous_seconds: 1800
+    actions: [create_alarm]
+
+  - rule_name: "LR-IT-006: Cloud Storage Upload Spike"
+    rule_type: statistical
+    severity: high
+    risk_rating: 7
+    mitre: [T1567.002]
+    filter: {destination_host_regex: "(dropbox|drive\\.google|onedrive|box\\.com|mega\\.nz)"}
+    statistical: {field: bytes_out, calculation: sum, time_window_seconds: 3600, standard_deviations: 3, group_by: [login]}
+    actions: [create_alarm]

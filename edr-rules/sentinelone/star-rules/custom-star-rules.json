@@ -1,0 +1,55 @@
+{
+  "star_rules": [
+    {
+      "rule_name": "Credential Dumping Tool Execution",
+      "description": "Detects execution of known credential theft tools targeting LSASS",
+      "mitre_technique": "T1003.001",
+      "severity": "Critical",
+      "status": "Active",
+      "scope": "Site",
+      "query": "SrcProcCmdLine ContainsCIS 'sekurlsa' OR SrcProcCmdLine ContainsCIS 'lsadump' OR SrcProcCmdLine ContainsCIS 'mimikatz' OR (SrcProcName = 'procdump.exe' AND SrcProcCmdLine ContainsCIS 'lsass') OR (SrcProcName = 'rundll32.exe' AND SrcProcCmdLine ContainsCIS 'comsvcs' AND SrcProcCmdLine ContainsCIS 'MiniDump')",
+      "response_actions": ["ALERT", "KILL", "QUARANTINE", "NETWORK_QUARANTINE"],
+      "expiration": "No Expiration"
+    },
+    {
+      "rule_name": "Ransomware - Shadow Copy Deletion",
+      "description": "Detects volume shadow copy deletion indicating ransomware activity",
+      "mitre_technique": "T1490",
+      "severity": "Critical",
+      "status": "Active",
+      "query": "(SrcProcName = 'vssadmin.exe' AND SrcProcCmdLine ContainsCIS 'delete shadows') OR (SrcProcName = 'wmic.exe' AND SrcProcCmdLine ContainsCIS 'shadowcopy delete') OR (SrcProcName = 'bcdedit.exe' AND SrcProcCmdLine ContainsCIS 'recoveryenabled no')",
+      "response_actions": ["ALERT", "KILL", "NETWORK_QUARANTINE"],
+      "expiration": "No Expiration"
+    },
+    {
+      "rule_name": "AMSI Bypass Attempt",
+      "description": "Detects attempts to bypass Antimalware Scan Interface",
+      "mitre_technique": "T1562.001",
+      "severity": "High",
+      "status": "Active",
+      "query": "SrcProcCmdLine ContainsCIS 'AmsiUtils' OR SrcProcCmdLine ContainsCIS 'amsiInitFailed' OR SrcProcCmdLine ContainsCIS 'AmsiScanBuffer'",
+      "response_actions": ["ALERT", "KILL"],
+      "expiration": "No Expiration"
+    },
+    {
+      "rule_name": "PsExec Lateral Movement",
+      "description": "Detects PsExec service installation for lateral movement",
+      "mitre_technique": "T1021.002",
+      "severity": "High",
+      "status": "Active",
+      "query": "(SrcProcName = 'psexec.exe' OR SrcProcName = 'psexec64.exe') OR (SrcProcParentName = 'services.exe' AND SrcProcName = 'PSEXESVC.exe')",
+      "response_actions": ["ALERT"],
+      "expiration": "No Expiration"
+    },
+    {
+      "rule_name": "LOLBin Download/Execute",
+      "description": "Detects LOLBin abuse for downloading or executing payloads",
+      "mitre_technique": "T1218",
+      "severity": "High",
+      "status": "Active",
+      "query": "SrcProcName IN ('mshta.exe', 'certutil.exe', 'regsvr32.exe', 'msbuild.exe', 'cmstp.exe') AND (SrcProcCmdLine ContainsCIS 'http' OR SrcProcCmdLine ContainsCIS 'javascript' OR SrcProcCmdLine ContainsCIS '-decode' OR SrcProcCmdLine ContainsCIS '-urlcache')",
+      "response_actions": ["ALERT", "KILL"],
+      "expiration": "No Expiration"
+    }
+  ]
+}

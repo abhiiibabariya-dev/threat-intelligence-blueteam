@@ -1,0 +1,223 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Identity Threats
+// =============================================================================
+// Description:  Detect identity-based threats including brute force, impossible
+//               travel, suspicious sign-ins, and MFA bypass attempts.
+// MITRE ATT&CK: T1110 (Brute Force), T1078 (Valid Accounts), T1556 (Modify Authentication)
+// Severity:     Medium to High
+// Data Sources:  SigninLogs, AADNonInteractiveUserSignInLogs, AuditLogs
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: Distributed Brute Force Attack Detection
+// MITRE: T1110.001 - Brute Force: Password Guessing
+// Severity: High
+// ---------------------------------------------------------------------------
+let threshold_failed = 15;
+let threshold_accounts = 3;
+let timeWindow = 1h;
+SigninLogs
+| where TimeGenerated >= ago(timeWindow)
+| where ResultType != "0"  // Non-successful sign-ins
+| where ResultType in ("50126", "50053", "50055", "50056")  // Invalid password codes
+| summarize
+    FailedAttempts = count(),
+    TargetAccounts = dcount(UserPrincipalName),
+    AccountsList = make_set(UserPrincipalName, 10),
+    AppsList = make_set(AppDisplayName, 5),
+    FirstAttempt = min(TimeGenerated),
+    LastAttempt = max(TimeGenerated)
+    by IPAddress, Location = tostring(LocationDetails.city)
+| where FailedAttempts >= threshold_failed and TargetAccounts >= threshold_accounts
+| extend
+    AlertSeverity = case(
+        FailedAttempts > 100 and TargetAccounts > 10, "High",
+        FailedAttempts > 50, "Medium",
+        "Low"
+    ),
+    AttackDuration = LastAttempt - FirstAttempt
+| project
+    TimeGenerated = LastAttempt,
+    AlertName = "Distributed Brute Force Attack",
+    IPAddress,
+    Location,
+    FailedAttempts,
+    TargetAccounts,
+    AccountsList,
+    AppsList,
+    AttackDuration,
+    AlertSeverity
+
+// ---------------------------------------------------------------------------
+// Rule 2: Impossible Travel Detection
+// MITRE: T1078 - Valid Accounts
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let timeRange = 14d;
+let impossibleTravelThreshold = 500;  // km
+let timeThreshold = 60m;  // minimum time between logins
+SigninLogs
+| where TimeGenerated >= ago(timeRange)
+| where ResultType == "0"  // Successful sign-ins only
+| extend
+    Latitude = toreal(parse_json(tostring(LocationDetails.geoCoordinates)).latitude),
+    Longitude = toreal(parse_json(tostring(LocationDetails.geoCoordinates)).longitude),
+    City = tostring(LocationDetails.city),
+    Country = tostring(LocationDetails.countryOrRegion)
+| where isnotempty(Latitude) and isnotempty(Longitude)
+| sort by UserPrincipalName asc, TimeGenerated asc
+| serialize
+| extend
+    PrevLatitude = prev(Latitude),
+    PrevLongitude = prev(Longitude),
+    PrevTime = prev(TimeGenerated),
+    PrevCity = prev(City),
+    PrevCountry = prev(Country),
+    PrevUser = prev(UserPrincipalName)
+| where UserPrincipalName == PrevUser
+| extend
+    TimeDiffMinutes = datetime_diff('minute', TimeGenerated, PrevTime),
+    // Haversine distance calculation (approximate)
+    DistanceKm = 6371 * acos(
+        sin(radians(Latitude)) * sin(radians(PrevLatitude)) +
+        cos(radians(Latitude)) * cos(radians(PrevLatitude)) *
+        cos(radians(PrevLongitude - Longitude))
+    )
+| where DistanceKm > impossibleTravelThreshold
+| where TimeDiffMinutes < todouble(DistanceKm) / 15  // Faster than ~900 km/h
+| project
+    TimeGenerated,
+    AlertName = "Impossible Travel Detected",
+    UserPrincipalName,
+    PreviousLocation = strcat(PrevCity, ", ", PrevCountry),
+    CurrentLocation = strcat(City, ", ", Country),
+    DistanceKm = round(DistanceKm, 0),
+    TimeDiffMinutes,
+    IPAddress
+
+// ---------------------------------------------------------------------------
+// Rule 3: MFA Fatigue / Push Spam Attack
+// MITRE: T1621 - Multi-Factor Authentication Request Generation
+// Severity: High
+// ---------------------------------------------------------------------------
+let mfaThreshold = 5;
+let timeWindow = 10m;
+SigninLogs
+| where TimeGenerated >= ago(1d)
+| where ResultType == "500121"  // MFA denied
+    or (ResultType == "0" and AuthenticationRequirement == "multiFactorAuthentication")
+| summarize
+    MFADenials = countif(ResultType == "500121"),
+    MFASuccesses = countif(ResultType == "0"),
+    TotalAttempts = count(),
+    IPAddresses = make_set(IPAddress, 5),
+    FirstAttempt = min(TimeGenerated),
+    LastAttempt = max(TimeGenerated)
+    by UserPrincipalName, bin(TimeGenerated, timeWindow)
+| where MFADenials >= mfaThreshold
+| extend
+    PossibleBypass = iff(MFASuccesses > 0 and MFADenials >= mfaThreshold, true, false)
+| project
+    TimeGenerated = LastAttempt,
+    AlertName = "MFA Fatigue Attack Detected",
+    UserPrincipalName,
+    MFADenials,
+    MFASuccesses,
+    PossibleBypass,
+    IPAddresses,
+    Duration = LastAttempt - FirstAttempt
+
+// ---------------------------------------------------------------------------
+// Rule 4: Suspicious Service Principal Activity
+// MITRE: T1078.004 - Valid Accounts: Cloud Accounts
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let baselineWindow = 14d;
+let detectionWindow = 1d;
+let anomalyThreshold = 3.0;  // Standard deviations
+let baseline = AADServicePrincipalSignInLogs
+| where TimeGenerated between (ago(baselineWindow) .. ago(detectionWindow))
+| summarize
+    AvgDaily = count() / todouble(baselineWindow / 1d),
+    StdDev = stdev(todouble(1))
+    by ServicePrincipalId, ServicePrincipalName;
+AADServicePrincipalSignInLogs
+| where TimeGenerated >= ago(detectionWindow)
+| summarize
+    CurrentCount = count(),
+    UniqueResources = dcount(ResourceDisplayName),
+    ResourcesList = make_set(ResourceDisplayName, 10),
+    IPAddresses = make_set(IPAddress, 5)
+    by ServicePrincipalId, ServicePrincipalName
+| join kind=inner baseline on ServicePrincipalId
+| where CurrentCount > (AvgDaily + anomalyThreshold * StdDev)
+| project
+    TimeGenerated = now(),
+    AlertName = "Anomalous Service Principal Activity",
+    ServicePrincipalName,
+    CurrentCount,
+    BaselineAvg = round(AvgDaily, 1),
+    UniqueResources,
+    ResourcesList,
+    IPAddresses
+
+// ---------------------------------------------------------------------------
+// Rule 5: Password Spray Detection
+// MITRE: T1110.003 - Brute Force: Password Spraying
+// Severity: High
+// ---------------------------------------------------------------------------
+let timeWindow = 30m;
+let authFailThreshold = 20;
+let uniqueAccountThreshold = 10;
+let successThreshold = 1;
+SigninLogs
+| where TimeGenerated >= ago(1d)
+| extend FailureOrSuccess = iff(ResultType == "0", "Success", "Failure")
+| summarize
+    FailureCount = countif(FailureOrSuccess == "Failure"),
+    SuccessCount = countif(FailureOrSuccess == "Success"),
+    UniqueAccounts = dcount(UserPrincipalName),
+    UniqueApps = dcount(AppDisplayName),
+    TargetAccounts = make_set(UserPrincipalName, 20),
+    SuccessAccounts = make_set_if(UserPrincipalName, FailureOrSuccess == "Success", 5)
+    by IPAddress, bin(TimeGenerated, timeWindow)
+| where FailureCount >= authFailThreshold
+    and UniqueAccounts >= uniqueAccountThreshold
+    and SuccessCount >= successThreshold  // At least one success = compromised credential
+| project
+    TimeGenerated,
+    AlertName = "Password Spray Attack with Successful Login",
+    IPAddress,
+    FailureCount,
+    SuccessCount,
+    UniqueAccounts,
+    TargetAccounts,
+    CompromisedAccounts = SuccessAccounts
+
+// ---------------------------------------------------------------------------
+// Rule 6: Privileged Role Assignment Outside PIM
+// MITRE: T1098 - Account Manipulation
+// Severity: High
+// ---------------------------------------------------------------------------
+let privilegedRoles = dynamic([
+    "Global Administrator", "Privileged Role Administrator",
+    "Security Administrator", "Exchange Administrator",
+    "SharePoint Administrator", "User Access Administrator"
+]);
+AuditLogs
+| where TimeGenerated >= ago(1d)
+| where OperationName has_any ("Add member to role", "Add eligible member to role")
+| extend
+    TargetUser = tostring(TargetResources[0].userPrincipalName),
+    RoleName = tostring(TargetResources[0].displayName),
+    InitiatedBy = tostring(InitiatedBy.user.userPrincipalName),
+    InitiatedByApp = tostring(InitiatedBy.app.displayName)
+| where RoleName in (privilegedRoles)
+| where InitiatedBy !has "PIM"  // Not through Privileged Identity Management
+| project
+    TimeGenerated,
+    AlertName = "Privileged Role Assignment Outside PIM",
+    TargetUser,
+    RoleName,
+    InitiatedBy = iff(isempty(InitiatedBy), InitiatedByApp, InitiatedBy),
+    CorrelationId

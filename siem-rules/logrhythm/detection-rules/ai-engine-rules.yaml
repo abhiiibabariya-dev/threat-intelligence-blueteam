@@ -1,0 +1,163 @@
+# LogRhythm AI Engine Detection Rules
+# Covers statistical, behavioral, threshold, unique values, and trend rule types
+---
+rules:
+  - rule_name: "LR-AIE-001: Brute Force Authentication"
+    rule_type: threshold
+    description: "Multiple failed logins from same source exceeding threshold"
+    severity: high
+    risk_rating: 8
+    common_event: "Authentication Failure"
+    log_source_type: [Windows Event Log, Linux Syslog, VPN]
+    filter:
+      classification: "Authentication Failure"
+      direction: any
+    threshold:
+      count: 10
+      time_window_seconds: 300
+      group_by: [origin_host_name]
+      reset_on_success: true
+    actions: [create_alarm, add_to_list: "Brute Force Sources", smartresponse: "Block IP"]
+
+  - rule_name: "LR-AIE-002: Password Spray Detection"
+    rule_type: unique_values
+    description: "Single source targeting multiple unique accounts with failed logins"
+    severity: high
+    risk_rating: 9
+    common_event: "Authentication Failure"
+    filter:
+      classification: "Authentication Failure"
+    unique_values:
+      field: login
+      minimum_unique: 5
+      time_window_seconds: 600
+      group_by: [origin_host_name]
+    actions: [create_alarm, send_notification: "SOC-L2"]
+
+  - rule_name: "LR-AIE-003: Lateral Movement Chain"
+    rule_type: statistical
+    description: "Host authenticating to abnormal number of remote hosts"
+    severity: high
+    risk_rating: 8
+    common_event: "Authentication Success"
+    filter:
+      classification: "Authentication Success"
+      direction: "Local to Remote"
+    statistical:
+      field: impacted_host_name
+      calculation: distinct_count
+      time_window_seconds: 3600
+      standard_deviations: 3
+      minimum_baseline_events: 100
+      group_by: [origin_host_name]
+    actions: [create_alarm, add_to_case: "Lateral Movement Investigation"]
+
+  - rule_name: "LR-AIE-004: Data Exfiltration Volume Anomaly"
+    rule_type: statistical
+    description: "Anomalous outbound data transfer volume from host"
+    severity: high
+    risk_rating: 8
+    common_event: "Network Traffic"
+    filter:
+      direction: "Local to Remote"
+      protocol: [TCP, UDP]
+    statistical:
+      field: bytes_out
+      calculation: sum
+      time_window_seconds: 3600
+      standard_deviations: 4
+      minimum_baseline_events: 500
+      group_by: [origin_host_name]
+    actions: [create_alarm, smartresponse: "Capture Traffic"]
+
+  - rule_name: "LR-AIE-005: Credential Dumping Activity"
+    rule_type: threshold
+    description: "LSASS memory access or credential dump tool execution"
+    severity: critical
+    risk_rating: 10
+    common_event: "Process Creation"
+    filter:
+      process: ["mimikatz", "procdump", "comsvcs"]
+      command_contains_any: ["sekurlsa", "lsass", "comsvcs.dll", "MiniDump"]
+    threshold:
+      count: 1
+      time_window_seconds: 60
+    actions: [create_alarm, smartresponse: "Isolate Host", send_notification: "SOC-L3"]
+
+  - rule_name: "LR-AIE-006: Off-Hours Activity Trend"
+    rule_type: trend
+    description: "Increasing trend of activity during non-business hours"
+    severity: medium
+    risk_rating: 6
+    common_event: "Any"
+    filter:
+      time_of_day: "outside_business_hours"
+      classification: ["Authentication Success", "Resource Access"]
+    trend:
+      direction: increasing
+      time_window_days: 7
+      comparison_window_days: 30
+      minimum_increase_percent: 200
+      group_by: [login]
+    actions: [create_alarm, add_to_list: "Off-Hours Watch"]
+
+  - rule_name: "LR-AIE-007: Privilege Escalation Sequence"
+    rule_type: behavioral
+    description: "User account elevation followed by unusual resource access"
+    severity: high
+    risk_rating: 8
+    common_event: "Multiple"
+    behavioral_sequence:
+      - step: 1
+        classification: "Privilege Elevation"
+        time_window_seconds: 0
+      - step: 2
+        classification: "Resource Access"
+        filter: {resource_type: "sensitive"}
+        time_after_previous_seconds: 1800
+    group_by: [login]
+    actions: [create_alarm, add_to_case: "Privilege Abuse"]
+
+  - rule_name: "LR-AIE-008: Ransomware File Encryption"
+    rule_type: threshold
+    description: "Rapid file modifications with known ransomware extensions"
+    severity: critical
+    risk_rating: 10
+    common_event: "File Modification"
+    filter:
+      object_name_regex: "\\.(encrypted|locked|crypt|enc|crypted|cry|crypto)$"
+    threshold:
+      count: 20
+      time_window_seconds: 60
+      group_by: [origin_host_name]
+    actions: [create_alarm, smartresponse: "Isolate Host", smartresponse: "Kill Process", send_notification: "IR Team"]
+
+  - rule_name: "LR-AIE-009: DNS Tunneling Detection"
+    rule_type: statistical
+    description: "Anomalous DNS query patterns indicating tunneling"
+    severity: high
+    risk_rating: 8
+    common_event: "DNS Query"
+    filter:
+      protocol: DNS
+    statistical:
+      field: query_length
+      calculation: average
+      time_window_seconds: 3600
+      standard_deviations: 3
+      group_by: [origin_host_name]
+    actions: [create_alarm, smartresponse: "Block DNS Domain"]
+
+  - rule_name: "LR-AIE-010: Multiple Security Tool Disabled"
+    rule_type: threshold
+    description: "Multiple security tools stopped or disabled in short window"
+    severity: critical
+    risk_rating: 10
+    common_event: "Service Stop"
+    filter:
+      service_name_regex: "(WinDefend|MsMpSvc|Sysmon|CrowdStrike|Tanium|CarbonBlack|SentinelOne)"
+    threshold:
+      count: 2
+      time_window_seconds: 300
+      group_by: [origin_host_name]
+    actions: [create_alarm, send_notification: "SOC-L3", smartresponse: "Restart Services"]

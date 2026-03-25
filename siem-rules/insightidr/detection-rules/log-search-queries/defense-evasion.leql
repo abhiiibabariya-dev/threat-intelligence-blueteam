@@ -1,0 +1,26 @@
+// InsightIDR LEQL Queries - Defense Evasion (TA0005)
+
+// IDR-DE-001: Event Log Cleared (T1070.001)
+where(event_id = 1102)
+groupby(host, account)
+calculate(count)
+
+// IDR-DE-002: Defender Disabled (T1562.001)
+where(command_line ICONTAINS-ANY ["Set-MpPreference", "DisableRealtimeMonitoring", "sc stop WinDefend", "DisableAntiSpyware"])
+groupby(host, account, command_line)
+calculate(count)
+
+// IDR-DE-003: Process Masquerading (T1036.005)
+where(process_name IN ["svchost.exe", "csrss.exe", "lsass.exe", "explorer.exe"] AND process_path INOTCONTAINS "\\Windows\\System32\\")
+groupby(host, process_name, process_path)
+calculate(count)
+
+// IDR-DE-004: AMSI Bypass (T1562.001)
+where(command_line ICONTAINS-ANY ["amsiInitFailed", "AmsiUtils", "amsiContext"])
+groupby(host, account, command_line)
+calculate(count)
+
+// IDR-DE-005: Firewall Disabled (T1562.004)
+where(command_line ICONTAINS-ANY ["netsh advfirewall set", "state off", "Set-NetFirewallProfile", "-Enabled False"])
+groupby(host, account, command_line)
+calculate(count)

@@ -1,0 +1,34 @@
+# Securonix Spotter Queries - Execution
+# MITRE ATT&CK Tactic: TA0002
+
+# SQ-EXE-001: Encoded PowerShell (T1059.001)
+index = activity AND categoryobject = "Process" AND sourceprocessname = "powershell.exe"
+| where resourcecustomfield2 MATCHES ".*-[eE][nN][cC].*"
+| fields datetime, accountname, devicename, resourcecustomfield2
+
+# SQ-EXE-002: Office Macro Spawning Shell (T1204.002)
+index = activity AND categoryobject = "Process" AND categoryoutcome = "Created"
+| where resourcecustomfield3 IN ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe")
+| where objectname IN ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe")
+| fields datetime, accountname, devicename, resourcecustomfield3, objectname, resourcecustomfield2
+
+# SQ-EXE-003: LOLBAS Download (T1105)
+index = activity AND categoryobject = "Process"
+| where sourceprocessname IN ("certutil.exe", "bitsadmin.exe") AND resourcecustomfield2 CONTAINS "http"
+| fields datetime, accountname, devicename, sourceprocessname, resourcecustomfield2
+
+# SQ-EXE-004: Mshta Execution (T1218.005)
+index = activity AND categoryobject = "Process" AND sourceprocessname = "mshta.exe"
+| where resourcecustomfield2 MATCHES ".*(http|javascript|vbscript).*"
+| fields datetime, accountname, devicename, resourcecustomfield2
+
+# SQ-EXE-005: Regsvr32 Proxy Execution (T1218.010)
+index = activity AND categoryobject = "Process" AND sourceprocessname = "regsvr32.exe"
+| where resourcecustomfield2 MATCHES ".*(scrobj|/i:|/n /s /u).*"
+| fields datetime, accountname, devicename, resourcecustomfield2
+
+# SQ-EXE-006: Suspicious Script Execution (T1059.005)
+index = activity AND categoryobject = "Process"
+| where sourceprocessname IN ("wscript.exe", "cscript.exe")
+| where resourcecustomfield2 MATCHES ".*(\\\\temp\\\\|\\\\appdata\\\\|\\\\downloads\\\\).*"
+| fields datetime, accountname, devicename, resourcecustomfield2

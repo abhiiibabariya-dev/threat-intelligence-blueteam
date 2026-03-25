@@ -1,0 +1,108 @@
+` ===================================================================
+` Splunk Detection Rules: Defense Evasion
+` ===================================================================
+` MITRE ATT&CK: T1055 (Process Injection), T1036 (Masquerading),
+`               T1070 (Indicator Removal), T1562 (Impair Defenses)
+` Severity:     Medium to Critical
+` Data Sources: Sysmon, Windows Security, EDR
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Rule 1: Process Injection Detection
+` MITRE: T1055 - Process Injection
+` ---------------------------------------------------------------------------
+index=sysmon (EventCode=8 OR EventCode=10)
+| eval InjectionType=case(
+    EventCode=8, "CreateRemoteThread",
+    EventCode=10 AND GrantedAccess IN ("0x1F0FFF", "0x1FFFFF", "0x143A"), "ProcessAccess_FullControl",
+    1=1, "Other"
+)
+| where TargetImage IN ("*\\lsass.exe", "*\\svchost.exe", "*\\explorer.exe",
+    "*\\winlogon.exe", "*\\csrss.exe", "*\\services.exe")
+| where SourceImage != TargetImage
+| where NOT match(SourceImage, "(?i)(MsMpEng|csrss|lsass|services)")
+| stats count as InjectionCount,
+        values(TargetImage) as TargetProcesses,
+        values(InjectionType) as Types
+    by SourceImage, Computer, User
+| eval AlertName="Process Injection Detected"
+| eval Severity="High"
+| eval MITREAttack="T1055"
+
+` ---------------------------------------------------------------------------
+` Rule 2: Masquerading - Process Name Spoofing
+` MITRE: T1036.005 - Match Legitimate Name or Location
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+| eval expected_path=case(
+    Image="*\\svchost.exe", "C:\\Windows\\System32\\svchost.exe",
+    Image="*\\lsass.exe", "C:\\Windows\\System32\\lsass.exe",
+    Image="*\\csrss.exe", "C:\\Windows\\System32\\csrss.exe",
+    Image="*\\services.exe", "C:\\Windows\\System32\\services.exe",
+    Image="*\\smss.exe", "C:\\Windows\\System32\\smss.exe",
+    Image="*\\explorer.exe", "C:\\Windows\\explorer.exe"
+)
+| where isnotnull(expected_path)
+| where Image != expected_path
+| eval AlertName="Process Masquerading - Wrong Path"
+| eval Severity="High"
+| eval MITREAttack="T1036.005"
+| table _time, Computer, User, Image, expected_path, ParentImage, CommandLine, AlertName, Severity
+
+` ---------------------------------------------------------------------------
+` Rule 3: Indicator Removal - Event Log Clearing
+` MITRE: T1070.001 - Clear Windows Event Logs
+` ---------------------------------------------------------------------------
+index=wineventlog (sourcetype=WinEventLog:Security EventCode=1102)
+    OR (sourcetype=WinEventLog:System EventCode=104)
+| eval ClearedLog=case(
+    EventCode=1102, "Security",
+    EventCode=104, LogName
+)
+| stats count as ClearEvents,
+        values(ClearedLog) as LogsCleared
+    by ComputerName, SubjectUserName
+| eval AlertName="Windows Event Log Cleared"
+| eval Severity="High"
+| eval MITREAttack="T1070.001"
+
+` ---------------------------------------------------------------------------
+` Rule 4: AMSI Bypass Detection
+` MITRE: T1562.001 - Impair Defenses: Disable or Modify Tools
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+    (CommandLine="*AmsiUtils*" OR CommandLine="*amsiInitFailed*"
+    OR CommandLine="*AmsiScanBuffer*" OR CommandLine="*SetProtectedState*"
+    OR CommandLine="*Disable-WindowsOptionalFeature*AMSI*")
+| stats count by Computer, User, Image, CommandLine, ParentImage
+| eval AlertName="AMSI Bypass Attempt"
+| eval Severity="Critical"
+| eval MITREAttack="T1562.001"
+
+` ---------------------------------------------------------------------------
+` Rule 5: Timestomping Detection
+` MITRE: T1070.006 - Indicator Removal: Timestomp
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=2
+| where TargetFilename="*\\Windows\\*" OR TargetFilename="*\\System32\\*"
+| where NOT match(Image, "(?i)(TrustedInstaller|TiWorker|msiexec|svchost)")
+| eval AlertName="File Timestamp Modified (Timestomping)"
+| eval Severity="Medium"
+| eval MITREAttack="T1070.006"
+
+` ---------------------------------------------------------------------------
+` Rule 6: Windows Defender Disabled/Tampered
+` MITRE: T1562.001 - Impair Defenses
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:System
+    (EventCode=7036 ServiceName="Windows Defender*" Message="*stopped*")
+    OR (EventCode=7040 ServiceName="Windows Defender*")
+| append [
+    search index=sysmon EventCode=13
+        TargetObject="*\\Windows Defender\\DisableAntiSpyware*"
+        Details="DWORD (0x00000001)"
+]
+| eval AlertName="Windows Defender Tampered"
+| eval Severity="Critical"
+| eval MITREAttack="T1562.001"
+| stats count by Computer, AlertName, Severity, MITREAttack

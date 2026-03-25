@@ -1,0 +1,150 @@
+// =============================================================================
+// Google Chronicle SIEM - YARA-L 2.0 Rules: Network Threats
+// =============================================================================
+// MITRE ATT&CK: T1071 (Application Layer Protocol), T1572 (Protocol Tunneling)
+// =============================================================================
+
+rule c2_beaconing_detection {
+  meta:
+    author = "Blue Team"
+    description = "Detects regular-interval network connections suggesting C2 beaconing"
+    mitre_attack = "T1071"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $conn.metadata.event_type = "NETWORK_CONNECTION"
+    $conn.target.ip_is_internal = false
+    $conn.target.port = 443 or $conn.target.port = 80 or
+    $conn.target.port = 8080 or $conn.target.port = 8443
+    $conn.principal.hostname = $hostname
+    $conn.target.ip = $dest_ip
+
+  match:
+    $hostname, $dest_ip over 24h
+
+  outcome:
+    $risk_score = 70
+    $connection_count = count($conn.metadata.id)
+    $unique_ports = count_distinct($conn.target.port)
+
+  condition:
+    $conn and $connection_count > 30
+}
+
+rule dns_tunneling_detection {
+  meta:
+    author = "Blue Team"
+    description = "Detects DNS tunneling via long subdomain queries"
+    mitre_attack = "T1572"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $dns.metadata.event_type = "NETWORK_DNS"
+    re.regex($dns.network.dns.questions.name, `^[a-zA-Z0-9]{30,}\.`) = true
+    $dns.principal.ip = $src_ip
+    $dns.network.dns.questions.name = $query
+
+  match:
+    $src_ip over 1h
+
+  outcome:
+    $risk_score = 80
+    $query_count = count($dns.metadata.id)
+    $unique_queries = count_distinct($query)
+
+  condition:
+    $dns and $query_count > 100 and $unique_queries > 50
+}
+
+rule tor_network_communication {
+  meta:
+    author = "Blue Team"
+    description = "Detects communication with TOR network nodes"
+    mitre_attack = "T1090.003"
+    severity = "MEDIUM"
+    priority = "MEDIUM"
+
+  events:
+    $conn.metadata.event_type = "NETWORK_CONNECTION"
+    (
+      $conn.target.port = 9001 or
+      $conn.target.port = 9030 or
+      $conn.target.port = 9050 or
+      $conn.target.port = 9051 or
+      $conn.target.port = 9150
+    )
+    $conn.target.ip_is_internal = false
+    $conn.principal.hostname = $hostname
+
+  match:
+    $hostname over 1h
+
+  outcome:
+    $risk_score = 65
+    $connection_count = count($conn.metadata.id)
+    $dest_ips = array_distinct($conn.target.ip)
+
+  condition:
+    $conn
+}
+
+rule encrypted_traffic_nonstandard_port {
+  meta:
+    author = "Blue Team"
+    description = "Detects TLS/SSL traffic on non-standard ports"
+    mitre_attack = "T1573"
+    severity = "MEDIUM"
+    priority = "LOW"
+
+  events:
+    $conn.metadata.event_type = "NETWORK_CONNECTION"
+    $conn.network.application_protocol = "SSL" or $conn.network.application_protocol = "TLS"
+    $conn.target.port != 443
+    $conn.target.port != 8443
+    $conn.target.port != 993
+    $conn.target.port != 995
+    $conn.target.port != 465
+    $conn.target.ip_is_internal = false
+    $conn.principal.hostname = $hostname
+
+  match:
+    $hostname over 1h
+
+  outcome:
+    $risk_score = 50
+    $connection_count = count($conn.metadata.id)
+    $ports_used = array_distinct($conn.target.port)
+
+  condition:
+    $conn and $connection_count > 10
+}
+
+rule port_scanning_detection {
+  meta:
+    author = "Blue Team"
+    description = "Detects internal network port scanning"
+    mitre_attack = "T1046"
+    severity = "MEDIUM"
+    priority = "MEDIUM"
+
+  events:
+    $scan.metadata.event_type = "NETWORK_CONNECTION"
+    $scan.target.ip_is_internal = true
+    $scan.principal.ip = $src_ip
+    $scan.target.port = $port
+    $scan.target.ip = $dest_ip
+
+  match:
+    $src_ip over 5m
+
+  outcome:
+    $risk_score = 60
+    $unique_ports = count_distinct($port)
+    $unique_hosts = count_distinct($dest_ip)
+    $total_connections = count($scan.metadata.id)
+
+  condition:
+    $scan and ($unique_ports > 20 or $unique_hosts > 15)
+}

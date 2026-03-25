@@ -1,0 +1,101 @@
+` ===================================================================
+` Splunk Detection Rules: Initial Access
+` ===================================================================
+` MITRE ATT&CK: T1566 (Phishing), T1190 (Exploit Public-Facing App),
+`               T1189 (Drive-by Compromise)
+` Severity:     Medium to Critical
+` Data Sources: Email, Web Proxy, IDS/IPS, Endpoint
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Rule 1: Phishing - Malicious Attachment Delivery
+` MITRE: T1566.001 - Phishing: Spearphishing Attachment
+` ---------------------------------------------------------------------------
+index=email sourcetype=mail
+| where attachment_count > 0
+| eval suspicious_ext=if(match(attachment_name, "\.(exe|scr|bat|cmd|ps1|vbs|js|hta|wsf|lnk|iso|img|vhd)$"), 1, 0)
+| eval double_ext=if(match(attachment_name, "\.\w+\.(exe|scr|bat|cmd|ps1|vbs|js)$"), 1, 0)
+| eval password_protected=if(match(body, "(?i)(password|passcode|pwd).{0,20}(is|:)\s*\w+"), 1, 0)
+| where suspicious_ext=1 OR double_ext=1
+| stats count as DeliveryCount,
+        dc(recipient) as TargetCount,
+        values(recipient) as Targets,
+        values(attachment_name) as Attachments,
+        values(sender) as Senders
+    by sender_domain
+| eval AlertName="Phishing - Suspicious Attachment Detected"
+| eval Severity=case(DeliveryCount > 10, "Critical", double_ext=1, "High", 1=1, "Medium")
+| eval MITREAttack="T1566.001"
+
+` ---------------------------------------------------------------------------
+` Rule 2: Phishing - Suspicious Link Delivery
+` MITRE: T1566.002 - Phishing: Spearphishing Link
+` ---------------------------------------------------------------------------
+index=email sourcetype=mail
+| rex field=body "(?i)(https?://[^\s\"'<>]+)" max_match=10
+| mvexpand body
+| eval url=body
+| where NOT match(url, "(?i)(microsoft\.com|google\.com|office\.com|yourdomain\.com)")
+| where match(url, "(?i)(login|signin|verify|secure|update|confirm|account|banking)")
+| stats count as PhishingLinks,
+        dc(recipient) as TargetCount,
+        values(url) as SuspiciousURLs
+    by sender, sender_domain
+| where PhishingLinks >= 1
+| eval AlertName="Phishing - Suspicious URL in Email"
+| eval Severity="High"
+| eval MITREAttack="T1566.002"
+
+` ---------------------------------------------------------------------------
+` Rule 3: Exploitation of Public-Facing Application
+` MITRE: T1190
+` ---------------------------------------------------------------------------
+index=web sourcetype=access_combined
+| where status >= 400
+| eval attack_pattern=case(
+    match(uri, "(?i)(union\s+select|or\s+1=1|'\s*or\s*'|--\s*$)"), "SQL Injection",
+    match(uri, "(?i)(<script|javascript:|onerror=|onload=)"), "XSS",
+    match(uri, "(?i)(\.\./|\.\.\\\\|/etc/passwd|/proc/self)"), "Path Traversal",
+    match(uri, "(?i)(cmd=|exec=|system\(|passthru|shell_exec)"), "Command Injection",
+    match(uri, "(?i)(\.php\?.*=https?://|file=https?://)"), "RFI/LFI",
+    1=1, "Unknown"
+)
+| where attack_pattern != "Unknown"
+| stats count as AttemptCount,
+        dc(uri) as UniquePayloads,
+        values(attack_pattern) as AttackTypes,
+        values(uri) as SamplePayloads,
+        dc(dest) as TargetApps
+    by src_ip
+| where AttemptCount >= 5
+| eval AlertName="Web Application Attack Detected"
+| eval Severity=case(AttemptCount > 50, "Critical", AttemptCount > 20, "High", 1=1, "Medium")
+| eval MITREAttack="T1190"
+
+` ---------------------------------------------------------------------------
+` Rule 4: Drive-by Compromise Indicators
+` MITRE: T1189
+` ---------------------------------------------------------------------------
+index=proxy sourcetype=proxy
+| where http_method="GET"
+| transaction src_ip dest maxspan=30s maxpause=5s
+| where eventcount >= 3
+| eval has_redirect=if(searchmatch("status=30*"), 1, 0)
+| eval has_suspicious_content=if(searchmatch("content_type=\"application/x-*\" OR content_type=\"application/octet-stream\""), 1, 0)
+| where has_redirect=1 AND has_suspicious_content=1
+| eval AlertName="Possible Drive-by Compromise (Redirect Chain + Download)"
+| eval Severity="High"
+| eval MITREAttack="T1189"
+
+` ---------------------------------------------------------------------------
+` Rule 5: Post-Exploitation Initial Callback
+` Correlates web browsing with immediate suspicious process execution
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+| where ParentImage IN ("*\\chrome.exe", "*\\firefox.exe", "*\\msedge.exe", "*\\iexplore.exe")
+| where Image IN ("*\\cmd.exe", "*\\powershell.exe", "*\\wscript.exe",
+    "*\\cscript.exe", "*\\mshta.exe", "*\\rundll32.exe")
+| stats count by Computer, User, Image, CommandLine, ParentImage
+| eval AlertName="Browser-Spawned Suspicious Process (Post-Exploit)"
+| eval Severity="Critical"
+| eval MITREAttack="T1189"

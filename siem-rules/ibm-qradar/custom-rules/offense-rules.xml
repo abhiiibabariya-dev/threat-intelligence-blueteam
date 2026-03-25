@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IBM QRadar Custom Rule Definitions: Offense Generation
+  Purpose: Multi-event correlation rules for automated offense creation
+  Deploy via: Admin > Content Management > Import
+-->
+<custom_rules xmlns="urn:qradar:custom-rules:1.0"
+              version="2.0"
+              export_date="2026-03-24T00:00:00Z">
+
+  <!-- =======================================================================
+       Rule 1: Multi-Stage Credential Attack Correlation
+       Description: Correlates brute force attempts followed by a successful
+         login from the same source, indicating a completed credential attack.
+       MITRE ATT&CK: T1110 (Brute Force) -> T1078 (Valid Accounts)
+       Offense Type: Source IP
+       ======================================================================= -->
+  <custom_rule>
+    <name>Multi-Stage Credential Attack - Brute Force to Successful Login</name>
+    <description>Detects brute force authentication attempts followed by a successful login from the same source IP within 30 minutes. This correlation identifies completed credential compromise sequences where an attacker has successfully guessed or cracked valid credentials.</description>
+    <enabled>true</enabled>
+    <rule_type>EVENT</rule_type>
+    <severity>9</severity>
+    <credibility>8</credibility>
+    <relevance>10</relevance>
+    <offense_mapping>SOURCE_IP</offense_mapping>
+    <groups>
+      <group>Credential Access</group>
+      <group>MITRE ATT&amp;CK T1110</group>
+      <group>MITRE ATT&amp;CK T1078</group>
+    </groups>
+    <rule_conditions>
+      <condition>
+        <test_group operator="AND">
+          <!-- Stage 1: Brute force threshold -->
+          <test>
+            <parameter>category</parameter>
+            <operator>EQUALS</operator>
+            <value>8101</value> <!-- Authentication Failure -->
+          </test>
+          <test>
+            <parameter>eventcount</parameter>
+            <operator>GREATER_THAN</operator>
+            <value>10</value>
+            <time_window>15</time_window>
+            <time_window_unit>MINUTES</time_window_unit>
+            <grouped_by>sourceip</grouped_by>
+          </test>
+        </test_group>
+      </condition>
+      <condition>
+        <!-- Stage 2: Successful authentication from same source -->
+        <test_group operator="AND">
+          <test>
+            <parameter>category</parameter>
+            <operator>EQUALS</operator>
+            <value>8100</value> <!-- Authentication Success -->
+          </test>
+          <test>
+            <parameter>sourceip</parameter>
+            <operator>EQUALS</operator>
+            <value>CORRELATED:sourceip</value>
+          </test>
+          <time_constraint>
+            <after_previous>true</after_previous>
+            <within_minutes>30</within_minutes>
+          </time_constraint>
+        </test_group>
+      </condition>
+    </rule_conditions>
+    <rule_actions>
+      <action type="OFFENSE">
+        <offense_name>Credential Compromise: Brute Force Succeeded from ${sourceip}</offense_name>
+        <close_after_inactive_minutes>60</close_after_inactive_minutes>
+      </action>
+      <action type="NOTIFICATION">
+        <email_group>SOC-Tier1</email_group>
+        <subject>CRITICAL: Brute Force Attack Succeeded - ${sourceip}</subject>
+      </action>
+    </rule_actions>
+  </custom_rule>
+
+  <!-- =======================================================================
+       Rule 2: Lateral Movement Chain Detection
+       Description: Detects a host being accessed via suspicious authentication
+         and then initiating connections to other internal hosts, indicating
+         lateral movement.
+       MITRE ATT&CK: T1021 (Remote Services) + T1550 (Alternate Auth Material)
+       Offense Type: Source IP
+       ======================================================================= -->
+  <custom_rule>
+    <name>Lateral Movement Chain - Compromised Host Pivoting</name>
+    <description>Correlates suspicious inbound authentication to a host followed by that host initiating multiple new connections to other internal systems. Detects post-compromise lateral movement patterns.</description>
+    <enabled>true</enabled>
+    <rule_type>FLOW</rule_type>
+    <severity>8</severity>
+    <credibility>7</credibility>
+    <relevance>9</relevance>
+    <offense_mapping>SOURCE_IP</offense_mapping>
+    <groups>
+      <group>Lateral Movement</group>
+      <group>MITRE ATT&amp;CK T1021</group>
+      <group>MITRE ATT&amp;CK T1550</group>
+    </groups>
+    <rule_conditions>
+      <condition>
+        <!-- Stage 1: Suspicious inbound authentication -->
+        <test_group operator="AND">
+          <test>
+            <parameter>category</parameter>
+            <operator>IN</operator>
+            <value>8100,8101</value> <!-- Auth Success/Failure -->
+          </test>
+          <test>
+            <parameter>EventID</parameter>
+            <operator>IN</operator>
+            <value>4624,4625</value>
+          </test>
+          <test>
+            <parameter>LogonType</parameter>
+            <operator>IN</operator>
+            <value>3,9,10</value> <!-- Network, NewCredentials, RemoteInteractive -->
+          </test>
+        </test_group>
+      </condition>
+      <condition>
+        <!-- Stage 2: Outbound connections from the authenticated host -->
+        <test_group operator="AND">
+          <test>
+            <parameter>sourceip</parameter>
+            <operator>EQUALS</operator>
+            <value>CORRELATED:destinationip</value>
+          </test>
+          <test>
+            <parameter>destinationport</parameter>
+            <operator>IN</operator>
+            <value>135,139,445,3389,5985,5986,22</value>
+          </test>
+          <test>
+            <parameter>flowdirection</parameter>
+            <operator>EQUALS</operator>
+            <value>L2L</value>
+          </test>
+          <test>
+            <parameter>uniquecount:destinationip</parameter>
+            <operator>GREATER_THAN</operator>
+            <value>3</value>
+            <time_window>30</time_window>
+            <time_window_unit>MINUTES</time_window_unit>
+          </test>
+          <time_constraint>
+            <after_previous>true</after_previous>
+            <within_minutes>60</within_minutes>
+          </time_constraint>
+        </test_group>
+      </condition>
+    </rule_conditions>
+    <rule_actions>
+      <action type="OFFENSE">
+        <offense_name>Lateral Movement Detected from ${sourceip}</offense_name>
+        <close_after_inactive_minutes>120</close_after_inactive_minutes>
+      </action>
+      <action type="REFERENCE_DATA">
+        <reference_set>Compromised_Hosts</reference_set>
+        <add_value>${sourceip}</add_value>
+      </action>
+    </rule_actions>
+  </custom_rule>
+
+  <!-- =======================================================================
+       Rule 3: Data Exfiltration Correlation
+       Description: Correlates unusual file access patterns with large
+         outbound data transfers, indicating data staging followed by
+         exfiltration.
+       MITRE ATT&CK: T1074 (Data Staged) + T1048 (Exfiltration Over
+         Alternative Protocol)
+       Offense Type: Source IP
+       ======================================================================= -->
+  <custom_rule>
+    <name>Data Exfiltration - File Access Followed by Large Outbound Transfer</name>
+    <description>Detects a host accessing an abnormally high number of files followed by large outbound data transfers to external destinations. Indicates data staging and exfiltration activity.</description>
+    <enabled>true</enabled>
+    <rule_type>EVENT</rule_type>
+    <severity>9</severity>
+    <credibility>7</credibility>
+    <relevance>10</relevance>
+    <offense_mapping>SOURCE_IP</offense_mapping>
+    <groups>
+      <group>Data Exfiltration</group>
+      <group>MITRE ATT&amp;CK T1074</group>
+      <group>MITRE ATT&amp;CK T1048</group>
+    </groups>
+    <rule_conditions>
+      <condition>
+        <!-- Stage 1: Mass file access -->
+        <test_group operator="AND">
+          <test>
+            <parameter>category</parameter>
+            <operator>EQUALS</operator>
+            <value>10001</value> <!-- File Access -->
+          </test>
+          <test>
+            <parameter>eventcount</parameter>
+            <operator>GREATER_THAN</operator>
+            <value>200</value>
+            <time_window>30</time_window>
+            <time_window_unit>MINUTES</time_window_unit>
+            <grouped_by>sourceip,username</grouped_by>
+          </test>
+        </test_group>
+      </condition>
+      <condition>
+        <!-- Stage 2: Large outbound transfer -->
+        <test_group operator="AND">
+          <test>
+            <parameter>sourceip</parameter>
+            <operator>EQUALS</operator>
+            <value>CORRELATED:sourceip</value>
+          </test>
+          <test>
+            <parameter>flowdirection</parameter>
+            <operator>EQUALS</operator>
+            <value>L2R</value>
+          </test>
+          <test>
+            <parameter>sourcebytes</parameter>
+            <operator>GREATER_THAN</operator>
+            <value>52428800</value> <!-- 50 MB -->
+          </test>
+          <time_constraint>
+            <after_previous>true</after_previous>
+            <within_minutes>120</within_minutes>
+          </time_constraint>
+        </test_group>
+      </condition>
+    </rule_conditions>
+    <rule_actions>
+      <action type="OFFENSE">
+        <offense_name>Potential Data Exfiltration from ${sourceip} by ${username}</offense_name>
+        <close_after_inactive_minutes>240</close_after_inactive_minutes>
+      </action>
+      <action type="NOTIFICATION">
+        <email_group>SOC-Tier2</email_group>
+        <subject>HIGH: Data Exfiltration Suspected - ${sourceip}</subject>
+      </action>
+    </rule_actions>
+  </custom_rule>
+
+  <!-- =======================================================================
+       Rule 4: Privilege Escalation to Persistence Chain
+       Description: Detects privilege escalation events followed by
+         indicators of persistence establishment such as scheduled task
+         creation, service installation, or registry modification.
+       MITRE ATT&CK: T1068 (Exploitation for Privilege Escalation) +
+         T1053 (Scheduled Task/Job) + T1543 (Create or Modify System Process)
+       Offense Type: Username
+       ======================================================================= -->
+  <custom_rule>
+    <name>Privilege Escalation Followed by Persistence Mechanism</name>
+    <description>Correlates privilege escalation indicators with subsequent persistence establishment. Detects an attacker gaining elevated privileges and then creating persistence mechanisms to maintain access.</description>
+    <enabled>true</enabled>
+    <rule_type>EVENT</rule_type>
+    <severity>10</severity>
+    <credibility>8</credibility>
+    <relevance>10</relevance>
+    <offense_mapping>USERNAME</offense_mapping>
+    <groups>
+      <group>Privilege Escalation</group>
+      <group>Persistence</group>
+      <group>MITRE ATT&amp;CK T1068</group>
+      <group>MITRE ATT&amp;CK T1053</group>
+      <group>MITRE ATT&amp;CK T1543</group>
+    </groups>
+    <rule_conditions>
+      <condition>
+        <!-- Stage 1: Privilege escalation indicator -->
+        <test_group operator="OR">
+          <test>
+            <parameter>EventID</parameter>
+            <operator>EQUALS</operator>
+            <value>4672</value> <!-- Special privileges assigned to new logon -->
+          </test>
+          <test>
+            <parameter>EventID</parameter>
+            <operator>IN</operator>
+            <value>4728,4732,4756</value> <!-- Added to privileged group -->
+          </test>
+        </test_group>
+      </condition>
+      <condition>
+        <!-- Stage 2: Persistence mechanism creation -->
+        <test_group operator="OR">
+          <test>
+            <parameter>EventID</parameter>
+            <operator>EQUALS</operator>
+            <value>4698</value> <!-- Scheduled task created -->
+          </test>
+          <test>
+            <parameter>EventID</parameter>
+            <operator>EQUALS</operator>
+            <value>7045</value> <!-- Service installed -->
+          </test>
+          <test>
+            <parameter>EventID</parameter>
+            <operator>EQUALS</operator>
+            <value>13</value> <!-- Sysmon: Registry value set (Run keys) -->
+          </test>
+          <time_constraint>
+            <after_previous>true</after_previous>
+            <within_minutes>60</within_minutes>
+          </time_constraint>
+          <test>
+            <parameter>username</parameter>
+            <operator>EQUALS</operator>
+            <value>CORRELATED:username</value>
+          </test>
+        </test_group>
+      </condition>
+    </rule_conditions>
+    <rule_actions>
+      <action type="OFFENSE">
+        <offense_name>Privilege Escalation + Persistence by ${username} on ${sourceip}</offense_name>
+        <close_after_inactive_minutes>180</close_after_inactive_minutes>
+      </action>
+      <action type="NOTIFICATION">
+        <email_group>SOC-Tier2</email_group>
+        <subject>CRITICAL: PrivEsc + Persistence Chain - ${username}</subject>
+      </action>
+      <action type="REFERENCE_DATA">
+        <reference_set>Suspect_Users</reference_set>
+        <add_value>${username}</add_value>
+      </action>
+    </rule_actions>
+  </custom_rule>
+
+  <!-- =======================================================================
+       Rule 5: Reconnaissance to Exploitation Sequence
+       Description: Correlates network scanning activity from a host
+         followed by exploitation attempts against discovered services,
+         detecting the full attack chain from discovery to initial access.
+       MITRE ATT&CK: T1046 (Network Service Scanning) + T1190
+         (Exploit Public-Facing Application)
+       Offense Type: Source IP
+       ======================================================================= -->
+  <custom_rule>
+    <name>Recon-to-Exploit Attack Chain</name>
+    <description>Detects a host performing network reconnaissance (port scanning or service enumeration) followed by exploitation attempts against discovered services. Identifies the full kill-chain progression from discovery to exploitation.</description>
+    <enabled>true</enabled>
+    <rule_type>FLOW</rule_type>
+    <severity>8</severity>
+    <credibility>7</credibility>
+    <relevance>9</relevance>
+    <offense_mapping>SOURCE_IP</offense_mapping>
+    <groups>
+      <group>Discovery</group>
+      <group>Initial Access</group>
+      <group>MITRE ATT&amp;CK T1046</group>
+      <group>MITRE ATT&amp;CK T1190</group>
+    </groups>
+    <rule_conditions>
+      <condition>
+        <!-- Stage 1: Port scanning / service enumeration -->
+        <test_group operator="AND">
+          <test>
+            <parameter>flowdirection</parameter>
+            <operator>IN</operator>
+            <value>L2R,L2L</value>
+          </test>
+          <test>
+            <parameter>uniquecount:destinationport</parameter>
+            <operator>GREATER_THAN</operator>
+            <value>20</value>
+            <time_window>10</time_window>
+            <time_window_unit>MINUTES</time_window_unit>
+            <grouped_by>sourceip,destinationip</grouped_by>
+          </test>
+          <test>
+            <parameter>destinationbytes</parameter>
+            <operator>EQUALS</operator>
+            <value>0</value>
+          </test>
+        </test_group>
+      </condition>
+      <condition>
+        <!-- Stage 2: IDS/IPS exploit signature triggered -->
+        <test_group operator="AND">
+          <test>
+            <parameter>sourceip</parameter>
+            <operator>EQUALS</operator>
+            <value>CORRELATED:sourceip</value>
+          </test>
+          <test>
+            <parameter>category</parameter>
+            <operator>IN</operator>
+            <value>13001,13002,13003</value> <!-- Exploit, Attack, Suspicious -->
+          </test>
+          <time_constraint>
+            <after_previous>true</after_previous>
+            <within_minutes>60</within_minutes>
+          </time_constraint>
+        </test_group>
+      </condition>
+    </rule_conditions>
+    <rule_actions>
+      <action type="OFFENSE">
+        <offense_name>Recon-to-Exploit Chain from ${sourceip}</offense_name>
+        <close_after_inactive_minutes>120</close_after_inactive_minutes>
+      </action>
+      <action type="NOTIFICATION">
+        <email_group>SOC-Tier1</email_group>
+        <subject>HIGH: Recon to Exploit Chain Detected - ${sourceip}</subject>
+      </action>
+    </rule_actions>
+  </custom_rule>
+
+</custom_rules>

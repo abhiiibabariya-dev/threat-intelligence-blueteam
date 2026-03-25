@@ -1,0 +1,58 @@
+# LogRhythm - Execution Detection Rules
+---
+rules:
+  - rule_name: "LR-EXE-001: Encoded PowerShell"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1059.001]
+    filter: {process: powershell.exe, command_contains: "-enc"}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, smartresponse: "Decode Base64"]
+
+  - rule_name: "LR-EXE-002: Office Macro Execution"
+    rule_type: threshold
+    severity: critical
+    risk_rating: 9
+    mitre: [T1204.002]
+    filter:
+      parent_process_any: [winword.exe, excel.exe, powerpnt.exe]
+      process_any: [cmd.exe, powershell.exe, wscript.exe, mshta.exe]
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, smartresponse: "Kill Process"]
+
+  - rule_name: "LR-EXE-003: LOLBAS Download"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1105]
+    filter: {process_any: [certutil.exe, bitsadmin.exe], command_contains_any: ["-urlcache", "/transfer", "http"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-EXE-004: Regsvr32 Proxy Execution"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1218.010]
+    filter: {process: regsvr32.exe, command_contains_any: ["scrobj.dll", "/i:", "/n /s /u"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-EXE-005: Mshta Execution"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1218.005]
+    filter: {process: mshta.exe, command_contains_any: ["http", "javascript", "vbscript"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-EXE-006: Linux Reverse Shell"
+    rule_type: threshold
+    severity: critical
+    risk_rating: 10
+    mitre: [T1059.004]
+    filter: {command_contains_any: ["bash -i >& /dev/tcp", "nc -e /bin", "python -c import socket"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, smartresponse: "Isolate Host"]

@@ -1,0 +1,270 @@
+// =============================================================================
+// Microsoft Sentinel - Proactive Threat Hunting Queries
+// =============================================================================
+// Description:  Collection of KQL queries for proactive threat hunting across
+//               process anomalies, network beaconing, persistence, and cred theft.
+// Usage:        Run in Sentinel > Hunting > New Query, or in Log Analytics
+// =============================================================================
+
+// ===========================================================================
+// SECTION 1: PROCESS ANOMALIES
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Hunt 1.1: Rare Process Execution (Baseline Deviation)
+// Purpose: Find processes that have never or rarely been seen before
+// ---------------------------------------------------------------------------
+let lookbackWindow = 30d;
+let detectionWindow = 1d;
+let rarityThreshold = 3;
+let processBaseline = DeviceProcessEvents
+| where TimeGenerated between (ago(lookbackWindow) .. ago(detectionWindow))
+| summarize BaselineCount = count() by FileName
+| where BaselineCount > 10;  // Known processes
+DeviceProcessEvents
+| where TimeGenerated >= ago(detectionWindow)
+| summarize
+    CurrentCount = count(),
+    Devices = make_set(DeviceName, 5),
+    Users = make_set(AccountName, 5),
+    CommandLines = make_set(substring(ProcessCommandLine, 0, 200), 5)
+    by FileName, FolderPath
+| join kind=leftanti processBaseline on FileName
+| where CurrentCount <= rarityThreshold
+| sort by CurrentCount asc
+| project
+    HuntName = "Rare Process Execution",
+    FileName,
+    FolderPath,
+    ExecutionCount = CurrentCount,
+    Devices,
+    Users,
+    CommandLines
+
+// ---------------------------------------------------------------------------
+// Hunt 1.2: Process Execution from Unusual Locations
+// Purpose: Find executables running from non-standard directories
+// ---------------------------------------------------------------------------
+let normalPaths = dynamic([
+    @"C:\Windows\", @"C:\Program Files\", @"C:\Program Files (x86)\",
+    @"C:\ProgramData\Microsoft\"
+]);
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where FolderPath !startswith_cs @"C:\Windows\"
+    and FolderPath !startswith_cs @"C:\Program Files\"
+    and FolderPath !startswith_cs @"C:\Program Files (x86)\"
+| where FolderPath has_any (@"\Temp\", @"\AppData\Local\Temp\",
+    @"\Downloads\", @"\Public\", @"\ProgramData\", @"\Recycle")
+| summarize
+    Count = count(),
+    Devices = dcount(DeviceName),
+    CommandLines = make_set(substring(ProcessCommandLine, 0, 200), 3)
+    by FileName, FolderPath
+| where Count < 10  // Focus on rare occurrences
+| sort by Count asc
+
+// ---------------------------------------------------------------------------
+// Hunt 1.3: Processes with No Parent (Orphaned)
+// Purpose: Identify processes that lost their parent - possible injection
+// ---------------------------------------------------------------------------
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where isempty(InitiatingProcessFileName) or InitiatingProcessFileName == ""
+| where FileName !in~ ("System", "Registry", "smss.exe", "csrss.exe", "wininit.exe")
+| project
+    TimeGenerated,
+    DeviceName,
+    FileName,
+    ProcessCommandLine = substring(ProcessCommandLine, 0, 300),
+    AccountName,
+    ProcessId,
+    FolderPath
+
+// ===========================================================================
+// SECTION 2: NETWORK BEACONING
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Hunt 2.1: Regular Interval Network Connections (Beacon Detection)
+// Purpose: Find periodic outbound connections suggesting C2 beaconing
+// ---------------------------------------------------------------------------
+let minDataPoints = 10;
+DeviceNetworkEvents
+| where TimeGenerated >= ago(24h)
+| where ActionType == "ConnectionSuccess"
+| where RemoteIPType == "Public"
+| sort by DeviceName, RemoteIP, TimeGenerated asc
+| serialize
+| extend
+    PrevTime = prev(TimeGenerated),
+    PrevDevice = prev(DeviceName),
+    PrevIP = prev(RemoteIP)
+| where DeviceName == PrevDevice and RemoteIP == PrevIP
+| extend IntervalMs = datetime_diff('millisecond', TimeGenerated, PrevTime)
+| where IntervalMs between (5000 .. 7200000)  // 5s to 2h
+| summarize
+    Intervals = make_list(IntervalMs),
+    Count = count(),
+    AvgIntervalSec = round(avg(IntervalMs) / 1000.0, 1),
+    StdDevSec = round(stdev(IntervalMs) / 1000.0, 1)
+    by DeviceName, RemoteIP, RemotePort
+| where Count >= minDataPoints
+| extend CoefficientOfVariation = round(StdDevSec / AvgIntervalSec * 100, 1)
+| where CoefficientOfVariation < 20  // Low variation = beaconing
+| sort by CoefficientOfVariation asc
+| project
+    HuntName = "Potential C2 Beacon",
+    DeviceName,
+    RemoteIP,
+    RemotePort,
+    DataPoints = Count,
+    AvgIntervalSec,
+    CoefficientOfVariation
+
+// ---------------------------------------------------------------------------
+// Hunt 2.2: Long-Duration Connections
+// Purpose: Find persistent connections that may indicate C2 tunnels
+// ---------------------------------------------------------------------------
+DeviceNetworkEvents
+| where TimeGenerated >= ago(24h)
+| where RemoteIPType == "Public"
+| summarize
+    ConnectionDuration = max(TimeGenerated) - min(TimeGenerated),
+    DataTransferred = sum(todouble(AdditionalFields.SentBytes) + todouble(AdditionalFields.ReceivedBytes)),
+    ConnectionCount = count()
+    by DeviceName, RemoteIP, RemotePort, InitiatingProcessFileName
+| where ConnectionDuration > 4h
+| where InitiatingProcessFileName !in~ (
+    "Teams.exe", "Outlook.exe", "OneDrive.exe", "chrome.exe",
+    "msedge.exe", "firefox.exe", "svchost.exe"
+)
+| sort by ConnectionDuration desc
+
+// ===========================================================================
+// SECTION 3: PERSISTENCE MECHANISMS
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Hunt 3.1: Registry Autorun Modifications
+// Purpose: Find suspicious autorun registry changes
+// ---------------------------------------------------------------------------
+let autorunKeys = dynamic([
+    @"Run", @"RunOnce", @"RunServices", @"RunServicesOnce",
+    @"Winlogon\Shell", @"Winlogon\Userinit", @"Winlogon\Notify",
+    @"Explorer\ShellExecuteHooks", @"BootExecute"
+]);
+DeviceRegistryEvents
+| where TimeGenerated >= ago(7d)
+| where ActionType in ("RegistryValueSet", "RegistryKeyCreated")
+| where RegistryKey has_any (autorunKeys)
+| extend
+    IsSuspicious = InitiatingProcessFileName !in~ (
+        "explorer.exe", "msiexec.exe", "svchost.exe",
+        "TrustedInstaller.exe", "MsMpEng.exe"
+    )
+| where IsSuspicious
+| project
+    TimeGenerated,
+    DeviceName,
+    RegistryKey,
+    RegistryValueName,
+    RegistryValueData = substring(RegistryValueData, 0, 300),
+    InitiatingProcessFileName,
+    InitiatingProcessAccountName
+
+// ---------------------------------------------------------------------------
+// Hunt 3.2: Newly Created Scheduled Tasks
+// Purpose: Identify potentially malicious scheduled tasks
+// ---------------------------------------------------------------------------
+DeviceProcessEvents
+| where TimeGenerated >= ago(7d)
+| where FileName =~ "schtasks.exe" and ProcessCommandLine has "/create"
+| extend
+    TaskName = extract(@"/tn\s+[""']?([^""'/]+)", 1, ProcessCommandLine),
+    TaskAction = extract(@"/tr\s+[""']?([^""']+)", 1, ProcessCommandLine),
+    Schedule = extract(@"/sc\s+(\w+)", 1, ProcessCommandLine)
+| where TaskAction has_any (
+    "powershell", "cmd", "wscript", "cscript", "mshta",
+    "http", "\\Temp\\", "\\AppData\\", "bypass"
+)
+| project
+    TimeGenerated,
+    DeviceName,
+    AccountName,
+    TaskName,
+    TaskAction = substring(TaskAction, 0, 300),
+    Schedule,
+    FullCommandLine = substring(ProcessCommandLine, 0, 500)
+
+// ===========================================================================
+// SECTION 4: CREDENTIAL THEFT
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Hunt 4.1: LSASS Process Access
+// Purpose: Detect tools accessing LSASS memory for credential dumping
+// ---------------------------------------------------------------------------
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where (FileName =~ "procdump.exe" and ProcessCommandLine has "lsass")
+    or (FileName =~ "rundll32.exe" and ProcessCommandLine has "comsvcs" and ProcessCommandLine has "MiniDump")
+    or (FileName =~ "taskmgr.exe" and ProcessCommandLine has "lsass")
+    or ProcessCommandLine has_any ("sekurlsa", "lsadump", "mimikatz", "kerberos::list")
+| project
+    TimeGenerated,
+    DeviceName,
+    AccountName,
+    FileName,
+    ProcessCommandLine = substring(ProcessCommandLine, 0, 500),
+    InitiatingProcessFileName,
+    FolderPath
+
+// ---------------------------------------------------------------------------
+// Hunt 4.2: Kerberoasting Activity
+// Purpose: Detect potential Kerberoasting (mass SPN requests)
+// ---------------------------------------------------------------------------
+SecurityEvent
+| where TimeGenerated >= ago(1d)
+| where EventID == 4769  // Kerberos service ticket request
+| where TicketEncryptionType in ("0x17", "0x18")  // RC4 encryption (weak, preferred by attackers)
+| where ServiceName !endswith "$"  // Exclude machine accounts
+| where ServiceName !in ("krbtgt")  // Exclude krbtgt
+| summarize
+    TicketCount = count(),
+    UniqueServices = dcount(ServiceName),
+    ServicesList = make_set(ServiceName, 20),
+    ClientAddresses = make_set(IpAddress, 5)
+    by AccountName = TargetUserName, bin(TimeGenerated, 1h)
+| where UniqueServices > 5  // Requesting tickets for many services
+| sort by UniqueServices desc
+| project
+    HuntName = "Potential Kerberoasting",
+    TimeGenerated,
+    AccountName,
+    UniqueServicesRequested = UniqueServices,
+    TotalTickets = TicketCount,
+    ServicesList,
+    ClientAddresses
+
+// ---------------------------------------------------------------------------
+// Hunt 4.3: DCSync Detection
+// Purpose: Detect attempts to replicate AD data (DCSync attack)
+// ---------------------------------------------------------------------------
+SecurityEvent
+| where TimeGenerated >= ago(7d)
+| where EventID == 4662
+| where Properties has_any (
+    "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2",  // DS-Replication-Get-Changes
+    "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",  // DS-Replication-Get-Changes-All
+    "89e95b76-444d-4c62-991a-0facbeda640c"   // DS-Replication-Get-Changes-In-Filtered-Set
+)
+| where SubjectUserName !endswith "$"  // Exclude machine accounts (DCs)
+| project
+    TimeGenerated,
+    HuntName = "Potential DCSync Attack",
+    Computer,
+    SubjectUserName,
+    SubjectDomainName,
+    ObjectName,
+    Properties

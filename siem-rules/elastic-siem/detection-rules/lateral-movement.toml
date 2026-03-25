@@ -1,0 +1,117 @@
+# Elastic SIEM Detection Rules: Lateral Movement
+# MITRE ATT&CK: T1021, T1047, T1550
+
+[rule]
+rule_id = "e1a03001-0001-4000-8000-000000000001"
+risk_score = 73
+severity = "high"
+name = "PsExec Service Installation - Lateral Movement"
+description = "Detects PSEXESVC service creation or named pipe access indicating PsExec lateral movement."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+any where
+  (event.code == "7045" and winlog.event_data.ServiceName : "PSEXESVC") or
+  (event.code == "5145" and winlog.event_data.ShareName : "\\\\*\\IPC$" and winlog.event_data.RelativeTargetName : "PSEXESVC*")
+'''
+tags = ["Lateral Movement", "T1021.002", "T1570"]
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1021"
+name = "Remote Services"
+reference = "https://attack.mitre.org/techniques/T1021/"
+[[rule.threat.technique.subtechnique]]
+id = "T1021.002"
+name = "SMB/Windows Admin Shares"
+reference = "https://attack.mitre.org/techniques/T1021/002/"
+[rule.threat.tactic]
+id = "TA0008"
+name = "Lateral Movement"
+reference = "https://attack.mitre.org/tactics/TA0008/"
+
+[rule_2]
+rule_id = "e1a03001-0002-4000-8000-000000000002"
+risk_score = 70
+severity = "high"
+name = "WMI-Spawned Suspicious Process"
+description = "Detects WMI provider host spawning suspicious child processes indicative of remote WMI execution."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.parent.name : "wmiprvse.exe" and
+  process.name : ("cmd.exe", "powershell.exe", "pwsh.exe", "cscript.exe", "wscript.exe", "mshta.exe", "rundll32.exe", "net.exe", "whoami.exe")
+'''
+tags = ["Lateral Movement", "T1047"]
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+[[rule_2.threat.technique]]
+id = "T1047"
+name = "Windows Management Instrumentation"
+reference = "https://attack.mitre.org/techniques/T1047/"
+[rule_2.threat.tactic]
+id = "TA0008"
+name = "Lateral Movement"
+reference = "https://attack.mitre.org/tactics/TA0008/"
+
+[rule_3]
+rule_id = "e1a03001-0003-4000-8000-000000000003"
+risk_score = 50
+severity = "medium"
+name = "RDP Lateral Movement to Multiple Hosts"
+description = "Detects RDP connections (LogonType 10) from a single user to multiple hosts."
+type = "threshold"
+index = ["winlogbeat-*"]
+language = "kuery"
+query = '''event.code: "4624" and winlog.event_data.LogonType: "10" and not user.name: *$'''
+tags = ["Lateral Movement", "T1021.001"]
+[rule_3.threshold]
+field = ["source.ip"]
+value = 3
+
+[[rule_3.threat]]
+framework = "MITRE ATT&CK"
+[[rule_3.threat.technique]]
+id = "T1021"
+name = "Remote Services"
+reference = "https://attack.mitre.org/techniques/T1021/"
+[[rule_3.threat.technique.subtechnique]]
+id = "T1021.001"
+name = "Remote Desktop Protocol"
+reference = "https://attack.mitre.org/techniques/T1021/001/"
+[rule_3.threat.tactic]
+id = "TA0008"
+name = "Lateral Movement"
+reference = "https://attack.mitre.org/tactics/TA0008/"
+
+[rule_4]
+rule_id = "e1a03001-0004-4000-8000-000000000004"
+risk_score = 75
+severity = "high"
+name = "Pass-the-Hash via NTLM Network Logon"
+description = "Detects NTLM-based network logons from non-machine accounts potentially indicating pass-the-hash activity."
+type = "query"
+index = ["winlogbeat-*"]
+language = "kuery"
+query = '''event.code: "4624" and winlog.event_data.LogonType: "9" and winlog.event_data.AuthenticationPackageName: "Negotiate" and not user.name: *$'''
+tags = ["Lateral Movement", "Credential Access", "T1550.002"]
+
+[[rule_4.threat]]
+framework = "MITRE ATT&CK"
+[[rule_4.threat.technique]]
+id = "T1550"
+name = "Use Alternate Authentication Material"
+reference = "https://attack.mitre.org/techniques/T1550/"
+[[rule_4.threat.technique.subtechnique]]
+id = "T1550.002"
+name = "Pass the Hash"
+reference = "https://attack.mitre.org/techniques/T1550/002/"
+[rule_4.threat.tactic]
+id = "TA0008"
+name = "Lateral Movement"
+reference = "https://attack.mitre.org/tactics/TA0008/"

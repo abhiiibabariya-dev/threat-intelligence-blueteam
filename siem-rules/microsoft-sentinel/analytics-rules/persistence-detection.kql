@@ -1,0 +1,193 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Persistence Detection
+// =============================================================================
+// Description:  Detect persistence mechanisms including registry modifications,
+//               scheduled tasks, startup items, and service creation.
+// MITRE ATT&CK: T1547, T1053, T1543, T1546
+// Severity:     Medium to High
+// Data Sources:  SecurityEvent, DeviceRegistryEvents, DeviceProcessEvents
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: Suspicious Registry Run Key Modification
+// MITRE: T1547.001 - Boot or Logon Autostart Execution: Registry Run Keys
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let runKeyPaths = dynamic([
+    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+    @"SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+    @"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Run",
+    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run",
+    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell",
+    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit"
+]);
+DeviceRegistryEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType in ("RegistryValueSet", "RegistryKeyCreated")
+| where RegistryKey has_any (runKeyPaths)
+| where InitiatingProcessFileName !in~ (
+    "explorer.exe", "msiexec.exe", "setup.exe",
+    "OneDriveSetup.exe", "Teams.exe"  // Known legitimate modifiers
+)
+| extend
+    RegistryValue = RegistryValueData,
+    ValueName = RegistryValueName
+| where isnotempty(RegistryValue)
+| project
+    TimeGenerated,
+    AlertName = "Suspicious Registry Run Key Modified",
+    DeviceName,
+    RegistryKey,
+    ValueName,
+    RegistryValue = substring(RegistryValue, 0, 300),
+    InitiatingProcess = InitiatingProcessFileName,
+    InitiatingCommandLine = substring(InitiatingProcessCommandLine, 0, 300),
+    AccountName = InitiatingProcessAccountName
+
+// ---------------------------------------------------------------------------
+// Rule 2: Scheduled Task Created for Persistence
+// MITRE: T1053.005 - Scheduled Task/Job: Scheduled Task
+// Severity: Medium
+// ---------------------------------------------------------------------------
+union
+    (SecurityEvent
+    | where TimeGenerated >= ago(1d)
+    | where EventID == 4698  // Scheduled task created
+    | extend
+        TaskName = tostring(parse_xml(EventData).DataItem.EventData.Data[0]["#text"]),
+        TaskContent = tostring(parse_xml(EventData).DataItem.EventData.Data[1]["#text"])
+    | project TimeGenerated, Computer, Account, TaskName, TaskContent, Source = "SecurityEvent"),
+    (DeviceProcessEvents
+    | where TimeGenerated >= ago(1d)
+    | where FileName =~ "schtasks.exe"
+    | where ProcessCommandLine has "/create"
+    | project TimeGenerated, Computer = DeviceName, Account = AccountName,
+        TaskName = extract(@"/tn\s+""?([^""]+)""?", 1, ProcessCommandLine),
+        TaskContent = ProcessCommandLine, Source = "ProcessEvent")
+| where TaskContent has_any (
+    "powershell", "cmd.exe", "wscript", "cscript", "mshta",
+    "http://", "https://", "\\AppData\\", "\\Temp\\",
+    "-enc", "-e ", "bypass", "hidden"
+)
+| project
+    TimeGenerated,
+    AlertName = "Suspicious Scheduled Task Created",
+    Computer,
+    Account,
+    TaskName,
+    TaskContent = substring(TaskContent, 0, 500),
+    Source
+
+// ---------------------------------------------------------------------------
+// Rule 3: New Windows Service Created
+// MITRE: T1543.003 - Create or Modify System Process: Windows Service
+// Severity: Medium
+// ---------------------------------------------------------------------------
+SecurityEvent
+| where TimeGenerated >= ago(1d)
+| where EventID == 7045  // Service installed
+| extend
+    ServiceName = tostring(EventData.ServiceName),
+    ServiceFileName = tostring(EventData.ImagePath),
+    ServiceType = tostring(EventData.ServiceType),
+    ServiceStartType = tostring(EventData.StartType),
+    AccountUsed = tostring(EventData.AccountName)
+| where ServiceFileName has_any (
+    "powershell", "cmd.exe", "mshta", "wscript", "cscript",
+    "\\AppData\\", "\\Temp\\", "\\ProgramData\\",
+    "http://", "https://", ".bat", ".vbs", ".ps1"
+)
+    or ServiceStartType == "auto start"  // Auto-start services warrant review
+| where ServiceFileName !has_any (
+    "Windows", "Microsoft", "svchost"  // Basic allowlisting
+)
+| project
+    TimeGenerated,
+    AlertName = "Suspicious Windows Service Installed",
+    Computer,
+    ServiceName,
+    ServiceFileName = substring(ServiceFileName, 0, 300),
+    ServiceType,
+    ServiceStartType,
+    AccountUsed
+
+// ---------------------------------------------------------------------------
+// Rule 4: WMI Event Subscription (Fileless Persistence)
+// MITRE: T1546.003 - Event Triggered Execution: WMI Event Subscription
+// Severity: High
+// ---------------------------------------------------------------------------
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where (FileName =~ "wmic.exe" and ProcessCommandLine has_any (
+    "__EventFilter", "__EventConsumer", "__FilterToConsumerBinding",
+    "ActiveScriptEventConsumer", "CommandLineEventConsumer"
+))
+    or (FileName =~ "powershell.exe" and ProcessCommandLine has_any (
+    "Set-WmiInstance", "Register-WmiEvent", "__EventFilter",
+    "ActiveScriptEventConsumer", "CommandLineEventConsumer"
+))
+| project
+    TimeGenerated,
+    AlertName = "WMI Event Subscription Created (Fileless Persistence)",
+    DeviceName,
+    AccountName,
+    FileName,
+    ProcessCommandLine = substring(ProcessCommandLine, 0, 500),
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine = substring(InitiatingProcessCommandLine, 0, 300)
+
+// ---------------------------------------------------------------------------
+// Rule 5: Startup Folder Modification
+// MITRE: T1547.001 - Boot or Logon Autostart Execution
+// Severity: Medium
+// ---------------------------------------------------------------------------
+DeviceFileEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType in ("FileCreated", "FileModified")
+| where FolderPath has_any (
+    @"\Start Menu\Programs\Startup",
+    @"\Microsoft\Windows\Start Menu\Programs\Startup"
+)
+| where FileName endswith_cs ".exe" or FileName endswith_cs ".bat"
+    or FileName endswith_cs ".vbs" or FileName endswith_cs ".lnk"
+    or FileName endswith_cs ".ps1" or FileName endswith_cs ".cmd"
+| project
+    TimeGenerated,
+    AlertName = "File Added to Startup Folder",
+    DeviceName,
+    FileName,
+    FolderPath,
+    FileSize,
+    SHA256,
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine = substring(InitiatingProcessCommandLine, 0, 300),
+    InitiatingProcessAccountName
+
+// ---------------------------------------------------------------------------
+// Rule 6: DLL Search Order Hijacking Setup
+// MITRE: T1574.001 - Hijack Execution Flow: DLL Search Order Hijacking
+// Severity: High
+// ---------------------------------------------------------------------------
+DeviceFileEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType == "FileCreated"
+| where FileName endswith ".dll"
+| where FolderPath has_any (
+    @"C:\Windows\System32\",
+    @"C:\Windows\SysWOW64\",
+    @"C:\Windows\"
+)
+| where InitiatingProcessFileName !in~ (
+    "msiexec.exe", "TiWorker.exe", "TrustedInstaller.exe",
+    "svchost.exe", "wuauclt.exe", "MpSigStub.exe"
+)
+| project
+    TimeGenerated,
+    AlertName = "Suspicious DLL Written to System Directory",
+    DeviceName,
+    FileName,
+    FolderPath,
+    FileSize,
+    SHA256,
+    InitiatingProcessFileName,
+    InitiatingProcessAccountName

@@ -1,0 +1,104 @@
+# Elastic SIEM Detection Rules: Initial Access
+# MITRE ATT&CK: T1566, T1190, T1189
+
+[rule]
+rule_id = "e1a01001-0001-4000-8000-000000000001"
+risk_score = 73
+severity = "high"
+name = "Phishing - Office Document Spawning Suspicious Process"
+description = "Detects Microsoft Office applications spawning command shells or script engines, indicating possible macro-based phishing payload execution."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.parent.name : ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe") and
+  process.name : ("cmd.exe", "powershell.exe", "pwsh.exe", "wscript.exe", "cscript.exe", "mshta.exe", "rundll32.exe", "regsvr32.exe")
+'''
+tags = ["Phishing", "Initial Access", "T1566.001"]
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1566"
+name = "Phishing"
+reference = "https://attack.mitre.org/techniques/T1566/"
+[[rule.threat.technique.subtechnique]]
+id = "T1566.001"
+name = "Spearphishing Attachment"
+reference = "https://attack.mitre.org/techniques/T1566/001/"
+[rule.threat.tactic]
+id = "TA0001"
+name = "Initial Access"
+reference = "https://attack.mitre.org/tactics/TA0001/"
+
+[rule_2]
+rule_id = "e1a01001-0002-4000-8000-000000000002"
+risk_score = 75
+severity = "high"
+name = "Web Application Exploitation Attempt"
+description = "Detects web server processes spawning suspicious child processes, indicating exploitation of a public-facing application."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.parent.name : ("w3wp.exe", "httpd.exe", "nginx.exe", "apache2", "tomcat*", "java.exe") and
+  process.name : ("cmd.exe", "powershell.exe", "bash", "sh", "python*", "perl", "whoami", "net.exe", "certutil.exe")
+'''
+tags = ["Exploitation", "Initial Access", "T1190"]
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+[[rule_2.threat.technique]]
+id = "T1190"
+name = "Exploit Public-Facing Application"
+reference = "https://attack.mitre.org/techniques/T1190/"
+[rule_2.threat.tactic]
+id = "TA0001"
+name = "Initial Access"
+reference = "https://attack.mitre.org/tactics/TA0001/"
+
+[rule_3]
+rule_id = "e1a01001-0003-4000-8000-000000000003"
+risk_score = 65
+severity = "medium"
+name = "Drive-by Download - Browser Spawning Suspicious Process"
+description = "Detects browser processes spawning command interpreters or LOLBins, indicating possible drive-by compromise."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.parent.name : ("chrome.exe", "msedge.exe", "firefox.exe", "iexplore.exe", "brave.exe") and
+  process.name : ("cmd.exe", "powershell.exe", "mshta.exe", "wscript.exe", "cscript.exe", "certutil.exe", "rundll32.exe") and
+  not process.args : ("--type=*", "--enable-*")
+'''
+tags = ["Drive-by", "Initial Access", "T1189"]
+
+[[rule_3.threat]]
+framework = "MITRE ATT&CK"
+[[rule_3.threat.technique]]
+id = "T1189"
+name = "Drive-by Compromise"
+reference = "https://attack.mitre.org/techniques/T1189/"
+[rule_3.threat.tactic]
+id = "TA0001"
+name = "Initial Access"
+reference = "https://attack.mitre.org/tactics/TA0001/"
+
+[rule_4]
+rule_id = "e1a01001-0004-4000-8000-000000000004"
+risk_score = 60
+severity = "medium"
+name = "HTML Smuggling - Suspicious File Written by Browser"
+description = "Detects browsers writing executable or script files to disk, a technique used in HTML smuggling attacks."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+file where event.type == "creation" and
+  process.name : ("chrome.exe", "msedge.exe", "firefox.exe", "iexplore.exe") and
+  file.extension : ("exe", "dll", "scr", "bat", "cmd", "ps1", "vbs", "js", "hta", "iso", "img", "vhd")
+'''
+tags = ["HTML Smuggling", "Initial Access", "T1566.001"]

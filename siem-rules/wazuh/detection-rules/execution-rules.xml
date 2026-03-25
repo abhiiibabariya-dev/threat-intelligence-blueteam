@@ -1,0 +1,122 @@
+<!-- Wazuh Detection Rules: Execution -->
+<!-- MITRE ATT&CK Tactic: TA0002 - Execution -->
+<!-- Rule IDs: 100160-100179 -->
+
+<group name="execution,mitre_ta0002,">
+
+  <!-- T1059.001 - Encoded PowerShell Command -->
+  <rule id="100160" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)powershell.*-[eE]([nN][cC])?[oO]?[dD]?.*[A-Za-z0-9+/=]{40,}</field>
+    <description>Execution: Encoded PowerShell command detected - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+    <group>powershell,encoded_command,</group>
+  </rule>
+
+  <!-- T1059.001 - PowerShell Download Cradle -->
+  <rule id="100161" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(Invoke-WebRequest|wget|curl|Net\.WebClient|DownloadString|DownloadFile|Invoke-RestMethod|Start-BitsTransfer|iwr\s|iex\s)</field>
+    <description>Execution: PowerShell download cradle detected</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+    <group>powershell,download_cradle,</group>
+  </rule>
+
+  <!-- T1059.001 - PowerShell AMSI Bypass -->
+  <rule id="100162" level="15">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)amsiInitFailed|AmsiUtils|amsiContext|SetValue.*AMSI|Disable-WindowsOptionalFeature.*AMSI</field>
+    <description>Execution: PowerShell AMSI bypass attempt detected</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+    <group>powershell,amsi_bypass,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- T1059.003 - Suspicious cmd.exe Usage -->
+  <rule id="100163" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)cmd\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)/c\s+(echo|type|copy|certutil|bitsadmin|wmic|net\s+user)</field>
+    <description>Execution: Suspicious cmd.exe command - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1059.003</id>
+    </mitre>
+    <group>cmd_execution,suspicious,</group>
+  </rule>
+
+  <!-- T1059.005 - Visual Basic Script Execution -->
+  <rule id="100164" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)(wscript|cscript)\.exe$</field>
+    <description>Execution: VBScript/JScript execution via $(win.eventdata.image) - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1059.005</id>
+    </mitre>
+    <group>script_execution,vbscript,</group>
+  </rule>
+
+  <!-- T1218.005 - Mshta Execution -->
+  <rule id="100165" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)mshta\.exe$</field>
+    <description>Execution: Mshta.exe execution (LOLBAS) - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1218.005</id>
+    </mitre>
+    <group>lolbas,mshta,</group>
+  </rule>
+
+  <!-- T1218.010 - Regsvr32 Execution (Squiblydoo) -->
+  <rule id="100166" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)regsvr32\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)/s\s+/n\s+/u\s+/i:|scrobj\.dll</field>
+    <description>Execution: Regsvr32 proxy execution (Squiblydoo) detected</description>
+    <mitre>
+      <id>T1218.010</id>
+    </mitre>
+    <group>lolbas,regsvr32,</group>
+  </rule>
+
+  <!-- T1218.011 - Rundll32 Suspicious Execution -->
+  <rule id="100167" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)rundll32\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(javascript|vbscript|shell32|comsvcs|DllRegisterServer|http|\\\\temp\\\\|\\\\appdata\\\\)</field>
+    <description>Execution: Suspicious rundll32 execution - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1218.011</id>
+    </mitre>
+    <group>lolbas,rundll32,</group>
+  </rule>
+
+  <!-- T1204.002 - User Execution: Malicious File (Office Macro) -->
+  <rule id="100168" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)(winword|excel|powerpnt|outlook)\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell|pwsh|wscript|cscript|mshta|certutil)\.exe$</field>
+    <description>Execution: Office application spawned suspicious child process $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1204.002</id>
+    </mitre>
+    <group>office_macro,malicious_document,</group>
+  </rule>
+
+  <!-- Linux: Suspicious Shell Execution -->
+  <rule id="100169" level="10">
+    <if_sid>533</if_sid>
+    <match type="pcre2">(?i)bash\s+-c.*base64|python.*-c.*import|perl.*-e.*socket|curl.*\|\s*(bash|sh)|wget.*\|\s*(bash|sh)</match>
+    <description>Execution: Suspicious shell command with code execution pattern</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>linux_execution,suspicious_shell,</group>
+  </rule>
+
+</group>

@@ -1,0 +1,153 @@
+# Elastic SIEM Detection Rules: Persistence
+# MITRE ATT&CK: T1547, T1053, T1543
+
+[rule]
+rule_id = "e1a02001-0001-4000-8000-000000000001"
+risk_score = 50
+severity = "medium"
+name = "Registry Run Key Modification"
+description = "Detects modification of registry run keys for persistence."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+registry where event.type == "change" and
+  registry.path : (
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\*",
+    "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell",
+    "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit"
+  ) and
+  not process.executable : (
+    "?:\\Windows\\explorer.exe",
+    "?:\\Windows\\System32\\msiexec.exe",
+    "?:\\Program Files\\*",
+    "?:\\Program Files (x86)\\*"
+  )
+'''
+tags = ["Persistence", "T1547.001"]
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1547"
+name = "Boot or Logon Autostart Execution"
+reference = "https://attack.mitre.org/techniques/T1547/"
+[[rule.threat.technique.subtechnique]]
+id = "T1547.001"
+name = "Registry Run Keys / Startup Folder"
+reference = "https://attack.mitre.org/techniques/T1547/001/"
+[rule.threat.tactic]
+id = "TA0003"
+name = "Persistence"
+reference = "https://attack.mitre.org/tactics/TA0003/"
+
+[rule_2]
+rule_id = "e1a02001-0002-4000-8000-000000000002"
+risk_score = 55
+severity = "medium"
+name = "Suspicious Scheduled Task Created"
+description = "Detects creation of scheduled tasks with suspicious command targets."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.name : "schtasks.exe" and process.args : "/create" and
+  process.args : ("*powershell*", "*cmd*", "*wscript*", "*cscript*", "*mshta*", "*http*", "*\\Temp\\*", "*bypass*", "*hidden*", "*-enc*")
+'''
+tags = ["Persistence", "T1053.005"]
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+[[rule_2.threat.technique]]
+id = "T1053"
+name = "Scheduled Task/Job"
+reference = "https://attack.mitre.org/techniques/T1053/"
+[[rule_2.threat.technique.subtechnique]]
+id = "T1053.005"
+name = "Scheduled Task"
+reference = "https://attack.mitre.org/techniques/T1053/005/"
+[rule_2.threat.tactic]
+id = "TA0003"
+name = "Persistence"
+reference = "https://attack.mitre.org/tactics/TA0003/"
+
+[rule_3]
+rule_id = "e1a02001-0003-4000-8000-000000000003"
+risk_score = 60
+severity = "medium"
+name = "Suspicious Windows Service Installed"
+description = "Detects installation of Windows services with suspicious binary paths."
+type = "query"
+index = ["winlogbeat-*"]
+language = "kuery"
+query = '''event.code: "7045" and winlog.event_data.ImagePath: (*powershell* or *cmd.exe* or *\\Temp\\* or *\\AppData\\* or *.bat* or *.ps1* or *http*)'''
+tags = ["Persistence", "T1543.003"]
+
+[[rule_3.threat]]
+framework = "MITRE ATT&CK"
+[[rule_3.threat.technique]]
+id = "T1543"
+name = "Create or Modify System Process"
+reference = "https://attack.mitre.org/techniques/T1543/"
+[[rule_3.threat.technique.subtechnique]]
+id = "T1543.003"
+name = "Windows Service"
+reference = "https://attack.mitre.org/techniques/T1543/003/"
+[rule_3.threat.tactic]
+id = "TA0003"
+name = "Persistence"
+reference = "https://attack.mitre.org/tactics/TA0003/"
+
+[rule_4]
+rule_id = "e1a02001-0004-4000-8000-000000000004"
+risk_score = 55
+severity = "medium"
+name = "Startup Folder File Creation"
+description = "Detects files being placed in startup folders for persistence."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+file where event.type == "creation" and
+  file.path : ("*\\Start Menu\\Programs\\Startup\\*") and
+  file.extension : ("exe", "bat", "cmd", "vbs", "lnk", "ps1", "hta", "js") and
+  not process.executable : ("?:\\Windows\\explorer.exe")
+'''
+tags = ["Persistence", "T1547.001"]
+
+[rule_5]
+rule_id = "e1a02001-0005-4000-8000-000000000005"
+risk_score = 70
+severity = "high"
+name = "WMI Event Subscription Created"
+description = "Detects creation of WMI event subscriptions for fileless persistence."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  (
+    (process.name : "wmic.exe" and process.args : ("*__EventFilter*", "*__EventConsumer*", "*ActiveScriptEventConsumer*")) or
+    (process.name : "powershell.exe" and process.args : ("*Set-WmiInstance*", "*Register-WmiEvent*", "*__EventFilter*"))
+  )
+'''
+tags = ["Persistence", "Fileless", "T1546.003"]
+
+[[rule_5.threat]]
+framework = "MITRE ATT&CK"
+[[rule_5.threat.technique]]
+id = "T1546"
+name = "Event Triggered Execution"
+reference = "https://attack.mitre.org/techniques/T1546/"
+[[rule_5.threat.technique.subtechnique]]
+id = "T1546.003"
+name = "Windows Management Instrumentation Event Subscription"
+reference = "https://attack.mitre.org/techniques/T1546/003/"
+[rule_5.threat.tactic]
+id = "TA0003"
+name = "Persistence"
+reference = "https://attack.mitre.org/tactics/TA0003/"

@@ -1,0 +1,91 @@
+` ===================================================================
+` Splunk Detection Rules: Execution
+` ===================================================================
+` MITRE ATT&CK: T1059 (Command and Scripting Interpreter),
+`               T1047 (WMI), T1053 (Scheduled Task/Job)
+` Severity:     Medium to Critical
+` Data Sources: Sysmon, Windows Security, PowerShell Logs
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Rule 1: Obfuscated PowerShell Execution
+` MITRE: T1059.001 - PowerShell
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Microsoft-Windows-PowerShell/Operational EventCode=4104
+| eval script_len=len(ScriptBlockText)
+| eval has_encoding=if(match(ScriptBlockText, "(?i)(FromBase64|ToBase64|Convert|encodedcommand|-enc\s|-e\s)"), 1, 0)
+| eval has_obfuscation=if(match(ScriptBlockText, "(\$\{|\-join|\-split|char\]|\[type\]|replace|format)"), 1, 0)
+| eval has_download=if(match(ScriptBlockText, "(?i)(Net\.WebClient|DownloadString|DownloadFile|Invoke-WebRequest|wget|curl|Start-BitsTransfer)"), 1, 0)
+| eval has_reflection=if(match(ScriptBlockText, "(?i)(Reflection\.Assembly|GetType|InvokeMember|DynamicMethod)"), 1, 0)
+| eval has_amsi_bypass=if(match(ScriptBlockText, "(?i)(AmsiUtils|amsiInitFailed|AmsiScanBuffer)"), 1, 0)
+| eval ThreatScore=has_encoding*2 + has_obfuscation*1 + has_download*2 + has_reflection*3 + has_amsi_bypass*3
+| where ThreatScore >= 3
+| eval AlertName="Malicious PowerShell Detected"
+| eval Severity=case(ThreatScore >= 7, "Critical", ThreatScore >= 5, "High", 1=1, "Medium")
+| eval MITREAttack="T1059.001"
+| table _time, Computer, UserName, ThreatScore, Severity,
+        ScriptBlockText, has_encoding, has_download, has_reflection, has_amsi_bypass
+
+` ---------------------------------------------------------------------------
+` Rule 2: WMI Process Execution
+` MITRE: T1047 - Windows Management Instrumentation
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+| where ParentImage="*\\wmiprvse.exe"
+| where NOT match(Image, "(?i)(WmiPrvSE|WmiApSrv|scrcons)")
+| eval SuspiciousChild=case(
+    match(Image, "(?i)(cmd|powershell|cscript|wscript|mshta)"), "ScriptEngine",
+    match(Image, "(?i)(net|nltest|dsquery|whoami)"), "Recon",
+    1=1, "Other"
+)
+| stats count,
+        values(Image) as SpawnedProcesses,
+        values(CommandLine) as Commands,
+        values(SuspiciousChild) as Categories
+    by Computer, User
+| eval AlertName="Suspicious WMI-Spawned Process"
+| eval Severity="High"
+| eval MITREAttack="T1047"
+
+` ---------------------------------------------------------------------------
+` Rule 3: Malicious Scheduled Task Creation
+` MITRE: T1053.005 - Scheduled Task
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4698
+| rex field=TaskContent "<Command>(?<TaskCommand>[^<]+)</Command>"
+| rex field=TaskContent "<Arguments>(?<TaskArgs>[^<]+)</Arguments>"
+| where match(TaskCommand, "(?i)(powershell|cmd|wscript|cscript|mshta|rundll32)")
+    OR match(TaskArgs, "(?i)(-enc|-e\s|bypass|hidden|http://|https://|\\\\)")
+| eval AlertName="Suspicious Scheduled Task Created"
+| eval Severity="High"
+| eval MITREAttack="T1053.005"
+| table _time, Computer, SubjectUserName, TaskName, TaskCommand, TaskArgs, Severity
+
+` ---------------------------------------------------------------------------
+` Rule 4: Scripting Engine Spawning Shell
+` MITRE: T1059.005 - Visual Basic, T1059.007 - JavaScript
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+| where ParentImage IN ("*\\wscript.exe", "*\\cscript.exe", "*\\mshta.exe")
+| where Image IN ("*\\cmd.exe", "*\\powershell.exe", "*\\pwsh.exe")
+| eval AlertName="Script Engine Spawning Shell"
+| eval Severity="High"
+| eval MITREAttack="T1059.005"
+| table _time, Computer, User, ParentImage, Image, CommandLine, Severity
+
+` ---------------------------------------------------------------------------
+` Rule 5: Certutil Abuse for Download/Decode
+` MITRE: T1059, T1140 - Deobfuscate/Decode Files
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1 Image="*\\certutil.exe"
+| where match(CommandLine, "(?i)(-urlcache|-decode|-decodehex|-encode|http://|https://|ftp://)")
+| eval AbuseType=case(
+    match(CommandLine, "urlcache"), "Download",
+    match(CommandLine, "decode"), "Decode",
+    match(CommandLine, "encode"), "Encode",
+    1=1, "Unknown"
+)
+| eval AlertName="Certutil Abuse: ".AbuseType
+| eval Severity="High"
+| eval MITREAttack="T1059,T1140"
+| table _time, Computer, User, CommandLine, AbuseType, Severity

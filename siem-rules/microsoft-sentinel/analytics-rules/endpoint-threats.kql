@@ -1,0 +1,252 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Endpoint Threats
+// =============================================================================
+// Description:  Detect endpoint-based threats including suspicious process
+//               creation, LOLBins abuse, PowerShell attacks, and malware behaviors.
+// MITRE ATT&CK: T1059, T1218, T1055, T1036, T1547
+// Severity:     Medium to Critical
+// Data Sources:  SecurityEvent, DeviceProcessEvents, DeviceFileEvents
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: Suspicious PowerShell Execution Patterns
+// MITRE: T1059.001 - Command and Scripting Interpreter: PowerShell
+// Severity: High
+// ---------------------------------------------------------------------------
+let suspiciousKeywords = dynamic([
+    "IEX", "Invoke-Expression", "downloadstring", "Net.WebClient",
+    "Start-BitsTransfer", "Invoke-WebRequest", "FromBase64String",
+    "EncodedCommand", "-enc ", "-e ", "bypass", "unrestricted",
+    "hidden", "-nop", "reflection.assembly", "GetDelegateForFunctionPointer",
+    "System.Runtime.InteropServices", "Mimikatz", "Invoke-Mimikatz",
+    "AmsiUtils", "amsiInitFailed", "Invoke-Shellcode"
+]);
+union
+    (SecurityEvent
+    | where EventID == 4688
+    | where Process has_any ("powershell.exe", "pwsh.exe")
+    | extend CommandLine = CommandLine),
+    (DeviceProcessEvents
+    | where FileName has_any ("powershell.exe", "pwsh.exe")
+    | extend CommandLine = ProcessCommandLine,
+        Computer = DeviceName,
+        Account = AccountName)
+| where TimeGenerated >= ago(1d)
+| where CommandLine has_any (suspiciousKeywords)
+| extend
+    HasEncoding = CommandLine has_any ("-enc", "-e ", "FromBase64String"),
+    HasDownload = CommandLine has_any ("downloadstring", "WebClient", "WebRequest", "BitsTransfer"),
+    HasAmsiBypass = CommandLine has_any ("AmsiUtils", "amsiInitFailed"),
+    HasReflection = CommandLine has_any ("reflection.assembly", "GetDelegateForFunctionPointer")
+| extend
+    ThreatScore = toint(HasEncoding) * 2 + toint(HasDownload) * 2 +
+                  toint(HasAmsiBypass) * 3 + toint(HasReflection) * 3
+| where ThreatScore >= 2
+| project
+    TimeGenerated,
+    AlertName = "Suspicious PowerShell Execution",
+    Computer,
+    Account,
+    CommandLine = substring(CommandLine, 0, 500),
+    ThreatScore,
+    HasEncoding,
+    HasDownload,
+    HasAmsiBypass
+
+// ---------------------------------------------------------------------------
+// Rule 2: LOLBin (Living Off the Land Binary) Abuse
+// MITRE: T1218 - System Binary Proxy Execution
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let lolbins = dynamic([
+    "mshta.exe", "msbuild.exe", "regsvr32.exe", "rundll32.exe",
+    "certutil.exe", "cmstp.exe", "installutil.exe", "cscript.exe",
+    "wscript.exe", "forfiles.exe", "pcalua.exe", "infdefaultinstall.exe",
+    "msconfig.exe", "msiexec.exe", "odbcconf.exe", "regasm.exe",
+    "regsvcs.exe", "control.exe", "presentationhost.exe", "ieexec.exe"
+]);
+let suspiciousLolbinArgs = dynamic([
+    "http://", "https://", "ftp://", "/i:http", "javascript:",
+    "vbscript:", "scrobj.dll", "/s /n /u /i:", "-decode",
+    "-urlcache", "-split", "/dde", "mshta vbscript:",
+    "script:", "-com", "appdomain"
+]);
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where FileName in~ (lolbins)
+| where ProcessCommandLine has_any (suspiciousLolbinArgs)
+    or InitiatingProcessFileName in~ ("cmd.exe", "powershell.exe", "wscript.exe", "mshta.exe")
+| extend
+    ParentProcess = InitiatingProcessFileName,
+    ParentCommandLine = InitiatingProcessCommandLine
+| project
+    TimeGenerated,
+    AlertName = "LOLBin Abuse Detected",
+    DeviceName,
+    AccountName,
+    FileName,
+    ProcessCommandLine = substring(ProcessCommandLine, 0, 500),
+    ParentProcess,
+    ParentCommandLine = substring(ParentCommandLine, 0, 300),
+    FolderPath
+
+// ---------------------------------------------------------------------------
+// Rule 3: Process Injection Indicators
+// MITRE: T1055 - Process Injection
+// Severity: High
+// ---------------------------------------------------------------------------
+// Detect processes accessing other processes' memory (common in injection)
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| where FileName in~ ("notepad.exe", "svchost.exe", "explorer.exe", "rundll32.exe")
+| where ProcessCommandLine == "" or ProcessCommandLine == FileName
+    // Spawned with no arguments (suspicious for these processes)
+| join kind=inner (
+    DeviceNetworkEvents
+    | where TimeGenerated >= ago(1d)
+    | where RemotePort in (80, 443, 8080, 8443, 4444, 1337)
+    | project NetworkTime = TimeGenerated, DeviceName, InitiatingProcessId,
+              RemoteIP, RemotePort, RemoteUrl
+) on $left.DeviceName == $right.DeviceName, $left.ProcessId == $right.InitiatingProcessId
+| where NetworkTime between (TimeGenerated .. (TimeGenerated + 5m))
+| project
+    TimeGenerated,
+    AlertName = "Possible Process Injection - Hollowed Process Network Activity",
+    DeviceName,
+    SuspiciousProcess = FileName,
+    ProcessCommandLine,
+    RemoteIP,
+    RemotePort,
+    RemoteUrl,
+    AccountName
+
+// ---------------------------------------------------------------------------
+// Rule 4: Suspicious Child Process Spawning
+// MITRE: T1059 - Command and Scripting Interpreter
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let suspiciousParentChild = datatable(Parent:string, Child:string) [
+    "winword.exe", "cmd.exe",
+    "winword.exe", "powershell.exe",
+    "winword.exe", "mshta.exe",
+    "excel.exe", "cmd.exe",
+    "excel.exe", "powershell.exe",
+    "outlook.exe", "powershell.exe",
+    "outlook.exe", "cmd.exe",
+    "msedge.exe", "cmd.exe",
+    "chrome.exe", "cmd.exe",
+    "iexplore.exe", "cmd.exe",
+    "svchost.exe", "cmd.exe",
+    "wmiprvse.exe", "powershell.exe",
+    "services.exe", "cmd.exe",
+    "spoolsv.exe", "cmd.exe",
+    "taskeng.exe", "powershell.exe",
+    "wscript.exe", "powershell.exe",
+    "mshta.exe", "powershell.exe"
+];
+DeviceProcessEvents
+| where TimeGenerated >= ago(1d)
+| extend
+    ParentName = tolower(InitiatingProcessFileName),
+    ChildName = tolower(FileName)
+| join kind=inner suspiciousParentChild on $left.ParentName == $right.Parent, $left.ChildName == $right.Child
+| project
+    TimeGenerated,
+    AlertName = "Suspicious Parent-Child Process Relationship",
+    DeviceName,
+    ParentProcess = InitiatingProcessFileName,
+    ParentCommandLine = substring(InitiatingProcessCommandLine, 0, 300),
+    ChildProcess = FileName,
+    ChildCommandLine = substring(ProcessCommandLine, 0, 500),
+    AccountName,
+    FolderPath
+
+// ---------------------------------------------------------------------------
+// Rule 5: Credential Dumping Tool Execution
+// MITRE: T1003 - OS Credential Dumping
+// Severity: Critical
+// ---------------------------------------------------------------------------
+let credDumpTools = dynamic([
+    "mimikatz", "procdump", "comsvcs.dll", "sekurlsa",
+    "lsass", "ntdsutil", "vssadmin", "ntds.dit"
+]);
+let credDumpCommands = dynamic([
+    "sekurlsa::logonpasswords", "lsadump::sam", "lsadump::dcsync",
+    "MiniDump", "comsvcs.dll,MiniDump", "comsvcs.dll,#24",
+    "ntdsutil", "ifm", "create full"
+]);
+union
+    (DeviceProcessEvents
+    | where TimeGenerated >= ago(1d)
+    | where ProcessCommandLine has_any (credDumpCommands)
+        or (FileName =~ "procdump.exe" and ProcessCommandLine has "lsass")
+        or (FileName =~ "rundll32.exe" and ProcessCommandLine has "comsvcs.dll" and ProcessCommandLine has "MiniDump")
+    | extend Source = "ProcessEvent"),
+    (SecurityEvent
+    | where TimeGenerated >= ago(1d)
+    | where EventID == 4688
+    | where CommandLine has_any (credDumpCommands)
+    | extend
+        Source = "SecurityEvent",
+        DeviceName = Computer,
+        AccountName = Account,
+        FileName = Process,
+        ProcessCommandLine = CommandLine)
+| project
+    TimeGenerated,
+    AlertName = "Credential Dumping Tool Detected",
+    DeviceName,
+    AccountName,
+    FileName,
+    ProcessCommandLine = substring(ProcessCommandLine, 0, 500),
+    Source
+
+// ---------------------------------------------------------------------------
+// Rule 6: Ransomware Behavior Indicators
+// MITRE: T1486 - Data Encrypted for Impact
+// Severity: Critical
+// ---------------------------------------------------------------------------
+let ransomwareExtensions = dynamic([
+    ".encrypted", ".locked", ".crypto", ".crypt", ".locky",
+    ".cerber", ".zepto", ".thor", ".zzzzz", ".aaa",
+    ".abc", ".xyz", ".enc", ".r5a", ".WNCRY"
+]);
+// Shadow copy deletion
+let shadowDeleteEvents = DeviceProcessEvents
+| where TimeGenerated >= ago(1h)
+| where (FileName =~ "vssadmin.exe" and ProcessCommandLine has "delete shadows")
+    or (FileName =~ "wmic.exe" and ProcessCommandLine has "shadowcopy delete")
+    or (FileName =~ "bcdedit.exe" and ProcessCommandLine has_any ("recoveryenabled no", "bootstatuspolicy ignoreallfailures"))
+    or (FileName =~ "wbadmin.exe" and ProcessCommandLine has "delete catalog");
+// Mass file modification
+let massFileChanges = DeviceFileEvents
+| where TimeGenerated >= ago(1h)
+| where ActionType == "FileRenamed" or ActionType == "FileModified"
+| summarize
+    FileCount = count(),
+    UniqueExtensions = dcount(tostring(split(FileName, ".")[-1])),
+    Folders = dcount(FolderPath)
+    by DeviceName, InitiatingProcessFileName, bin(TimeGenerated, 5m)
+| where FileCount > 100 and Folders > 5;
+// Combine indicators
+shadowDeleteEvents
+| project TimeGenerated, DeviceName, IndicatorType = "ShadowDelete",
+    ProcessInfo = strcat(FileName, " ", ProcessCommandLine)
+| union (
+    massFileChanges
+    | project TimeGenerated, DeviceName, IndicatorType = "MassFileChange",
+        ProcessInfo = strcat(InitiatingProcessFileName, " - ", FileCount, " files in ", Folders, " folders")
+)
+| summarize
+    Indicators = make_set(IndicatorType),
+    IndicatorCount = dcount(IndicatorType),
+    Details = make_set(ProcessInfo, 5)
+    by DeviceName, bin(TimeGenerated, 10m)
+| where IndicatorCount >= 1
+| project
+    TimeGenerated,
+    AlertName = "Ransomware Behavior Detected",
+    DeviceName,
+    IndicatorCount,
+    Indicators,
+    Details

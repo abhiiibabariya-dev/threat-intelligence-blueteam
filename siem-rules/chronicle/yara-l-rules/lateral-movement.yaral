@@ -1,0 +1,149 @@
+// =============================================================================
+// Google Chronicle SIEM - YARA-L 2.0 Rules: Lateral Movement
+// =============================================================================
+// MITRE ATT&CK: T1021 (Remote Services), T1047 (WMI)
+// =============================================================================
+
+rule psexec_lateral_movement {
+  meta:
+    author = "Blue Team"
+    description = "Detects PsExec-based lateral movement"
+    mitre_attack = "T1021.002"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    // PsExec service installation on target
+    $svc.metadata.event_type = "PROCESS_LAUNCH"
+    (
+      $svc.principal.process.file.full_path = /.*\\PSEXESVC\.exe$/ nocase or
+      ($svc.metadata.product_event_type = "7045" and
+       $svc.target.resource.name = /PSEXESVC/ nocase)
+    )
+    $svc.principal.hostname = $target_host
+    $svc.principal.user.userid = $user
+
+  match:
+    $user over 1h
+
+  outcome:
+    $risk_score = 80
+    $target_count = count_distinct($target_host)
+    $targets = array_distinct($target_host)
+
+  condition:
+    $svc and $target_count >= 2
+}
+
+rule wmi_remote_execution {
+  meta:
+    author = "Blue Team"
+    description = "Detects WMI-based remote process execution"
+    mitre_attack = "T1047"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $wmi.metadata.event_type = "PROCESS_LAUNCH"
+    $wmi.principal.process.file.full_path = /.*\\wmiprvse\.exe$/ nocase
+    not $wmi.target.process.file.full_path = /.*\\(WmiPrvSE|WmiApSrv|scrcons)\.exe$/ nocase
+    $wmi.target.process.file.full_path = /.*\\(cmd|powershell|cscript|wscript|mshta)\.exe$/ nocase
+    $wmi.principal.hostname = $hostname
+
+  match:
+    $hostname over 1h
+
+  outcome:
+    $risk_score = 75
+    $spawned_processes = array_distinct($wmi.target.process.file.full_path)
+    $commands = array_distinct($wmi.target.process.command_line)
+
+  condition:
+    $wmi
+}
+
+rule rdp_lateral_movement_chain {
+  meta:
+    author = "Blue Team"
+    description = "Detects RDP lateral movement across multiple hosts"
+    mitre_attack = "T1021.001"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $rdp.metadata.event_type = "USER_LOGIN"
+    $rdp.metadata.product_event_type = "4624"
+    $rdp.extensions.auth.auth_details = "10"  // LogonType 10 = RDP
+    $rdp.principal.ip = $src_ip
+    $rdp.target.user.userid = $user
+    $rdp.principal.hostname = $target
+
+  match:
+    $user over 4h
+
+  outcome:
+    $risk_score = 70
+    $unique_targets = count_distinct($target)
+    $targets = array_distinct($target)
+    $source_ips = array_distinct($src_ip)
+
+  condition:
+    $rdp and $unique_targets >= 3
+}
+
+rule smb_share_enumeration {
+  meta:
+    author = "Blue Team"
+    description = "Detects SMB share enumeration across multiple hosts"
+    mitre_attack = "T1021.002"
+    severity = "MEDIUM"
+    priority = "MEDIUM"
+
+  events:
+    $smb.metadata.event_type = "NETWORK_CONNECTION"
+    $smb.target.port = 445
+    $smb.target.ip_is_internal = true
+    $smb.principal.ip = $src_ip
+    $smb.target.ip = $dest_ip
+
+  match:
+    $src_ip over 15m
+
+  outcome:
+    $risk_score = 60
+    $unique_targets = count_distinct($dest_ip)
+    $total_connections = count($smb.metadata.id)
+
+  condition:
+    $smb and $unique_targets > 10
+}
+
+rule pass_the_hash_detection {
+  meta:
+    author = "Blue Team"
+    description = "Detects Pass-the-Hash via NTLM type 3 logon without type 1/2"
+    mitre_attack = "T1550.002"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $logon.metadata.event_type = "USER_LOGIN"
+    $logon.metadata.product_event_type = "4624"
+    $logon.extensions.auth.auth_details = "3"  // Network logon
+    $logon.extensions.auth.mechanism = "NTLM"
+    not $logon.target.user.userid = /.*\$$/  // Exclude machine accounts
+    $logon.principal.ip = $src_ip
+    $logon.target.user.userid = $user
+    $logon.principal.hostname = $dest_host
+
+  match:
+    $src_ip, $user over 1h
+
+  outcome:
+    $risk_score = 80
+    $unique_targets = count_distinct($dest_host)
+    $logon_count = count($logon.metadata.id)
+
+  condition:
+    $logon and $unique_targets > 2 and $logon_count > 3
+}

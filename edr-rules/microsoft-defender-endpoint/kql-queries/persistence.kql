@@ -1,0 +1,43 @@
+// =============================================================================
+// Microsoft Defender for Endpoint - Persistence Detection
+// MITRE ATT&CK: T1547, T1053, T1543
+// =============================================================================
+
+// Query 1: Suspicious Registry Run Key Modification
+DeviceRegistryEvents
+| where Timestamp > ago(1d)
+| where ActionType in ("RegistryValueSet", "RegistryKeyCreated")
+| where RegistryKey has_any ("\\Run", "\\RunOnce", "\\Winlogon\\Shell", "\\Winlogon\\Userinit")
+| where InitiatingProcessFileName !in~ ("explorer.exe", "msiexec.exe", "svchost.exe")
+| project Timestamp, DeviceName, RegistryKey, RegistryValueName, RegistryValueData,
+    InitiatingProcessFileName, InitiatingProcessAccountName
+
+// Query 2: Malicious Scheduled Task
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where FileName =~ "schtasks.exe" and ProcessCommandLine has "/create"
+| where ProcessCommandLine has_any ("powershell", "cmd", "wscript", "mshta", "http", "bypass", "-enc")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine
+
+// Query 3: Suspicious Service Installation
+DeviceEvents
+| where Timestamp > ago(7d)
+| where ActionType == "ServiceInstalled"
+| where AdditionalFields has_any ("powershell", "cmd", "\\Temp\\", "\\AppData\\", ".bat", ".ps1")
+| project Timestamp, DeviceName, AdditionalFields
+
+// Query 4: WMI Event Subscription
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where ProcessCommandLine has_any ("__EventFilter", "__EventConsumer", "ActiveScriptEventConsumer",
+    "Set-WmiInstance", "Register-WmiEvent")
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine
+
+// Query 5: Startup Folder Persistence
+DeviceFileEvents
+| where Timestamp > ago(1d)
+| where ActionType == "FileCreated"
+| where FolderPath has "\\Start Menu\\Programs\\Startup\\"
+| where FileName endswith ".exe" or FileName endswith ".bat" or FileName endswith ".vbs"
+    or FileName endswith ".lnk" or FileName endswith ".ps1"
+| project Timestamp, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName

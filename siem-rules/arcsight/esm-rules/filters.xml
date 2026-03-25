@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ArcSight ESM Filter Definitions
+  Description: Event categorization and filtering rules
+  Author: Blue Team
+-->
+<Filters xmlns="http://www.arcsight.com/esm/filters">
+
+  <Filter id="filter-auth-failures" enabled="true">
+    <Name>Authentication Failures</Name>
+    <Description>Captures all failed authentication events across sources</Description>
+    <Conditions>
+      <Condition field="categoryBehavior" operator="equals" value="/Authentication/Verify"/>
+      <Condition field="categoryOutcome" operator="equals" value="/Failure"/>
+    </Conditions>
+  </Filter>
+
+  <Filter id="filter-malware-indicators" enabled="true">
+    <Name>Malware Indicators</Name>
+    <Description>Filters events matching known malware indicators</Description>
+    <Conditions>
+      <Or>
+        <Condition field="categorySignificance" operator="equals" value="/Hostile"/>
+        <Condition field="categoryDeviceGroup" operator="equals" value="/IDS"/>
+        <Condition field="categoryBehavior" operator="equals" value="/Access/Malware"/>
+      </Or>
+    </Conditions>
+  </Filter>
+
+  <Filter id="filter-privilege-escalation" enabled="true">
+    <Name>Privilege Escalation Events</Name>
+    <Description>Detects privilege escalation activities</Description>
+    <Conditions>
+      <And>
+        <Condition field="categoryBehavior" operator="equals" value="/Authorization/Verify"/>
+        <Condition field="categoryOutcome" operator="equals" value="/Success"/>
+        <Or>
+          <Condition field="deviceEventClassId" operator="equals" value="4672"/>
+          <Condition field="deviceEventClassId" operator="equals" value="4673"/>
+        </Or>
+      </And>
+    </Conditions>
+  </Filter>
+
+  <Filter id="filter-known-good" enabled="true">
+    <Name>Known Good Traffic Exclusion</Name>
+    <Description>Filters out known legitimate traffic to reduce noise</Description>
+    <Conditions>
+      <Or>
+        <Condition field="sourceAddress" operator="inActiveList" value="Approved Scanners"/>
+        <Condition field="destinationAddress" operator="inActiveList" value="CDN/Cloud Services"/>
+        <Condition field="sourceUserName" operator="inActiveList" value="Service Accounts - Approved"/>
+      </Or>
+    </Conditions>
+  </Filter>
+
+  <Filter id="filter-data-exfiltration" enabled="true">
+    <Name>Data Exfiltration Indicators</Name>
+    <Description>Identifies potential data exfiltration patterns</Description>
+    <Conditions>
+      <And>
+        <Condition field="bytesOut" operator="greaterThan" value="52428800"/>
+        <Condition field="sourceAddress" operator="inSubnet" value="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"/>
+        <Condition field="destinationAddress" operator="notInSubnet" value="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"/>
+        <Condition field="destinationAddress" operator="notInActiveList" value="Approved External Services"/>
+      </And>
+    </Conditions>
+  </Filter>
+
+</Filters>

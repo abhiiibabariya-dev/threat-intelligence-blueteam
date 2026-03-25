@@ -1,0 +1,369 @@
+` ============================================================================
+` Splunk SPL Detection Rules - Exfiltration (TA0010)
+` ============================================================================
+` These rules detect data exfiltration techniques including DNS tunneling,
+` unusual outbound transfers, and cloud storage abuse, mapped to MITRE
+` ATT&CK Exfiltration tactic.
+`
+` Required Data Sources:
+`   - DNS logs (Splunk Stream, Sysmon Event ID 22, Infoblox, etc.)
+`   - Firewall/Proxy logs (Palo Alto, Cisco ASA, Squid, etc.)
+`   - Email gateway logs
+`   - Cloud access security broker (CASB) logs
+`   - Windows event logs
+`
+` Usage: Deploy as saved searches or ES correlation searches in Splunk.
+` ============================================================================
+
+
+` ============================================================================
+` Rule 1: DNS Tunneling / Large DNS Query Detection
+` ============================================================================
+` Rule Name:    exfiltration-dns-tunneling
+` Description:  Detects potential DNS tunneling by identifying anomalously
+`               long DNS queries, high query volumes to a single domain,
+`               and unusual DNS record types (TXT, NULL). DNS tunneling
+`               encodes data in DNS queries to exfiltrate information or
+`               establish C2 channels. Baseline average query length is
+`               typically 15-30 characters; tunneling queries often exceed
+`               50 characters.
+` MITRE ATT&CK: T1048.001 - Exfiltration Over Alternative Protocol:
+`               Exfiltration Over Symmetric Encrypted Non-C2 Protocol
+`               T1071.004 - Application Layer Protocol: DNS
+` Tactic:       Exfiltration (TA0010), Command and Control (TA0011)
+` Severity:     High
+` Data Sources: DNS query logs (stream:dns, Sysmon Event ID 22, Infoblox,
+`               Windows DNS debug logs)
+` False Positives: CDN lookups, DKIM/SPF verification, antivirus cloud
+`                  lookups, legitimate TXT record queries
+` ============================================================================
+
+index=dns sourcetype="stream:dns"
+    message_type=QUERY
+| eval query_name=coalesce(query{}.name, query, "unknown")
+| eval query_type=coalesce(query{}.type, qtype, "A")
+| eval query_length=len(query_name)
+| eval subdomain_count=mvcount(split(query_name, ".")) - 2
+| eval src_ip=coalesce(src_ip, src, "unknown")
+| eval base_domain=mvindex(split(query_name, "."), -2) . "." . mvindex(split(query_name, "."), -1)
+| where query_length > 0
+| bucket _time span=10m
+| stats count as query_count
+        avg(query_length) as avg_query_length
+        max(query_length) as max_query_length
+        dc(query_name) as unique_queries
+        sum(query_length) as total_query_bytes
+        values(query_type) as query_types
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by src_ip, base_domain, _time
+| where (avg_query_length > 50 AND query_count >= 10)
+    OR (query_count > 100 AND unique_queries > 50)
+    OR (max_query_length > 100)
+    OR (match(mvjoin(query_types, ","), "(?i)(TXT|NULL|CNAME)") AND query_count > 50)
+| eval tunnel_score=case(
+    avg_query_length > 80 AND query_count > 50, "CRITICAL",
+    avg_query_length > 50 AND query_count > 100, "HIGH",
+    max_query_length > 150, "HIGH",
+    1=1, "MEDIUM")
+| eval avg_query_length=round(avg_query_length, 1)
+| eval estimated_data_bytes=total_query_bytes
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table src_ip, base_domain, query_count, unique_queries, avg_query_length,
+        max_query_length, estimated_data_bytes, query_types, tunnel_score,
+        first_seen, last_seen
+| sort -tunnel_score, -query_count
+
+
+` ============================================================================
+` Rule 2: Unusual Outbound Data Volume Detection
+` ============================================================================
+` Rule Name:    exfiltration-unusual-outbound-volume
+` Description:  Detects hosts sending anomalously large volumes of data to
+`               external destinations. Compares current outbound transfer
+`               volumes against a rolling baseline to identify statistical
+`               outliers. Thresholds: single session > 500MB or aggregate
+`               hourly outbound > 1GB to a single destination.
+` MITRE ATT&CK: T1048 - Exfiltration Over Alternative Protocol
+` Tactic:       Exfiltration (TA0010)
+` Severity:     High
+` Data Sources: Firewall logs (pan:traffic, cisco:asa), proxy logs,
+`               NetFlow data
+` False Positives: Large file uploads to cloud storage (OneDrive, GDrive),
+`                  video conferencing, software build artifacts, backups
+` ============================================================================
+
+index=firewall sourcetype IN ("pan:traffic", "cisco:asa")
+    action=allowed direction=outbound
+| eval src_ip=coalesce(src_ip, src, src_addr)
+| eval dest_ip=coalesce(dest_ip, dst, dst_addr)
+| eval bytes_out=coalesce(bytes_out, bytes_sent, bytes, 0)
+| where NOT cidrmatch("10.0.0.0/8", dest_ip)
+    AND NOT cidrmatch("172.16.0.0/12", dest_ip)
+    AND NOT cidrmatch("192.168.0.0/16", dest_ip)
+| bucket _time span=1h
+| stats sum(bytes_out) as total_bytes_out
+        count as session_count
+        dc(dest_ip) as unique_destinations
+        values(dest_ip) as destinations
+        max(bytes_out) as largest_single_transfer
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by src_ip, _time
+| eval total_mb=round(total_bytes_out/1048576, 2)
+| eval largest_transfer_mb=round(largest_single_transfer/1048576, 2)
+| where total_mb > 1024 OR largest_transfer_mb > 500
+| eval severity=case(
+    total_mb > 5120, "CRITICAL",
+    total_mb > 2048, "HIGH",
+    largest_transfer_mb > 1024, "HIGH",
+    1=1, "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table src_ip, total_mb, largest_transfer_mb, session_count,
+        unique_destinations, destinations, severity, first_seen, last_seen
+| sort -total_mb
+
+
+` ============================================================================
+` Rule 3: Data Staging for Exfiltration
+` ============================================================================
+` Rule Name:    exfiltration-data-staging-detection
+` Description:  Detects data staging activities where adversaries collect
+`               and compress files before exfiltration. Monitors for use of
+`               archiving tools (7zip, WinRAR, tar) targeting sensitive
+`               directories, creation of large archive files, and use of
+`               built-in tools like compact.exe or makecab.exe.
+` MITRE ATT&CK: T1074 - Data Staged
+`               T1074.001 - Data Staged: Local Data Staging
+`               T1560.001 - Archive Collected Data: Archive via Utility
+` Tactic:       Collection (TA0009), Exfiltration (TA0010)
+` Severity:     Medium
+` Data Sources: Sysmon Event ID 1 (Process Create), Sysmon Event ID 11
+`               (File Create)
+` False Positives: Legitimate backup operations, software build processes,
+`                  IT file migrations
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+    (Image="*\\7z.exe" OR Image="*\\7za.exe" OR Image="*\\7zG.exe"
+     OR Image="*\\WinRAR.exe" OR Image="*\\rar.exe"
+     OR Image="*\\zip.exe" OR Image="*\\tar.exe"
+     OR Image="*\\compact.exe" OR Image="*\\makecab.exe"
+     OR (Image="*\\powershell.exe"
+         AND (CommandLine="*Compress-Archive*"
+              OR CommandLine="*IO.Compression*"
+              OR CommandLine="*ZipFile*")))
+| eval archiver=Image
+| eval cmdline=CommandLine
+| eval acting_user=User
+| eval parent=ParentImage
+| eval targets_sensitive=if(
+    match(cmdline, "(?i)(\\\\users\\\\|\\\\documents|\\\\desktop|\\\\downloads|\\\\shared|\\\\finance|\\\\hr\\\\|\\\\confidential|\\\\secrets|\\\\passwords|\\\\credentials)"),
+    "yes", "no")
+| eval archive_output=if(
+    match(cmdline, "(?i)(\\\\temp\\\\|\\\\tmp\\\\|\\\\appdata\\\\|\\\\public\\\\|\\\\programdata\\\\)"),
+    "suspicious_output_path", "standard_path")
+| where NOT match(parent, "(?i)(backup|veeam|acronis|commvault|sccm)")
+| stats count as archive_operations
+        values(archiver) as tools_used
+        values(cmdline) as commands
+        values(parent) as parent_processes
+        values(targets_sensitive) as sensitive_data_targeted
+        values(archive_output) as output_locations
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval severity=case(
+    match(mvjoin(sensitive_data_targeted, ","), "yes")
+        AND match(mvjoin(output_locations, ","), "suspicious"), "HIGH",
+    match(mvjoin(sensitive_data_targeted, ","), "yes"), "MEDIUM",
+    archive_operations >= 5, "MEDIUM",
+    1=1, "LOW")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, tools_used, commands, parent_processes,
+        archive_operations, sensitive_data_targeted, output_locations,
+        severity, first_seen, last_seen
+| sort -severity, -archive_operations
+
+
+` ============================================================================
+` Rule 4: Cloud Storage Exfiltration Detection
+` ============================================================================
+` Rule Name:    exfiltration-cloud-storage-upload
+` Description:  Detects potential data exfiltration to cloud storage services
+`               (Google Drive, Dropbox, OneDrive, Box, Mega, etc.) by
+`               monitoring for large or frequent uploads. Combines proxy/web
+`               logs with file size analysis to identify anomalous cloud
+`               storage activity outside normal business usage patterns.
+` MITRE ATT&CK: T1567.002 - Exfiltration Over Web Service: Exfiltration
+`               to Cloud Storage
+` Tactic:       Exfiltration (TA0010)
+` Severity:     Medium
+` Data Sources: Web proxy logs, CASB logs, firewall SSL decryption logs
+` False Positives: Legitimate cloud backup services, authorized file sharing,
+`                  marketing content uploads
+` ============================================================================
+
+index=proxy sourcetype IN ("squid:access", "bluecoat:proxysg", "pan:url_filtering", "zscaler:web")
+    (url="*drive.google.com/upload*"
+     OR url="*upload.drive.google.com*"
+     OR url="*content.dropboxapi.com*"
+     OR url="*dl.dropboxusercontent.com*"
+     OR url="*.files.1drv.com*"
+     OR url="*upload.box.com*"
+     OR url="*mega.nz*"
+     OR url="*transfer.sh*"
+     OR url="*wetransfer.com/api*"
+     OR url="*file.io*"
+     OR url="*anonfiles.com*"
+     OR url="*gofile.io*")
+    http_method IN ("POST", "PUT", "PATCH")
+| eval src_ip=coalesce(src_ip, c_ip, src)
+| eval cloud_service=case(
+    match(url, "(?i)google"), "Google Drive",
+    match(url, "(?i)dropbox"), "Dropbox",
+    match(url, "(?i)1drv|onedrive"), "OneDrive",
+    match(url, "(?i)box\.com"), "Box",
+    match(url, "(?i)mega\.nz"), "MEGA",
+    match(url, "(?i)transfer\.sh|wetransfer|file\.io|anonfiles|gofile"), "Anonymous File Sharing",
+    1=1, "Other Cloud Storage")
+| eval bytes_uploaded=coalesce(bytes_out, sc_bytes, bytes, 0)
+| eval user_id=coalesce(user, cs_username, "unknown")
+| bucket _time span=1h
+| stats sum(bytes_uploaded) as total_bytes_uploaded
+        count as upload_count
+        dc(cloud_service) as unique_services
+        values(cloud_service) as services_used
+        earliest(_time) as first_upload
+        latest(_time) as last_upload
+        by src_ip, user_id, _time
+| eval total_mb_uploaded=round(total_bytes_uploaded/1048576, 2)
+| where total_mb_uploaded > 100 OR upload_count > 20
+    OR match(mvjoin(services_used, ","), "Anonymous File Sharing")
+| eval severity=case(
+    match(mvjoin(services_used, ","), "Anonymous File Sharing"), "CRITICAL",
+    total_mb_uploaded > 1024, "HIGH",
+    total_mb_uploaded > 500, "MEDIUM",
+    upload_count > 50, "MEDIUM",
+    1=1, "LOW")
+| eval first_upload=strftime(first_upload, "%Y-%m-%d %H:%M:%S")
+| eval last_upload=strftime(last_upload, "%Y-%m-%d %H:%M:%S")
+| table src_ip, user_id, services_used, upload_count, total_mb_uploaded,
+        severity, first_upload, last_upload
+| sort -severity, -total_mb_uploaded
+
+
+` ============================================================================
+` Rule 5: Email-Based Exfiltration Detection
+` ============================================================================
+` Rule Name:    exfiltration-email-large-attachments
+` Description:  Detects potential data exfiltration via email by monitoring
+`               for emails with unusually large attachments, emails sent to
+`               personal/free email services, and high-volume email sending
+`               from a single user. Targets both internal mail servers and
+`               webmail usage.
+` MITRE ATT&CK: T1048.003 - Exfiltration Over Alternative Protocol:
+`               Exfiltration Over Unencrypted Non-C2 Protocol
+`               T1567.001 - Exfiltration Over Web Service: Exfiltration to
+`               Code Repository (when using webmail)
+` Tactic:       Exfiltration (TA0010)
+` Severity:     Medium
+` Data Sources: Email gateway logs (Proofpoint, Mimecast, Exchange),
+`               O365 message trace logs
+` False Positives: Legitimate large attachments (presentations, reports),
+`                  marketing email campaigns, automated report distribution
+` ============================================================================
+
+index=email sourcetype IN ("exchange:messagetracking", "o365:management:activity", "proofpoint:email", "mimecast:email")
+    action IN ("SEND", "DELIVER", "Send")
+| eval sender=coalesce(sender, SenderAddress, from, "unknown")
+| eval recipient=coalesce(recipient, RecipientAddress, to, "unknown")
+| eval attachment_size=coalesce(TotalBytes, MessageSize, size, 0)
+| eval attachment_count=coalesce(AttachmentCount, attachment_count, 0)
+| eval subject=coalesce(Subject, subject, "N/A")
+| eval is_external=if(
+    NOT match(recipient, "(?i)@(yourcompany\.com|yourdomain\.com)"),
+    "external", "internal")
+| eval is_personal_email=if(
+    match(recipient, "(?i)@(gmail|yahoo|hotmail|outlook|protonmail|aol|icloud|yandex|mail\.ru|tutanota)\."),
+    "personal_service", "business")
+| where is_external="external"
+| bucket _time span=1h
+| stats sum(attachment_size) as total_bytes_sent
+        count as email_count
+        dc(recipient) as unique_recipients
+        values(recipient) as recipients
+        values(is_personal_email) as recipient_types
+        max(attachment_size) as largest_attachment
+        values(subject) as subjects
+        earliest(_time) as first_sent
+        latest(_time) as last_sent
+        by sender, _time
+| eval total_mb_sent=round(total_bytes_sent/1048576, 2)
+| eval largest_attachment_mb=round(largest_attachment/1048576, 2)
+| where total_mb_sent > 25 OR email_count > 50
+    OR (match(mvjoin(recipient_types, ","), "personal_service") AND total_mb_sent > 10)
+| eval severity=case(
+    match(mvjoin(recipient_types, ","), "personal_service") AND total_mb_sent > 50, "HIGH",
+    total_mb_sent > 100, "HIGH",
+    email_count > 100, "MEDIUM",
+    1=1, "MEDIUM")
+| eval first_sent=strftime(first_sent, "%Y-%m-%d %H:%M:%S")
+| eval last_sent=strftime(last_sent, "%Y-%m-%d %H:%M:%S")
+| table sender, email_count, unique_recipients, total_mb_sent,
+        largest_attachment_mb, recipient_types, recipients, severity,
+        first_sent, last_sent
+| sort -severity, -total_mb_sent
+
+
+` ============================================================================
+` Rule 6: Exfiltration via Alternate Data Streams or Hidden Shares
+` ============================================================================
+` Rule Name:    exfiltration-alternate-data-streams
+` Description:  Detects the use of NTFS Alternate Data Streams (ADS) to
+`               hide data before exfiltration or to stash tools. Monitors
+`               for processes reading or writing ADS content using the
+`               colon syntax (file.txt:hidden_stream).
+` MITRE ATT&CK: T1564.004 - Hide Artifacts: NTFS File Attributes
+`               T1074.001 - Data Staged: Local Data Staging
+` Tactic:       Defense Evasion (TA0005), Exfiltration (TA0010)
+` Severity:     Medium
+` Data Sources: Sysmon Event ID 1 (Process Create), Sysmon Event ID 15
+`               (FileCreateStreamHash)
+` False Positives: Some legitimate applications use ADS (e.g., browsers
+`                  store zone information), SmartScreen
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+    ((EventCode=1
+        AND (CommandLine="*type *>*:*"
+             OR CommandLine="*echo *>*:*"
+             OR CommandLine="*expand *:*"
+             OR CommandLine="*Get-Content*-Stream*"
+             OR CommandLine="*Set-Content*-Stream*"
+             OR CommandLine="*Add-Content*-Stream*"))
+     OR (EventCode=15
+         AND NOT TargetFilename="*:Zone.Identifier"
+         AND NOT TargetFilename="*:$DATA"))
+| eval event_type=case(
+    EventCode=1, "process_ads_access",
+    EventCode=15, "ads_creation",
+    1=1, "other")
+| eval detail=coalesce(CommandLine, TargetFilename, "N/A")
+| eval acting_user=User
+| eval process=Image
+| stats count as ads_events
+        values(event_type) as activity_types
+        values(detail) as details
+        values(process) as processes
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, activity_types, processes, details, ads_events,
+        first_seen, last_seen
+| sort -ads_events

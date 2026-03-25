@@ -1,0 +1,269 @@
+-- =============================================================================
+-- IBM QRadar AQL Detection Rules: Network Threats
+-- MITRE ATT&CK Tactic: TA0011 (Command and Control), TA0010 (Exfiltration),
+--                       TA0007 (Discovery)
+-- =============================================================================
+-- Each rule block includes: Rule Name, Description, MITRE Mapping, Severity,
+-- and a full AQL query.
+-- =============================================================================
+
+
+-- =============================================================================
+-- Rule 1: C2 Beaconing Detection
+-- Description: Identifies hosts exhibiting periodic outbound connection
+--   patterns consistent with command-and-control beaconing. Detects
+--   regular-interval callbacks by measuring timing consistency of
+--   connections to the same destination.
+-- MITRE ATT&CK: T1071 - Application Layer Protocol
+--   Sub-techniques: T1071.001 (Web Protocols)
+-- Severity: Critical
+-- =============================================================================
+SELECT
+    sourceip                                AS "Internal Host",
+    destinationip                           AS "External Destination",
+    destinationport                         AS "Destination Port",
+    COUNT(*)                                AS "Connection Count",
+    MIN(starttime)                          AS "First Seen",
+    MAX(starttime)                          AS "Last Seen",
+    AVG(sourcebytes)                        AS "Avg Bytes Sent",
+    STDEV(sourcebytes)                      AS "Bytes StdDev",
+    UNIQUECOUNT(
+        DATEFORMAT(starttime, 'HH:mm')
+    )                                       AS "Unique Time Slots"
+FROM flows
+WHERE flowdirection = 'L2R'
+    AND destinationport IN (80, 443, 8080, 8443)
+    -- Exclude known CDN and cloud provider ranges
+    AND NOT INCIDR(destinationip, '13.107.0.0/16')   -- Microsoft
+    AND NOT INCIDR(destinationip, '17.0.0.0/8')      -- Apple
+    AND NOT INCIDR(destinationip, '31.13.0.0/16')    -- Facebook
+    -- Only internal source IPs
+    AND (
+        INCIDR(sourceip, '10.0.0.0/8')
+        OR INCIDR(sourceip, '172.16.0.0/12')
+        OR INCIDR(sourceip, '192.168.0.0/16')
+    )
+GROUP BY sourceip, destinationip, destinationport
+HAVING
+    -- Minimum connection threshold to establish a pattern
+    COUNT(*) >= 20
+    -- Low standard deviation of bytes indicates automated beaconing
+    AND STDEV(sourcebytes) < (AVG(sourcebytes) * 0.3)
+    -- High ratio of connections to unique time slots indicates regularity
+    AND COUNT(*) / NULLIF(UNIQUECOUNT(DATEFORMAT(starttime, 'HH:mm')), 0) > 2
+ORDER BY "Connection Count" DESC
+LAST 6 HOURS;
+
+
+-- =============================================================================
+-- Rule 2: DNS Tunneling Detection
+-- Description: Detects DNS tunneling activity by identifying hosts that
+--   generate abnormally long DNS queries, high volumes of TXT record
+--   requests, or communicate with an unusually high number of unique
+--   subdomains under a single parent domain.
+-- MITRE ATT&CK: T1071.004 - Application Layer Protocol: DNS
+-- Severity: High
+-- =============================================================================
+SELECT
+    sourceip                                AS "Source Host",
+    "DNS Request Domain"                    AS "Queried Domain",
+    "DNS Request Type"                      AS "Query Type",
+    COUNT(*)                                AS "Query Count",
+    AVG(LENGTH("DNS Request Domain"))       AS "Avg Domain Length",
+    MAX(LENGTH("DNS Request Domain"))       AS "Max Domain Length",
+    SUM(sourcebytes + destinationbytes)     AS "Total DNS Bytes",
+    UNIQUECOUNT("DNS Request Domain")       AS "Unique Subdomains"
+FROM events
+WHERE category = 18001                       -- DNS Query
+    AND (
+        -- Long domain names (potential encoded data)
+        LENGTH("DNS Request Domain") > 50
+
+        -- High volume of TXT record requests
+        OR "DNS Request Type" IN ('TXT', 'NULL', 'CNAME')
+
+        -- Queries to known DNS tunneling indicators
+        OR "DNS Request Domain" MATCHES '(?:[a-z0-9]{30,}\.){1,}[a-z]{2,}'
+    )
+    -- Exclude internal DNS zones
+    AND "DNS Request Domain" NOT LIKE '%.internal.corp%'
+    AND "DNS Request Domain" NOT LIKE '%.in-addr.arpa%'
+GROUP BY sourceip, "DNS Request Domain"
+HAVING
+    COUNT(*) > 50
+    OR AVG(LENGTH("DNS Request Domain")) > 40
+    OR UNIQUECOUNT("DNS Request Domain") > 100
+ORDER BY "Query Count" DESC
+LAST 1 HOURS;
+
+
+-- =============================================================================
+-- Rule 3: Port Scanning Detection
+-- Description: Identifies hosts performing horizontal or vertical port scans
+--   by detecting a high number of connection attempts to multiple ports
+--   on a single host (vertical) or the same port across many hosts
+--   (horizontal).
+-- MITRE ATT&CK: T1046 - Network Service Scanning
+-- Severity: Medium
+-- =============================================================================
+
+-- Vertical Port Scan: One source scanning many ports on one destination
+SELECT
+    sourceip                                AS "Scanner IP",
+    destinationip                           AS "Target IP",
+    UNIQUECOUNT(destinationport)            AS "Ports Scanned",
+    COUNT(*)                                AS "Total Attempts",
+    MIN(starttime)                          AS "Scan Start",
+    MAX(starttime)                          AS "Scan End",
+    APPLICATIONNAME(applicationid)          AS "Application"
+FROM flows
+WHERE flowdirection IN ('L2R', 'L2L')
+    AND flowtype = 0                         -- Standard flow
+    AND destinationbytes = 0                 -- No response (closed/filtered ports)
+    AND sourcepackets <= 3                   -- SYN only or SYN+RST
+GROUP BY sourceip, destinationip
+HAVING UNIQUECOUNT(destinationport) >= 25
+ORDER BY "Ports Scanned" DESC
+LAST 15 MINUTES;
+
+-- Horizontal Port Scan: One source scanning one port across many destinations
+SELECT
+    sourceip                                AS "Scanner IP",
+    destinationport                         AS "Target Port",
+    UNIQUECOUNT(destinationip)              AS "Hosts Scanned",
+    COUNT(*)                                AS "Total Attempts",
+    MIN(starttime)                          AS "Scan Start",
+    MAX(starttime)                          AS "Scan End"
+FROM flows
+WHERE flowdirection IN ('L2R', 'L2L')
+    AND flowtype = 0
+    AND destinationbytes = 0
+    AND sourcepackets <= 3
+GROUP BY sourceip, destinationport
+HAVING UNIQUECOUNT(destinationip) >= 15
+ORDER BY "Hosts Scanned" DESC
+LAST 15 MINUTES;
+
+
+-- =============================================================================
+-- Rule 4: Suspicious Outbound Connections (Data Exfiltration)
+-- Description: Detects large outbound data transfers to external destinations
+--   that may indicate data exfiltration. Monitors for unusual volume,
+--   connections to rare destinations, and transfers over non-standard ports.
+-- MITRE ATT&CK: T1048 - Exfiltration Over Alternative Protocol
+--   Sub-techniques: T1048.001 (Exfiltration Over Symmetric Encrypted
+--   Non-C2 Protocol), T1048.003 (Exfiltration Over Unencrypted Non-C2 Protocol)
+-- Severity: High
+-- =============================================================================
+SELECT
+    sourceip                                AS "Internal Host",
+    destinationip                           AS "External Destination",
+    destinationport                         AS "Destination Port",
+    PROTOCOLNAME(protocolid)                AS "Protocol",
+    SUM(sourcebytes) / 1048576              AS "Data Sent (MB)",
+    SUM(destinationbytes) / 1048576         AS "Data Received (MB)",
+    COUNT(*)                                AS "Flow Count",
+    MIN(starttime)                          AS "First Flow",
+    MAX(starttime)                          AS "Last Flow"
+FROM flows
+WHERE flowdirection = 'L2R'
+    AND (
+        INCIDR(sourceip, '10.0.0.0/8')
+        OR INCIDR(sourceip, '172.16.0.0/12')
+        OR INCIDR(sourceip, '192.168.0.0/16')
+    )
+    -- Non-standard ports or known exfiltration vectors
+    AND (
+        -- Large transfers on any port
+        sourcebytes > 104857600              -- > 100 MB per flow
+        -- Or transfers over non-standard ports
+        OR destinationport NOT IN (80, 443, 53, 25, 587, 993, 995)
+    )
+    -- Exclude known backup and update destinations
+    AND destinationip NOT IN (
+        SELECT sourceip FROM reference_data('Approved_External_Destinations')
+    )
+GROUP BY sourceip, destinationip, destinationport, protocolid
+HAVING SUM(sourcebytes) > 52428800          -- > 50 MB total in the window
+ORDER BY "Data Sent (MB)" DESC
+LAST 1 HOURS;
+
+
+-- =============================================================================
+-- Rule 5: Protocol Anomalies
+-- Description: Detects traffic using non-standard protocols or protocol
+--   mismatches (e.g., non-HTTP traffic on port 80, non-DNS traffic
+--   on port 53) that may indicate tunneling, covert channels, or C2.
+-- MITRE ATT&CK: T1571 - Non-Standard Port
+-- Severity: Medium
+-- =============================================================================
+SELECT
+    sourceip                                AS "Source IP",
+    destinationip                           AS "Destination IP",
+    sourceport                              AS "Source Port",
+    destinationport                         AS "Destination Port",
+    PROTOCOLNAME(protocolid)                AS "Protocol",
+    APPLICATIONNAME(applicationid)          AS "Detected Application",
+    SUM(sourcebytes + destinationbytes)     AS "Total Bytes",
+    COUNT(*)                                AS "Flow Count",
+    starttime                               AS "Event Time"
+FROM flows
+WHERE flowdirection = 'L2R'
+    AND (
+        -- Non-HTTP application on HTTP ports
+        (destinationport IN (80, 8080)
+            AND APPLICATIONNAME(applicationid) NOT IN ('HTTP', 'http', 'Web Browsing', 'UNKNOWN'))
+
+        -- Non-HTTPS application on HTTPS ports
+        OR (destinationport IN (443, 8443)
+            AND APPLICATIONNAME(applicationid) NOT IN ('HTTPS', 'SSL', 'TLS', 'UNKNOWN'))
+
+        -- Non-DNS traffic on DNS port
+        OR (destinationport = 53
+            AND PROTOCOLNAME(protocolid) = 'TCP'
+            AND SUM(sourcebytes) > 5120)     -- DNS over TCP > 5KB is suspicious
+
+        -- SSH on non-standard port
+        OR (APPLICATIONNAME(applicationid) = 'SSH'
+            AND destinationport NOT IN (22, 2222))
+
+        -- RDP on non-standard port
+        OR (APPLICATIONNAME(applicationid) = 'RDP'
+            AND destinationport NOT IN (3389))
+
+        -- IRC traffic (common C2 protocol)
+        OR APPLICATIONNAME(applicationid) IN ('IRC', 'irc')
+    )
+GROUP BY sourceip, destinationip, sourceport, destinationport, protocolid, applicationid
+ORDER BY "Total Bytes" DESC
+LAST 1 HOURS;
+
+
+-- =============================================================================
+-- Rule 6: DNS Fast Flux Detection
+-- Description: Identifies domains exhibiting fast-flux DNS behavior where
+--   a single domain resolves to many different IP addresses in a short
+--   period, a common technique for resilient C2 infrastructure.
+-- MITRE ATT&CK: T1568.001 - Dynamic Resolution: Fast Flux DNS
+-- Severity: High
+-- =============================================================================
+SELECT
+    "DNS Request Domain"                    AS "Domain",
+    UNIQUECOUNT("DNS Response IP")          AS "Unique IPs",
+    COUNT(*)                                AS "Total Lookups",
+    MIN("DNS Response TTL")                 AS "Min TTL",
+    AVG("DNS Response TTL")                 AS "Avg TTL",
+    UNIQUECOUNT(sourceip)                   AS "Requesting Hosts"
+FROM events
+WHERE category = 18001                       -- DNS Query
+    AND "DNS Response IP" IS NOT NULL
+    AND "DNS Request Domain" NOT LIKE '%.cdn.%'
+    AND "DNS Request Domain" NOT LIKE '%.akamai%'
+    AND "DNS Request Domain" NOT LIKE '%.cloudfront%'
+    AND "DNS Request Domain" NOT LIKE '%.googleapis.com'
+GROUP BY "DNS Request Domain"
+HAVING
+    UNIQUECOUNT("DNS Response IP") >= 5
+    AND AVG("DNS Response TTL") < 300        -- Low TTL is typical of fast flux
+ORDER BY "Unique IPs" DESC
+LAST 3 HOURS;

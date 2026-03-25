@@ -1,0 +1,125 @@
+<!-- Wazuh Detection Rules: Privilege Escalation -->
+<!-- MITRE ATT&CK Tactic: TA0004 - Privilege Escalation -->
+<!-- Rule IDs: 100260-100279 -->
+
+<group name="privilege_escalation,mitre_ta0004,">
+
+  <!-- T1548.002 - UAC Bypass via fodhelper -->
+  <rule id="100260" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)fodhelper\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell|pwsh)\.exe$</field>
+    <description>Privilege Escalation: UAC bypass via fodhelper.exe - $(win.eventdata.image) spawned</description>
+    <mitre>
+      <id>T1548.002</id>
+    </mitre>
+    <group>uac_bypass,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- T1548.002 - UAC Bypass via eventvwr -->
+  <rule id="100261" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)eventvwr\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell|pwsh|mshta)\.exe$</field>
+    <description>Privilege Escalation: UAC bypass via eventvwr.exe</description>
+    <mitre>
+      <id>T1548.002</id>
+    </mitre>
+    <group>uac_bypass,critical,</group>
+  </rule>
+
+  <!-- T1134.001 - Token Impersonation (Potato Attacks) -->
+  <rule id="100262" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(JuicyPotato|SweetPotato|RottenPotato|PrintSpoofer|GodPotato|RoguePotato|SharpEfsPotato)</field>
+    <description>Privilege Escalation: Token impersonation tool (Potato attack) - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1134.001</id>
+    </mitre>
+    <group>token_manipulation,potato_attack,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- T1068 - Exploitation for Privilege Escalation -->
+  <rule id="100263" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)(svchost|spoolsv|searchindexer|w3wp)\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell|pwsh)\.exe$</field>
+    <field name="win.eventdata.user" type="pcre2">(?i)(SYSTEM|NT AUTHORITY)</field>
+    <description>Privilege Escalation: System service spawned shell as SYSTEM - possible exploit</description>
+    <mitre>
+      <id>T1068</id>
+    </mitre>
+    <group>service_exploit,</group>
+  </rule>
+
+  <!-- T1134.002 - Create Process with Token -->
+  <rule id="100264" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(runas\s+/netonly|runas\s+/savecred|Invoke-TokenManipulation|Invoke-RunAs|incognito\s+execute)</field>
+    <description>Privilege Escalation: Token manipulation via $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1134.002</id>
+    </mitre>
+    <group>token_manipulation,</group>
+  </rule>
+
+  <!-- T1546.008 - Accessibility Features (Sticky Keys) -->
+  <rule id="100265" level="14">
+    <if_sid>61600</if_sid>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\\\Image File Execution Options\\\\(sethc|utilman|osk|narrator|magnify)\.exe</field>
+    <description>Privilege Escalation: Accessibility feature debugger set - backdoor via $(win.eventdata.targetObject)</description>
+    <mitre>
+      <id>T1546.008</id>
+    </mitre>
+    <group>sticky_keys,backdoor,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- Linux: T1548.001 - SUID/SGID Abuse -->
+  <rule id="100266" level="10">
+    <if_sid>533</if_sid>
+    <match type="pcre2">(?i)chmod\s+[24][0-7]{3}|chmod\s+[ugo]\+s|find\s+/\s+-perm\s+-[24]000|find.*-perm.*4000</match>
+    <description>Privilege Escalation: SUID/SGID modification or enumeration detected</description>
+    <mitre>
+      <id>T1548.001</id>
+    </mitre>
+    <group>linux_privesc,suid,</group>
+  </rule>
+
+  <!-- Linux: T1548.003 - Sudo Abuse -->
+  <rule id="100267" level="12">
+    <if_sid>5401,5402</if_sid>
+    <match type="pcre2">(?i)sudo.*NOPASSWD|sudo\s+-l|sudo\s+-u\s+root|pkexec</match>
+    <description>Privilege Escalation: Sudo privilege enumeration or abuse</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>linux_privesc,sudo_abuse,</group>
+  </rule>
+
+  <!-- T1574.001 - DLL Search Order Hijacking -->
+  <rule id="100268" level="10">
+    <if_sid>61607</if_sid>
+    <field name="win.eventdata.imageLoaded" type="pcre2">(?i)\\\\(temp|appdata|downloads|public)\\\\.*\.dll$</field>
+    <description>Privilege Escalation: DLL loaded from suspicious path - possible DLL hijacking - $(win.eventdata.imageLoaded)</description>
+    <mitre>
+      <id>T1574.001</id>
+    </mitre>
+    <group>dll_hijacking,</group>
+  </rule>
+
+  <!-- Linux: Kernel Exploit Attempt -->
+  <rule id="100269" level="14">
+    <if_sid>533</if_sid>
+    <match type="pcre2">(?i)(dirty_?cow|dirty_?pipe|overlayfs|exploit.*kernel|CVE-20[12][0-9]-\d+)</match>
+    <description>Privilege Escalation: Possible kernel exploit execution</description>
+    <mitre>
+      <id>T1068</id>
+    </mitre>
+    <group>linux_privesc,kernel_exploit,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+</group>

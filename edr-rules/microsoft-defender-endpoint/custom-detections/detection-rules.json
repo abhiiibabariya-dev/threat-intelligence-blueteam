@@ -1,0 +1,66 @@
+{
+  "custom_detection_rules": [
+    {
+      "ruleName": "Credential Dumping Tool Execution",
+      "description": "Detects execution of known credential dumping tools targeting LSASS or SAM",
+      "severity": "high",
+      "mitreTechnique": "T1003",
+      "category": "CredentialAccess",
+      "queryFrequency": "PT1H",
+      "queryPeriod": "PT1H",
+      "query": "DeviceProcessEvents | where Timestamp > ago(1h) | where ProcessCommandLine has_any ('sekurlsa', 'lsadump', 'mimikatz') or (FileName =~ 'procdump.exe' and ProcessCommandLine has 'lsass') or (FileName =~ 'rundll32.exe' and ProcessCommandLine has 'comsvcs' and ProcessCommandLine has 'MiniDump')",
+      "alertTitle": "Credential Dumping Tool Detected on {DeviceName}",
+      "recommendedActions": ["Isolate the device", "Reset credentials for affected accounts", "Investigate lateral movement"],
+      "enabled": true
+    },
+    {
+      "ruleName": "Ransomware Shadow Copy Deletion",
+      "description": "Detects volume shadow copy deletion indicating ransomware activity",
+      "severity": "high",
+      "mitreTechnique": "T1490",
+      "category": "Impact",
+      "queryFrequency": "PT15M",
+      "queryPeriod": "PT1H",
+      "query": "DeviceProcessEvents | where Timestamp > ago(1h) | where (FileName =~ 'vssadmin.exe' and ProcessCommandLine has 'delete shadows') or (FileName =~ 'wmic.exe' and ProcessCommandLine has 'shadowcopy delete') or (FileName =~ 'bcdedit.exe' and ProcessCommandLine has_any ('recoveryenabled no', 'bootstatuspolicy ignoreallfailures'))",
+      "alertTitle": "RANSOMWARE - Shadow Copy Deletion on {DeviceName}",
+      "recommendedActions": ["Immediately isolate the device", "Check for lateral spread", "Verify backup integrity"],
+      "enabled": true
+    },
+    {
+      "ruleName": "Suspicious PowerShell Execution",
+      "description": "Detects PowerShell with encoded commands, download cradles, or AMSI bypass",
+      "severity": "medium",
+      "mitreTechnique": "T1059.001",
+      "category": "Execution",
+      "queryFrequency": "PT1H",
+      "queryPeriod": "PT1H",
+      "query": "DeviceProcessEvents | where Timestamp > ago(1h) | where FileName in~ ('powershell.exe', 'pwsh.exe') | where ProcessCommandLine has_any ('-enc', 'FromBase64', 'DownloadString', 'WebClient', 'IEX', 'Invoke-Expression', 'AmsiUtils', 'amsiInitFailed')",
+      "alertTitle": "Suspicious PowerShell on {DeviceName}",
+      "enabled": true
+    },
+    {
+      "ruleName": "PsExec Lateral Movement",
+      "description": "Detects PsExec service installation for lateral movement",
+      "severity": "medium",
+      "mitreTechnique": "T1021.002",
+      "category": "LateralMovement",
+      "queryFrequency": "PT1H",
+      "queryPeriod": "PT1H",
+      "query": "DeviceProcessEvents | where Timestamp > ago(1h) | where (FileName in~ ('PsExec.exe', 'PsExec64.exe')) or (InitiatingProcessFileName =~ 'services.exe' and FileName =~ 'PSEXESVC.exe')",
+      "alertTitle": "PsExec Lateral Movement on {DeviceName}",
+      "enabled": true
+    },
+    {
+      "ruleName": "LOLBin Abuse for Download",
+      "description": "Detects living-off-the-land binaries being used for downloading payloads",
+      "severity": "medium",
+      "mitreTechnique": "T1218",
+      "category": "DefenseEvasion",
+      "queryFrequency": "PT1H",
+      "queryPeriod": "PT1H",
+      "query": "DeviceProcessEvents | where Timestamp > ago(1h) | where FileName in~ ('mshta.exe', 'certutil.exe', 'regsvr32.exe', 'msbuild.exe', 'cmstp.exe') | where ProcessCommandLine has_any ('http://', 'https://', 'javascript:', '-decode', '-urlcache', 'scrobj.dll')",
+      "alertTitle": "LOLBin Abuse on {DeviceName}",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+# LogRhythm - Lateral Movement Detection Rules
+# MITRE ATT&CK Tactic: TA0008
+---
+rules:
+  - rule_name: "LR-LM-001: PsExec Service Installation"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1021.002]
+    common_event: "Service Installed"
+    filter: {service_name_regex: "(?i)psexe(svc|c)"}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, add_to_case: "Lateral Movement"]
+
+  - rule_name: "LR-LM-002: WMI Remote Process"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1047]
+    common_event: "Process Creation"
+    filter:
+      parent_process: wmiprvse.exe
+      process_any: [cmd.exe, powershell.exe, pwsh.exe]
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-LM-003: RDP to Multiple Hosts"
+    rule_type: unique_values
+    severity: high
+    risk_rating: 8
+    mitre: [T1021.001]
+    common_event: "Network Connection"
+    filter: {destination_port: 3389, direction: "Local to Remote"}
+    unique_values:
+      field: impacted_host_name
+      minimum_unique: 3
+      time_window_seconds: 3600
+      group_by: [origin_host_name]
+    actions: [create_alarm]
+
+  - rule_name: "LR-LM-004: Admin Share Access"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1021.002]
+    common_event: "Share Access"
+    filter:
+      event_id: 5140
+      share_name_any: ["ADMIN$", "C$"]
+    threshold: {count: 1, time_window_seconds: 60, group_by: [origin_host_name]}
+    actions: [create_alarm]
+
+  - rule_name: "LR-LM-005: WinRM Remote Shell"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1021.006]
+    common_event: "Process Creation"
+    filter:
+      parent_process: wsmprovhost.exe
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-LM-006: Pass-the-Hash Logon"
+    rule_type: threshold
+    severity: critical
+    risk_rating: 9
+    mitre: [T1550.002]
+    common_event: "Authentication Success"
+    filter:
+      event_id: 4624
+      logon_type: 9
+      authentication_package: Negotiate
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, smartresponse: "Reset Password"]
+
+  - rule_name: "LR-LM-007: SSH Brute Force then Login"
+    rule_type: behavioral
+    severity: high
+    risk_rating: 8
+    mitre: [T1021.004]
+    behavioral_sequence:
+      - step: 1
+        classification: "Authentication Failure"
+        filter: {protocol: SSH}
+        count: 5
+        time_window_seconds: 300
+      - step: 2
+        classification: "Authentication Success"
+        filter: {protocol: SSH}
+        same_origin: true
+        time_after_previous_seconds: 300
+    actions: [create_alarm, add_to_case: "Compromised Account"]
+
+  - rule_name: "LR-LM-008: Remote Scheduled Task Creation"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1053.005]
+    common_event: "Process Creation"
+    filter:
+      command_contains_all: ["schtasks", "/create", "/s "]
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]

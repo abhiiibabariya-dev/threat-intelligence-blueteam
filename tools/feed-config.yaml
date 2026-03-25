@@ -1,0 +1,190 @@
+# Threat Intelligence Feed Configuration
+# Configure API keys, endpoints, and refresh intervals for each feed
+
+global:
+  output_directory: "./output"
+  log_level: "INFO"
+  log_file: "./logs/threat-intel-fetcher.log"
+  default_output_format: "json"  # json, csv, stix2
+  proxy:
+    enabled: false
+    http: ""
+    https: ""
+  request_timeout: 30
+  max_retries: 3
+  retry_delay: 5
+
+feeds:
+  # abuse.ch Feeds
+  urlhaus:
+    enabled: true
+    name: "URLhaus - Malicious URLs"
+    url: "https://urlhaus-api.abuse.ch/v1/"
+    endpoints:
+      recent_urls: "/urls/recent/"
+      recent_payloads: "/payloads/recent/"
+      url_lookup: "/url/"
+      host_lookup: "/host/"
+      payload_lookup: "/payload/"
+      tag_lookup: "/tag/"
+    api_key: ""  # No API key required for basic access
+    refresh_interval_minutes: 60
+    output_format: "json"
+    ioc_types: ["url", "domain", "ip", "hash"]
+    confidence: 80
+    tlp: "GREEN"
+
+  malwarebazaar:
+    enabled: true
+    name: "MalwareBazaar - Malware Samples"
+    url: "https://mb-api.abuse.ch/api/v1/"
+    endpoints:
+      recent_samples: "/"
+      hash_lookup: "/"
+      tag_lookup: "/"
+      signature_lookup: "/"
+    api_key: ""
+    refresh_interval_minutes: 120
+    output_format: "json"
+    ioc_types: ["hash_md5", "hash_sha256", "hash_sha1"]
+    confidence: 90
+    tlp: "GREEN"
+    max_results: 1000
+
+  threatfox:
+    enabled: true
+    name: "ThreatFox - IOC Sharing"
+    url: "https://threatfox-api.abuse.ch/api/v1/"
+    endpoints:
+      recent_iocs: "/"
+      ioc_lookup: "/"
+      search: "/"
+      tag_lookup: "/"
+    api_key: ""
+    refresh_interval_minutes: 60
+    output_format: "json"
+    ioc_types: ["ip:port", "domain", "url", "hash"]
+    confidence: 85
+    tlp: "GREEN"
+
+  feodotracker:
+    enabled: true
+    name: "Feodo Tracker - Botnet C2"
+    url: "https://feodotracker.abuse.ch"
+    endpoints:
+      botnet_c2: "/downloads/ipblocklist_recommended.txt"
+      botnet_c2_json: "/downloads/ipblocklist.json"
+      recent_c2: "/downloads/ipblocklist_aggressive.txt"
+    api_key: ""
+    refresh_interval_minutes: 360
+    output_format: "json"
+    ioc_types: ["ip"]
+    confidence: 95
+    tlp: "GREEN"
+
+  # AlienVault OTX
+  alienvault_otx:
+    enabled: true
+    name: "AlienVault OTX - Open Threat Exchange"
+    url: "https://otx.alienvault.com/api/v1"
+    endpoints:
+      pulses_subscribed: "/pulses/subscribed"
+      pulses_activity: "/pulses/activity"
+      indicators_ipv4: "/indicators/IPv4/{indicator}/general"
+      indicators_domain: "/indicators/domain/{indicator}/general"
+      indicators_url: "/indicators/url/{indicator}/general"
+      indicators_file: "/indicators/file/{indicator}/general"
+    api_key: "${OTX_API_KEY}"  # Set via environment variable
+    refresh_interval_minutes: 120
+    output_format: "json"
+    ioc_types: ["ip", "domain", "url", "hash", "email", "cve"]
+    confidence: 70
+    tlp: "GREEN"
+    pulse_days: 30
+
+  # MITRE ATT&CK
+  mitre_attack:
+    enabled: true
+    name: "MITRE ATT&CK Framework"
+    url: "https://raw.githubusercontent.com/mitre/cti/master"
+    endpoints:
+      enterprise: "/enterprise-attack/enterprise-attack.json"
+      mobile: "/mobile-attack/mobile-attack.json"
+      ics: "/ics-attack/ics-attack.json"
+    api_key: ""
+    refresh_interval_minutes: 1440  # Daily
+    output_format: "stix2"
+    confidence: 100
+    tlp: "CLEAR"
+
+  # NIST NVD
+  nist_nvd:
+    enabled: true
+    name: "NIST National Vulnerability Database"
+    url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+    endpoints:
+      cve_search: ""
+      cve_by_id: "?cveId={cve_id}"
+      cve_recent: "?pubStartDate={start_date}&pubEndDate={end_date}"
+    api_key: "${NVD_API_KEY}"  # Optional but recommended for higher rate limits
+    refresh_interval_minutes: 360
+    output_format: "json"
+    confidence: 100
+    tlp: "CLEAR"
+    results_per_page: 200
+
+  # Emerging Threats
+  emerging_threats:
+    enabled: true
+    name: "Emerging Threats - Suricata/Snort Rules"
+    url: "https://rules.emergingthreats.net"
+    endpoints:
+      compromised_ips: "/blockrules/compromised-ips.txt"
+      botcc: "/blockrules/botcc.rules"
+      emerging_rules: "/open/suricata-5.0/rules/emerging-all.rules"
+    api_key: ""
+    refresh_interval_minutes: 720
+    output_format: "json"
+    ioc_types: ["ip", "domain", "suricata_rule"]
+    confidence: 75
+    tlp: "GREEN"
+
+  # CISA Known Exploited Vulnerabilities
+  cisa_kev:
+    enabled: true
+    name: "CISA Known Exploited Vulnerabilities"
+    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    endpoints:
+      catalog: ""
+    api_key: ""
+    refresh_interval_minutes: 1440
+    output_format: "json"
+    confidence: 100
+    tlp: "CLEAR"
+
+# SIEM Rule Generation Settings
+siem_rule_generation:
+  enabled: true
+  platforms:
+    - splunk
+    - sentinel
+    - qradar
+    - elastic
+    - chronicle
+    - arcsight
+    - fortisiem
+    - exabeam
+    - logrhythm
+    - securonix
+    - mcafee_esm
+    - logpoint
+    - insightidr
+    - wazuh
+  output_directory: "./generated-rules"
+  ioc_threshold_per_rule: 100  # Max IOCs per lookup/rule
+  rule_severity_mapping:
+    critical: 95
+    high: 80
+    medium: 50
+    low: 25
+    informational: 10

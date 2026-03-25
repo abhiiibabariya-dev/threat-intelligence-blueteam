@@ -1,0 +1,183 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Cloud Threats
+// =============================================================================
+// Description:  Detect cloud-based threats including Azure resource abuse,
+//               privilege escalation, suspicious API calls, and cloud identity attacks.
+// MITRE ATT&CK: T1078.004, T1098, T1580, T1537
+// Severity:     Medium to Critical
+// Data Sources:  AzureActivity, AuditLogs, AzureDiagnostics
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: Suspicious Azure Resource Deployment
+// MITRE: T1578 - Modify Cloud Compute Infrastructure
+// Severity: High
+// ---------------------------------------------------------------------------
+AzureActivity
+| where TimeGenerated >= ago(1d)
+| where OperationNameValue has_any (
+    "Microsoft.Compute/virtualMachines/write",
+    "Microsoft.ContainerInstance/containerGroups/write",
+    "Microsoft.Compute/virtualMachineScaleSets/write"
+)
+| where ActivityStatusValue == "Success"
+| extend
+    ResourceGroup = tostring(parse_json(Properties).resourceGroup),
+    VMSize = tostring(parse_json(Properties).responseBody)
+| summarize
+    DeploymentCount = count(),
+    ResourceGroups = make_set(ResourceGroup, 5),
+    Subscriptions = make_set(SubscriptionId, 5),
+    FirstDeployment = min(TimeGenerated),
+    LastDeployment = max(TimeGenerated)
+    by Caller, CallerIpAddress
+| where DeploymentCount > 5
+| project
+    TimeGenerated = LastDeployment,
+    AlertName = "Bulk Azure VM Deployment",
+    Caller,
+    CallerIpAddress,
+    DeploymentCount,
+    ResourceGroups,
+    Subscriptions
+
+// ---------------------------------------------------------------------------
+// Rule 2: Azure Key Vault Suspicious Access
+// MITRE: T1552.005 - Unsecured Credentials: Cloud Instance Metadata
+// Severity: High
+// ---------------------------------------------------------------------------
+AzureDiagnostics
+| where TimeGenerated >= ago(1d)
+| where ResourceType == "VAULTS"
+| where OperationName in (
+    "SecretGet", "SecretList", "KeyGet", "KeyList",
+    "CertificateGet", "CertificateList"
+)
+| summarize
+    AccessCount = count(),
+    UniqueSecrets = dcount(id_s),
+    Operations = make_set(OperationName),
+    SecretsAccessed = make_set(id_s, 20)
+    by CallerIPAddress, identity_claim_upn_s, Resource
+| where AccessCount > 20 or UniqueSecrets > 10
+| project
+    TimeGenerated = now(),
+    AlertName = "Suspicious Key Vault Bulk Access",
+    User = identity_claim_upn_s,
+    CallerIPAddress,
+    VaultName = Resource,
+    AccessCount,
+    UniqueSecrets,
+    Operations,
+    SecretsAccessed
+
+// ---------------------------------------------------------------------------
+// Rule 3: Conditional Access Policy Modification
+// MITRE: T1556 - Modify Authentication Process
+// Severity: Critical
+// ---------------------------------------------------------------------------
+AuditLogs
+| where TimeGenerated >= ago(1d)
+| where OperationName has_any (
+    "Update conditional access policy",
+    "Delete conditional access policy",
+    "Add conditional access policy"
+)
+| extend
+    ModifiedBy = tostring(InitiatedBy.user.userPrincipalName),
+    ModifiedByIP = tostring(InitiatedBy.user.ipAddress),
+    PolicyName = tostring(TargetResources[0].displayName),
+    PolicyId = tostring(TargetResources[0].id)
+| extend
+    ModifiedProperties = parse_json(tostring(TargetResources[0].modifiedProperties))
+| project
+    TimeGenerated,
+    AlertName = "Conditional Access Policy Modified",
+    OperationName,
+    ModifiedBy,
+    ModifiedByIP,
+    PolicyName,
+    PolicyId,
+    ModifiedProperties,
+    CorrelationId
+
+// ---------------------------------------------------------------------------
+// Rule 4: OAuth Application Consent Grant (Illicit Consent)
+// MITRE: T1550.001 - Use Alternate Authentication Material: Application Access Token
+// Severity: High
+// ---------------------------------------------------------------------------
+AuditLogs
+| where TimeGenerated >= ago(1d)
+| where OperationName == "Consent to application"
+| extend
+    ConsentedBy = tostring(InitiatedBy.user.userPrincipalName),
+    AppName = tostring(TargetResources[0].displayName),
+    AppId = tostring(TargetResources[0].id)
+| extend
+    Permissions = parse_json(tostring(TargetResources[0].modifiedProperties))
+| mv-expand Permissions
+| extend
+    PermName = tostring(Permissions.displayName),
+    PermValue = tostring(Permissions.newValue)
+| where PermValue has_any (
+    "Mail.Read", "Mail.ReadWrite", "Files.ReadWrite.All",
+    "Directory.ReadWrite.All", "User.ReadWrite.All",
+    "full_access_as_app", "Sites.ReadWrite.All"
+)
+| summarize
+    HighRiskPermissions = make_set(PermValue),
+    PermissionCount = count()
+    by TimeGenerated, ConsentedBy, AppName, AppId
+| project
+    TimeGenerated,
+    AlertName = "High-Risk OAuth Consent Granted",
+    ConsentedBy,
+    AppName,
+    AppId,
+    HighRiskPermissions,
+    PermissionCount
+
+// ---------------------------------------------------------------------------
+// Rule 5: Azure Subscription Ownership Change
+// MITRE: T1098 - Account Manipulation
+// Severity: Critical
+// ---------------------------------------------------------------------------
+AzureActivity
+| where TimeGenerated >= ago(1d)
+| where OperationNameValue =~ "Microsoft.Authorization/roleAssignments/write"
+| where ActivityStatusValue == "Success"
+| extend
+    Properties = parse_json(Properties),
+    RoleDefinitionId = tostring(parse_json(Properties).requestbody)
+| where RoleDefinitionId has "Owner" or RoleDefinitionId has "8e3af657"  // Owner role GUID
+| project
+    TimeGenerated,
+    AlertName = "Subscription Owner Role Assigned",
+    Caller,
+    CallerIpAddress,
+    SubscriptionId,
+    ResourceGroup,
+    CorrelationId
+
+// ---------------------------------------------------------------------------
+// Rule 6: Cloud Storage Public Access Enabled
+// MITRE: T1537 - Transfer Data to Cloud Account
+// Severity: High
+// ---------------------------------------------------------------------------
+AzureActivity
+| where TimeGenerated >= ago(1d)
+| where OperationNameValue has_any (
+    "Microsoft.Storage/storageAccounts/write",
+    "Microsoft.Storage/storageAccounts/blobServices/containers/write"
+)
+| where ActivityStatusValue == "Success"
+| extend RequestBody = tostring(parse_json(Properties).requestbody)
+| where RequestBody has "publicAccess" and RequestBody has_any ("Blob", "Container")
+| project
+    TimeGenerated,
+    AlertName = "Storage Account Public Access Enabled",
+    Caller,
+    CallerIpAddress,
+    ResourceId = _ResourceId,
+    SubscriptionId,
+    RequestBody = substring(RequestBody, 0, 500)

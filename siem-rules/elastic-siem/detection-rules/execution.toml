@@ -1,0 +1,82 @@
+# Elastic SIEM Detection Rules: Execution
+# MITRE ATT&CK: T1059, T1047
+
+[rule]
+rule_id = "e1a04001-0001-4000-8000-000000000001"
+risk_score = 70
+severity = "high"
+name = "Suspicious PowerShell with Encoded Command"
+description = "Detects PowerShell execution with encoded commands, download cradles, or AMSI bypass attempts."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.name : ("powershell.exe", "pwsh.exe") and
+  process.args : ("-enc*", "-e *", "*FromBase64*", "*DownloadString*", "*WebClient*", "*Invoke-Expression*", "*IEX*", "*AmsiUtils*", "*amsiInitFailed*", "*bypass*", "*hidden*")
+'''
+tags = ["Execution", "T1059.001"]
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1059"
+name = "Command and Scripting Interpreter"
+reference = "https://attack.mitre.org/techniques/T1059/"
+[[rule.threat.technique.subtechnique]]
+id = "T1059.001"
+name = "PowerShell"
+reference = "https://attack.mitre.org/techniques/T1059/001/"
+[rule.threat.tactic]
+id = "TA0002"
+name = "Execution"
+reference = "https://attack.mitre.org/tactics/TA0002/"
+
+[rule_2]
+rule_id = "e1a04001-0002-4000-8000-000000000002"
+risk_score = 60
+severity = "medium"
+name = "Script Engine Spawning Command Shell"
+description = "Detects script engines (wscript, cscript, mshta) spawning cmd or PowerShell."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.parent.name : ("wscript.exe", "cscript.exe", "mshta.exe") and
+  process.name : ("cmd.exe", "powershell.exe", "pwsh.exe")
+'''
+tags = ["Execution", "T1059.005", "T1059.007"]
+
+[rule_3]
+rule_id = "e1a04001-0003-4000-8000-000000000003"
+risk_score = 65
+severity = "medium"
+name = "Certutil Used for Download or Decode"
+description = "Detects abuse of certutil.exe for downloading or decoding files."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.name : "certutil.exe" and
+  process.args : ("-urlcache", "-decode", "-decodehex", "-encode", "http*", "ftp*")
+'''
+tags = ["Execution", "Defense Evasion", "T1140"]
+
+[rule_4]
+rule_id = "e1a04001-0004-4000-8000-000000000004"
+risk_score = 75
+severity = "high"
+name = "Suspicious WMI Process Creation"
+description = "Detects WMI-based process creation via wmic.exe with process call create."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  process.name : "wmic.exe" and
+  process.args : ("process", "call", "create") and
+  process.args : ("*powershell*", "*cmd*", "*http*", "*\\\\*")
+'''
+tags = ["Execution", "T1047"]

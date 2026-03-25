@@ -1,0 +1,126 @@
+-- =============================================================================
+-- IBM QRadar AQL Rules: Identity Threats
+-- =============================================================================
+-- Description:  Detect identity-based threats including login anomalies,
+--               privilege escalation, and account lockouts.
+-- MITRE ATT&CK: T1110 (Brute Force), T1078 (Valid Accounts)
+-- Severity:     Medium to High
+-- Log Sources:  Windows Security, Active Directory, VPN, Cloud Auth
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Rule 1: Distributed Brute Force Attack
+-- MITRE: T1110 - Brute Force
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    COUNT(*) AS "Failed Attempts",
+    COUNT(DISTINCT username) AS "Unique Accounts",
+    GROUP(DISTINCT username) AS "Targeted Accounts",
+    MIN(starttime) AS "First Attempt",
+    MAX(starttime) AS "Last Attempt",
+    DATEFORMAT(MIN(starttime), 'yyyy-MM-dd HH:mm:ss') AS "Start Time",
+    DATEFORMAT(MAX(starttime), 'yyyy-MM-dd HH:mm:ss') AS "End Time"
+FROM events
+WHERE LOGSOURCETYPENAME(logsourcetypeid) = 'Microsoft Windows Security Event Log'
+    AND "EventID" = '4625'
+    AND INOFFENSE(sourceip) = 'FALSE'
+GROUP BY sourceip
+HAVING COUNT(*) > 15
+    AND COUNT(DISTINCT username) > 3
+ORDER BY "Failed Attempts" DESC
+LAST 1 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 2: Password Spray Detection
+-- MITRE: T1110.003 - Password Spraying
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    COUNT(*) AS "Total Attempts",
+    COUNT(DISTINCT username) AS "Unique Accounts",
+    GROUP(DISTINCT username) AS "Targeted Accounts"
+FROM events
+WHERE "EventID" = '4625'
+    AND category = 'Authentication'
+GROUP BY sourceip
+HAVING COUNT(DISTINCT username) > 10
+    AND COUNT(*) / COUNT(DISTINCT username) < 3
+LAST 30 MINUTES
+
+-- ---------------------------------------------------------------------------
+-- Rule 3: Privilege Escalation Detection
+-- MITRE: T1078 - Valid Accounts (Privilege Escalation)
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    username AS "User",
+    sourceip AS "Source IP",
+    COUNT(*) AS "Privilege Changes",
+    GROUP(DISTINCT "EventID") AS "Event IDs",
+    MIN(starttime) AS "First Event",
+    MAX(starttime) AS "Last Event"
+FROM events
+WHERE "EventID" IN ('4672', '4673', '4674')
+    AND username NOT IN ('SYSTEM', 'LOCAL SERVICE', 'NETWORK SERVICE')
+    AND username NOT LIKE '%$'
+GROUP BY username, sourceip
+HAVING COUNT(*) > 10
+LAST 1 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 4: Account Lockout Surge
+-- MITRE: T1110 - Brute Force
+-- Severity: Medium
+-- ---------------------------------------------------------------------------
+SELECT
+    username AS "Locked Account",
+    sourceip AS "Source",
+    COUNT(*) AS "Lockout Events",
+    DATEFORMAT(MIN(starttime), 'yyyy-MM-dd HH:mm:ss') AS "First Lockout",
+    DATEFORMAT(MAX(starttime), 'yyyy-MM-dd HH:mm:ss') AS "Last Lockout"
+FROM events
+WHERE "EventID" = '4740'
+GROUP BY username, sourceip
+HAVING COUNT(*) >= 3
+LAST 30 MINUTES
+
+-- ---------------------------------------------------------------------------
+-- Rule 5: Impossible Travel - Geolocation Anomaly
+-- MITRE: T1078 - Valid Accounts
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    username AS "User",
+    sourceip AS "Current IP",
+    GEODATA(sourceip, 'country') AS "Current Country",
+    GEODATA(sourceip, 'city') AS "Current City",
+    DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm:ss') AS "Login Time"
+FROM events
+WHERE category = 'Authentication'
+    AND "EventID" IN ('4624', '528', '540')
+    AND GEODATA(sourceip, 'country') IS NOT NULL
+    AND username NOT LIKE '%$'
+ORDER BY starttime DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 6: Service Account Interactive Logon
+-- MITRE: T1078.002 - Valid Accounts: Domain Accounts
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    username AS "Service Account",
+    sourceip AS "Source IP",
+    destinationip AS "Target Host",
+    "LogonType" AS "Logon Type",
+    COUNT(*) AS "Logon Count",
+    DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm:ss') AS "Time"
+FROM events
+WHERE "EventID" = '4624'
+    AND "LogonType" IN ('2', '10')
+    AND username LIKE 'svc_%'
+GROUP BY username, sourceip, destinationip, "LogonType"
+LAST 24 HOURS

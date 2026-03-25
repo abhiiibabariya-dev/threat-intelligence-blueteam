@@ -1,0 +1,133 @@
+# Exabeam Fusion - Persistence Detection Rules
+# MITRE ATT&CK Tactic: TA0003
+---
+rules:
+  - rule_name: "EXA-PER-001: Registry Run Key Persistence"
+    description: "Modification of registry Run/RunOnce keys for persistence"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1547.001]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: registry_path
+          operator: matches_any
+          values: ["*\\CurrentVersion\\Run*", "*\\CurrentVersion\\RunOnce*"]
+        - field: process_name
+          operator: not_in
+          values: [msiexec.exe, setup.exe, TrustedInstaller.exe]
+    entity: host
+    response: [create_notable_event, enrich_registry_context]
+
+  - rule_name: "EXA-PER-002: Scheduled Task Creation"
+    description: "New scheduled task created via command line or API"
+    severity: medium
+    risk_score: 65
+    mitre_attack: [T1053.005]
+    trigger:
+      type: real_time
+      data_source: windows_security
+      conditions:
+        - field: event_id
+          operator: equals
+          value: 4698
+    entity: src_user
+    response: [create_notable_event, check_task_legitimacy]
+
+  - rule_name: "EXA-PER-003: Suspicious Service Installation"
+    description: "New service with suspicious binary path (cmd, powershell, temp paths)"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1543.003]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: event_type
+          value: service_install
+        - field: service_binary
+          operator: matches_any
+          values: ["*cmd.exe*", "*powershell*", "*\\temp\\*", "*\\appdata\\*"]
+    entity: host
+    response: [create_critical_incident, isolate_endpoint]
+
+  - rule_name: "EXA-PER-004: WMI Event Subscription"
+    description: "WMI event consumer created for persistent execution"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1546.003]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: contains_any
+          values: ["__EventFilter", "__EventConsumer", "Register-WmiEvent"]
+    entity: host
+    response: [create_notable_event, enumerate_wmi_subscriptions]
+
+  - rule_name: "EXA-PER-005: New Local Admin Account"
+    description: "New local account added to Administrators group"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1136.001, T1098]
+    trigger:
+      type: sequence
+      conditions:
+        - step1: {field: event_id, value: 4720}
+        - step2: {field: event_id, value: 4732, group_name: "Administrators"}
+      time_window: 5m
+    entity: src_user
+    response: [create_critical_incident, notify_soc, disable_new_account]
+
+  - rule_name: "EXA-PER-006: SSH Authorized Keys Modification"
+    description: "Modification of SSH authorized_keys file for persistence"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1098.004]
+    trigger:
+      type: real_time
+      data_source: fim
+      conditions:
+        - field: file_path
+          operator: matches
+          value: "*/.ssh/authorized_keys"
+        - field: event_type
+          operator: in
+          values: [modified, created]
+    entity: host
+    response: [create_notable_event, compare_authorized_keys]
+
+  - rule_name: "EXA-PER-007: Crontab Modification"
+    description: "User or system crontab modified"
+    severity: medium
+    risk_score: 60
+    mitre_attack: [T1053.003]
+    trigger:
+      type: real_time
+      data_source: fim
+      conditions:
+        - field: file_path
+          operator: matches_any
+          values: ["/var/spool/cron/*", "/etc/cron.d/*", "/etc/crontab"]
+    entity: host
+    response: [create_notable_event, review_cron_content]
+
+  - rule_name: "EXA-PER-008: Startup Folder Modification"
+    description: "File added to Windows startup folder"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1547.001]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: file_path
+          operator: matches
+          value: "*\\Start Menu\\Programs\\Startup\\*"
+        - field: file_extension
+          operator: in
+          values: [.exe, .bat, .cmd, .vbs, .js, .lnk, .ps1]
+    entity: host
+    response: [create_notable_event, quarantine_file]

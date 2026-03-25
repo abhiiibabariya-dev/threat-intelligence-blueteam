@@ -1,0 +1,110 @@
+# Exabeam Fusion - Execution Detection Rules
+# MITRE ATT&CK Tactic: TA0002
+---
+rules:
+  - rule_name: "EXA-EXE-001: Encoded PowerShell Execution"
+    description: "PowerShell executed with encoded command - common malware behavior"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1059.001]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: process_name
+          operator: in
+          values: [powershell.exe, pwsh.exe]
+        - field: command_line
+          operator: matches
+          value: "*-[eE][nN][cC]*"
+    entity: host
+    response: [create_notable_event, decode_command, check_reputation]
+
+  - rule_name: "EXA-EXE-002: Office Application Spawning Shell"
+    description: "Microsoft Office spawning cmd/powershell - malicious macro indicator"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1204.002]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: parent_process
+          operator: in
+          values: [winword.exe, excel.exe, powerpnt.exe, outlook.exe]
+        - field: process_name
+          operator: in
+          values: [cmd.exe, powershell.exe, wscript.exe, cscript.exe, mshta.exe]
+    entity: host
+    response: [create_critical_incident, kill_process, quarantine_document]
+
+  - rule_name: "EXA-EXE-003: LOLBAS Execution"
+    description: "Living-off-the-land binary used for download or execution"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1218]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: process_name
+          operator: in
+          values: [certutil.exe, mshta.exe, regsvr32.exe, rundll32.exe, cmstp.exe, msiexec.exe, bitsadmin.exe]
+        - field: command_line
+          operator: matches_any
+          values: ["*http*", "*-urlcache*", "*/transfer*", "*/i:*", "*scrobj*"]
+    entity: host
+    response: [create_notable_event, block_network_connection]
+
+  - rule_name: "EXA-EXE-004: Suspicious Script Interpreter"
+    description: "WScript/CScript executing from unusual location"
+    severity: medium
+    risk_score: 65
+    mitre_attack: [T1059.005]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: process_name
+          operator: in
+          values: [wscript.exe, cscript.exe]
+        - field: command_line
+          operator: matches_any
+          values: ["*\\temp\\*", "*\\appdata\\*", "*\\downloads\\*"]
+    entity: host
+    response: [create_notable_event]
+
+  - rule_name: "EXA-EXE-005: Remote Scheduled Task Execution"
+    description: "Scheduled task created on remote host via schtasks"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1053.005]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches
+          value: "*schtasks*/create*/s *"
+    entity: src_user
+    response: [create_notable_event, trace_remote_target]
+
+  - rule_name: "EXA-EXE-006: Linux Reverse Shell"
+    description: "Reverse shell command patterns on Linux hosts"
+    severity: critical
+    risk_score: 95
+    mitre_attack: [T1059.004]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches_any
+          values:
+            - "*bash -i >& /dev/tcp/*"
+            - "*nc -e /bin/*"
+            - "*python*import socket*connect*"
+            - "*perl -e*socket*"
+            - "*php -r*fsockopen*"
+    entity: host
+    response: [create_critical_incident, kill_process, isolate_endpoint]

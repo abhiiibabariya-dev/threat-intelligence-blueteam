@@ -1,0 +1,31 @@
+// InsightIDR LEQL Queries - Persistence (TA0003)
+
+// IDR-PER-001: Registry Run Key (T1547.001)
+where(registry_path ICONTAINS "\\CurrentVersion\\Run")
+groupby(host, account, registry_path)
+calculate(count)
+
+// IDR-PER-002: Scheduled Task Creation (T1053.005)
+where(event_id = 4698)
+groupby(host, account, task_name)
+calculate(count)
+
+// IDR-PER-003: Suspicious Service (T1543.003)
+where(event_id = 7045 AND service_path ICONTAINS-ANY ["cmd.exe", "powershell", "mshta", "\\temp\\", "\\appdata\\"])
+groupby(host, service_name, service_path)
+calculate(count)
+
+// IDR-PER-004: New Admin Account (T1136.001)
+where(event_id = 4732 AND target_group ICONTAINS "Administrators")
+groupby(host, account, target_account)
+calculate(count)
+
+// IDR-PER-005: WMI Persistence (T1546.003)
+where(command_line ICONTAINS-ANY ["__EventFilter", "__EventConsumer", "Register-WmiEvent"])
+groupby(host, account, command_line)
+calculate(count)
+
+// IDR-PER-006: Startup Folder Drop (T1547.001)
+where(file_path ICONTAINS "\\Start Menu\\Programs\\Startup\\" AND file_extension IN [".exe", ".bat", ".vbs", ".ps1", ".lnk"])
+groupby(host, file_path, process_name)
+calculate(count)
