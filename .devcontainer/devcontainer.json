@@ -1,4 +1,20 @@
 {
+  "name": "BlueShell - Threat Intelligence Platform",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {}
+  "features": {},
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "BlueShell Web App",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postStartCommand": "cd ${containerWorkspaceFolder} && python3 -m http.server 8080 &",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
 }
