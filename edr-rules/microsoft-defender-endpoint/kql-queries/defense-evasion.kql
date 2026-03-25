@@ -1,0 +1,41 @@
+// =============================================================================
+// Microsoft Defender for Endpoint - Defense Evasion Detection
+// MITRE ATT&CK: T1055, T1036, T1562
+// =============================================================================
+
+// Query 1: Process Injection - Hollowed Process with Network Activity
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where FileName in~ ("notepad.exe", "svchost.exe", "rundll32.exe")
+| where ProcessCommandLine == "" or ProcessCommandLine == FileName
+| join kind=inner (
+    DeviceNetworkEvents | where Timestamp > ago(1d)
+    | where RemotePort in (80, 443, 8080, 4444)
+    | project DeviceName, InitiatingProcessId = InitiatingProcessId, RemoteIP, RemotePort
+) on DeviceName, $left.ProcessId == $right.InitiatingProcessId
+
+// Query 2: Process Masquerading
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where FileName in~ ("svchost.exe", "lsass.exe", "csrss.exe", "services.exe")
+| where not(FolderPath startswith "C:\\Windows\\System32" or FolderPath startswith "C:\\Windows\\SysWOW64")
+
+// Query 3: AMSI Bypass
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where ProcessCommandLine has_any ("AmsiUtils", "amsiInitFailed", "AmsiScanBuffer", "SetProtectedState")
+
+// Query 4: Defender Tampering
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where ProcessCommandLine has_any (
+    "Set-MpPreference -DisableRealtimeMonitoring",
+    "sc stop WinDefend",
+    "sc config WinDefend start=disabled",
+    "DisableAntiSpyware")
+
+// Query 5: Event Log Clearing
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where (FileName =~ "wevtutil.exe" and ProcessCommandLine has "cl")
+    or ProcessCommandLine has "Clear-EventLog"

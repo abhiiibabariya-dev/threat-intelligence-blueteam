@@ -1,0 +1,63 @@
+// =============================================================================
+// Elastic EQL Queries: Lateral Movement Sequences
+// MITRE ATT&CK: T1021, T1047, T1550
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Sequence 1: Network Logon Followed by Suspicious Process Execution
+// Detects lateral movement chain: authentication -> malicious execution
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=5m
+  [authentication where event.outcome == "success" and
+    winlog.event_data.LogonType == "3" and
+    source.ip != "127.0.0.1" and
+    not user.name : "*$"]
+  [process where event.type == "start" and
+    process.name : ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe", "net.exe")]
+
+// ---------------------------------------------------------------------------
+// Sequence 2: PsExec Lateral Movement Pattern
+// SMB pipe creation -> Service installation -> Process execution
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=2m
+  [file where event.type == "creation" and
+    file.name : "PSEXESVC*"]
+  [process where event.type == "start" and
+    process.parent.name : "services.exe" and
+    process.name : "PSEXESVC.exe"]
+  [process where event.type == "start" and
+    process.parent.name : "PSEXESVC.exe"]
+
+// ---------------------------------------------------------------------------
+// Sequence 3: WMI Remote Execution Chain
+// WMI connection -> Process spawn from wmiprvse.exe
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=1m
+  [network where destination.port == 135 and
+    source.ip != "127.0.0.1"]
+  [process where event.type == "start" and
+    process.parent.name : "wmiprvse.exe" and
+    process.name : ("cmd.exe", "powershell.exe", "cscript.exe")]
+
+// ---------------------------------------------------------------------------
+// Sequence 4: Remote Service Creation (sc.exe lateral movement)
+// ---------------------------------------------------------------------------
+sequence with maxspan=5m
+  [process where event.type == "start" and
+    process.name : "sc.exe" and
+    process.args : ("\\\\*", "create", "start") and
+    process.args : ("binPath*")]
+  [process where event.type == "start" and
+    process.parent.name : "services.exe" and
+    not process.name : ("svchost.exe", "spoolsv.exe", "lsass.exe")]
+
+// ---------------------------------------------------------------------------
+// Sequence 5: Pass-the-Hash / NTLM Relay
+// Type 9 logon followed by network activity
+// ---------------------------------------------------------------------------
+sequence by user.name with maxspan=10m
+  [authentication where
+    winlog.event_data.LogonType == "9" and
+    event.outcome == "success"]
+  [network where destination.port : (445, 135, 5985, 5986) and
+    not destination.ip : ("127.0.0.1", "::1")]

@@ -1,0 +1,242 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Network Threats
+// =============================================================================
+// Description:  Detect network-based threats including C2 beaconing, DNS
+//               tunneling, TOR usage, and unusual outbound connections.
+// MITRE ATT&CK: T1071, T1572, T1090, T1568
+// Severity:     Medium to High
+// Data Sources:  CommonSecurityLog, DnsEvents, DeviceNetworkEvents
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: C2 Beaconing Detection via Jitter Analysis
+// MITRE: T1071 - Application Layer Protocol
+// Severity: High
+// ---------------------------------------------------------------------------
+let timeRange = 24h;
+let minConnections = 20;
+let maxJitterPercent = 25;  // Beacons have low jitter
+DeviceNetworkEvents
+| where TimeGenerated >= ago(timeRange)
+| where ActionType == "ConnectionSuccess"
+| where RemoteIPType == "Public"
+| where RemotePort in (80, 443, 8080, 8443)
+| sort by DeviceName, RemoteIP, TimeGenerated asc
+| serialize
+| extend
+    PrevTime = prev(TimeGenerated),
+    PrevDevice = prev(DeviceName),
+    PrevRemoteIP = prev(RemoteIP)
+| where DeviceName == PrevDevice and RemoteIP == PrevRemoteIP
+| extend IntervalSeconds = datetime_diff('second', TimeGenerated, PrevTime)
+| where IntervalSeconds between (10 .. 3600)  // 10s to 1h intervals
+| summarize
+    ConnectionCount = count(),
+    AvgInterval = avg(IntervalSeconds),
+    StdDevInterval = stdev(IntervalSeconds),
+    MinInterval = min(IntervalSeconds),
+    MaxInterval = max(IntervalSeconds),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated)
+    by DeviceName, RemoteIP, RemotePort
+| where ConnectionCount >= minConnections
+| extend JitterPercent = round((StdDevInterval / AvgInterval) * 100, 1)
+| where JitterPercent <= maxJitterPercent
+| extend
+    BeaconScore = case(
+        JitterPercent < 5 and ConnectionCount > 50, 95,
+        JitterPercent < 10 and ConnectionCount > 30, 80,
+        JitterPercent < 15, 65,
+        50
+    )
+| where BeaconScore >= 65
+| project
+    TimeGenerated = LastSeen,
+    AlertName = "Potential C2 Beaconing Detected",
+    DeviceName,
+    RemoteIP,
+    RemotePort,
+    ConnectionCount,
+    AvgIntervalSeconds = round(AvgInterval, 0),
+    JitterPercent,
+    BeaconScore,
+    Duration = LastSeen - FirstSeen
+
+// ---------------------------------------------------------------------------
+// Rule 2: DNS Tunneling Detection
+// MITRE: T1572 - Protocol Tunneling (DNS)
+// Severity: High
+// ---------------------------------------------------------------------------
+let timeRange = 1d;
+let subdomainLengthThreshold = 40;
+let queryCountThreshold = 100;
+let entropyThreshold = 3.5;
+DnsEvents
+| where TimeGenerated >= ago(timeRange)
+| where QueryType in ("A", "TXT", "CNAME", "MX", "AAAA")
+| extend
+    Subdomain = tostring(split(Name, ".")[0]),
+    BaseDomain = strcat(tostring(split(Name, ".")[-2]), ".", tostring(split(Name, ".")[-1])),
+    SubdomainLength = strlen(tostring(split(Name, ".")[0]))
+| where SubdomainLength > subdomainLengthThreshold
+| summarize
+    QueryCount = count(),
+    UniqueSubdomains = dcount(Subdomain),
+    AvgSubdomainLength = avg(SubdomainLength),
+    MaxSubdomainLength = max(SubdomainLength),
+    SampleQueries = make_set(Name, 5),
+    ClientIPs = make_set(ClientIP, 10)
+    by BaseDomain
+| where QueryCount >= queryCountThreshold
+| where UniqueSubdomains > 50  // Many unique subdomains = tunneling
+| project
+    TimeGenerated = now(),
+    AlertName = "DNS Tunneling Suspected",
+    BaseDomain,
+    QueryCount,
+    UniqueSubdomains,
+    AvgSubdomainLength = round(AvgSubdomainLength, 0),
+    MaxSubdomainLength,
+    SampleQueries,
+    ClientIPs
+
+// ---------------------------------------------------------------------------
+// Rule 3: TOR Exit Node Communication
+// MITRE: T1090.003 - Proxy: Multi-hop Proxy
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let torExitNodes = externaldata(IPAddress:string)
+    [@"https://check.torproject.org/torbulkexitlist"]
+    with (format="txt", ignoreFirstRecord=false);
+// Alternative: Use a watchlist named "TOR_Exit_Nodes"
+// let torExitNodes = _GetWatchlist('TOR_Exit_Nodes') | project IPAddress = SearchKey;
+union
+    (CommonSecurityLog
+    | where TimeGenerated >= ago(1d)
+    | where DestinationIP in (torExitNodes) or SourceIP in (torExitNodes)
+    | extend MatchedIP = iff(DestinationIP in (torExitNodes), DestinationIP, SourceIP),
+             Direction = iff(DestinationIP in (torExitNodes), "Outbound", "Inbound")
+    | project TimeGenerated, DeviceName = DeviceVendor, SourceIP, DestinationIP,
+              MatchedIP, Direction, DestinationPort, Protocol = DeviceAction),
+    (DeviceNetworkEvents
+    | where TimeGenerated >= ago(1d)
+    | where RemoteIP in (torExitNodes)
+    | project TimeGenerated, DeviceName, SourceIP = LocalIP, DestinationIP = RemoteIP,
+              MatchedIP = RemoteIP, Direction = "Outbound", DestinationPort = RemotePort,
+              Protocol = ActionType)
+| project
+    TimeGenerated,
+    AlertName = "TOR Network Communication Detected",
+    DeviceName,
+    SourceIP,
+    DestinationIP,
+    MatchedIP,
+    Direction,
+    DestinationPort
+
+// ---------------------------------------------------------------------------
+// Rule 4: Unusual Outbound Traffic Volume
+// MITRE: T1048 - Exfiltration Over Alternative Protocol
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let baselineWindow = 14d;
+let detectionWindow = 1d;
+let anomalyMultiplier = 5;
+let baseline = CommonSecurityLog
+| where TimeGenerated between (ago(baselineWindow) .. ago(detectionWindow))
+| summarize
+    AvgDailyBytes = avg(SentBytes),
+    StdDevBytes = stdev(SentBytes)
+    by SourceIP;
+CommonSecurityLog
+| where TimeGenerated >= ago(detectionWindow)
+| summarize
+    TotalBytesSent = sum(SentBytes),
+    ConnectionCount = count(),
+    UniqueDestinations = dcount(DestinationIP),
+    TopDestinations = make_set(DestinationIP, 10),
+    TopPorts = make_set(DestinationPort, 10)
+    by SourceIP
+| join kind=inner baseline on SourceIP
+| where TotalBytesSent > (AvgDailyBytes + anomalyMultiplier * StdDevBytes)
+| where TotalBytesSent > 104857600  // > 100MB minimum
+| extend AnomalyRatio = round(TotalBytesSent / AvgDailyBytes, 1)
+| project
+    TimeGenerated = now(),
+    AlertName = "Unusual Outbound Data Volume",
+    SourceIP,
+    TotalBytesSentMB = round(TotalBytesSent / 1048576.0, 1),
+    BaselineAvgMB = round(AvgDailyBytes / 1048576.0, 1),
+    AnomalyRatio,
+    ConnectionCount,
+    UniqueDestinations,
+    TopDestinations
+
+// ---------------------------------------------------------------------------
+// Rule 5: Connections to Newly Registered Domains
+// MITRE: T1568 - Dynamic Resolution
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let newDomainThreshold = 30d;  // Domain registered within last 30 days
+// Requires TI feed or WHOIS data integration
+let newDomains = ThreatIntelligenceIndicator
+| where TimeGenerated >= ago(30d)
+| where ExpirationDateTime > now()
+| where isnotempty(DomainName)
+| where Tags has "newly-registered" or Description has "new domain"
+| distinct DomainName;
+DnsEvents
+| where TimeGenerated >= ago(1d)
+| where Name in (newDomains) or Name has_any (newDomains)
+| summarize
+    QueryCount = count(),
+    ClientIPs = make_set(ClientIP, 10),
+    UniqueClients = dcount(ClientIP),
+    FirstQuery = min(TimeGenerated),
+    LastQuery = max(TimeGenerated)
+    by Name
+| project
+    TimeGenerated = LastQuery,
+    AlertName = "Connection to Newly Registered Domain",
+    DomainName = Name,
+    QueryCount,
+    UniqueClients,
+    ClientIPs,
+    ObservationWindow = LastQuery - FirstQuery
+
+// ---------------------------------------------------------------------------
+// Rule 6: Port Scanning Detection
+// MITRE: T1046 - Network Service Scanning
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let timeWindow = 5m;
+let portThreshold = 20;
+let hostThreshold = 5;
+DeviceNetworkEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType in ("ConnectionAttempt", "ConnectionFailed")
+| summarize
+    UniquePortsScanned = dcount(RemotePort),
+    UniqueHostsScanned = dcount(RemoteIP),
+    PortsList = make_set(RemotePort, 25),
+    HostsList = make_set(RemoteIP, 10),
+    AttemptCount = count()
+    by DeviceName, LocalIP, bin(TimeGenerated, timeWindow)
+| where UniquePortsScanned >= portThreshold or UniqueHostsScanned >= hostThreshold
+| extend
+    ScanType = case(
+        UniquePortsScanned >= portThreshold and UniqueHostsScanned < 3, "Vertical Scan (many ports, few hosts)",
+        UniqueHostsScanned >= hostThreshold and UniquePortsScanned < 3, "Horizontal Scan (few ports, many hosts)",
+        "Combined Scan"
+    )
+| project
+    TimeGenerated,
+    AlertName = "Network Scanning Detected",
+    DeviceName,
+    SourceIP = LocalIP,
+    ScanType,
+    UniquePortsScanned,
+    UniqueHostsScanned,
+    AttemptCount,
+    PortsList,
+    HostsList

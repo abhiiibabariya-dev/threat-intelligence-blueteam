@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IBM QRadar Custom Correlation Rules
+  Description: Multi-event correlation rules, building blocks, and rule groups
+  MITRE ATT&CK: Multiple techniques
+  Author: Blue Team
+-->
+<CustomRules xmlns="http://www.ibm.com/qradar/rules">
+
+  <!-- ================================================================= -->
+  <!-- Building Blocks -->
+  <!-- ================================================================= -->
+
+  <BuildingBlock id="BB-AuthFailure" enabled="true">
+    <Name>BB: Authentication Failure</Name>
+    <Description>Identifies all authentication failure events across log sources</Description>
+    <Tests>
+      <Test field="category" operator="equals" value="Authentication"/>
+      <Test field="eventDirection" operator="equals" value="Failure"/>
+    </Tests>
+  </BuildingBlock>
+
+  <BuildingBlock id="BB-SuspiciousProcess" enabled="true">
+    <Name>BB: Suspicious Process Execution</Name>
+    <Description>Identifies execution of commonly abused system binaries</Description>
+    <Tests>
+      <Test field="EventID" operator="equals" value="4688"/>
+      <Or>
+        <Test field="Application" operator="contains" value="powershell.exe"/>
+        <Test field="Application" operator="contains" value="cmd.exe"/>
+        <Test field="Application" operator="contains" value="mshta.exe"/>
+        <Test field="Application" operator="contains" value="certutil.exe"/>
+        <Test field="Application" operator="contains" value="regsvr32.exe"/>
+        <Test field="Application" operator="contains" value="rundll32.exe"/>
+        <Test field="Application" operator="contains" value="wscript.exe"/>
+        <Test field="Application" operator="contains" value="cscript.exe"/>
+      </Or>
+    </Tests>
+  </BuildingBlock>
+
+  <BuildingBlock id="BB-InternalToExternal" enabled="true">
+    <Name>BB: Internal to External Communication</Name>
+    <Description>Identifies outbound traffic from internal to external networks</Description>
+    <Tests>
+      <Test field="sourceIP" operator="isInNetwork" value="Internal"/>
+      <Test field="destinationIP" operator="isNotInNetwork" value="Internal"/>
+    </Tests>
+  </BuildingBlock>
+
+  <!-- ================================================================= -->
+  <!-- Rule Group: Credential Access -->
+  <!-- ================================================================= -->
+
+  <RuleGroup name="Credential Access Detections">
+
+    <Rule id="CR-BruteForce-001" enabled="true" type="offense">
+      <Name>Distributed Brute Force Attack</Name>
+      <Description>Multiple failed logins from single source targeting multiple accounts indicates brute force attack.</Description>
+      <Severity>8</Severity>
+      <Credibility>7</Credibility>
+      <Relevance>9</Relevance>
+      <MITREAttack>T1110</MITREAttack>
+      <Tests>
+        <Test buildingBlock="BB-AuthFailure"/>
+      </Tests>
+      <GroupBy field="sourceIP"/>
+      <Threshold>
+        <EventCount operator="greaterThan" value="15" window="60"/>
+        <UniqueCount field="username" operator="greaterThan" value="3"/>
+      </Threshold>
+      <Actions>
+        <CreateOffense category="Brute Force" severity="8"/>
+        <AddToReferenceSet name="Brute_Force_IPs" field="sourceIP" ttl="24h"/>
+        <SendEmail to="soc-alerts@org.com" template="BruteForceAlert"/>
+      </Actions>
+    </Rule>
+
+    <Rule id="CR-BruteForceSuccess-002" enabled="true" type="offense">
+      <Name>Brute Force Followed by Successful Login</Name>
+      <Description>Failed login attempts followed by success from same source - credential compromise likely.</Description>
+      <Severity>9</Severity>
+      <Credibility>9</Credibility>
+      <Relevance>10</Relevance>
+      <MITREAttack>T1110</MITREAttack>
+      <ChainRule>
+        <FirstEvent>
+          <Test buildingBlock="BB-AuthFailure"/>
+          <Threshold eventCount="5" window="30m"/>
+        </FirstEvent>
+        <SecondEvent within="60m">
+          <Test field="category" operator="equals" value="Authentication"/>
+          <Test field="eventDirection" operator="equals" value="Success"/>
+          <Correlation field="sourceIP"/>
+          <Correlation field="username"/>
+        </SecondEvent>
+      </ChainRule>
+      <Actions>
+        <CreateOffense category="Credential Compromise" severity="9"/>
+        <AddToReferenceSet name="Compromised_Accounts" field="username" ttl="72h"/>
+      </Actions>
+    </Rule>
+
+    <Rule id="CR-CredDump-003" enabled="true" type="offense">
+      <Name>Credential Dumping Tool Detected</Name>
+      <Description>Execution of known credential theft tools detected.</Description>
+      <Severity>10</Severity>
+      <Credibility>9</Credibility>
+      <Relevance>10</Relevance>
+      <MITREAttack>T1003</MITREAttack>
+      <Tests>
+        <Test field="EventID" operator="equals" value="4688"/>
+        <Or>
+          <Test field="CommandLine" operator="contains" value="mimikatz"/>
+          <Test field="CommandLine" operator="contains" value="sekurlsa"/>
+          <Test field="CommandLine" operator="contains" value="lsadump"/>
+          <Test field="CommandLine" operator="contains" value="procdump"/>
+          <Test field="CommandLine" operator="contains" value="comsvcs.dll,MiniDump"/>
+        </Or>
+      </Tests>
+      <Actions>
+        <CreateOffense category="Credential Theft" severity="10"/>
+        <SendEmail to="soc-critical@org.com" template="CriticalAlert"/>
+        <AddToReferenceSet name="Compromised_Hosts" field="sourceIP" ttl="168h"/>
+      </Actions>
+    </Rule>
+
+  </RuleGroup>
+
+  <!-- ================================================================= -->
+  <!-- Rule Group: Lateral Movement -->
+  <!-- ================================================================= -->
+
+  <RuleGroup name="Lateral Movement Detections">
+
+    <Rule id="CR-LatMov-001" enabled="true" type="offense">
+      <Name>Lateral Movement - Multi-Host Authentication Chain</Name>
+      <Description>Single account authenticating to multiple hosts in sequence indicates lateral movement.</Description>
+      <Severity>8</Severity>
+      <Credibility>7</Credibility>
+      <Relevance>9</Relevance>
+      <MITREAttack>T1021</MITREAttack>
+      <Tests>
+        <Test field="EventID" operator="equals" value="4624"/>
+        <Test field="LogonType" operator="equals" value="3"/>
+        <Test field="username" operator="notContains" value="$"/>
+      </Tests>
+      <GroupBy field="username"/>
+      <Threshold>
+        <UniqueCount field="destinationIP" operator="greaterThan" value="3" window="60"/>
+      </Threshold>
+      <Actions>
+        <CreateOffense category="Lateral Movement" severity="8"/>
+      </Actions>
+    </Rule>
+
+    <Rule id="CR-PsExec-002" enabled="true" type="offense">
+      <Name>PsExec Service Installation</Name>
+      <Description>PSEXESVC service installation detected - PsExec lateral movement.</Description>
+      <Severity>8</Severity>
+      <MITREAttack>T1021.002</MITREAttack>
+      <Tests>
+        <Or>
+          <And>
+            <Test field="EventID" operator="equals" value="7045"/>
+            <Test field="ServiceName" operator="contains" value="PSEXESVC"/>
+          </And>
+          <And>
+            <Test field="EventID" operator="equals" value="5145"/>
+            <Test field="ShareName" operator="contains" value="IPC$"/>
+            <Test field="RelativeTargetName" operator="contains" value="PSEXESVC"/>
+          </And>
+        </Or>
+      </Tests>
+      <GroupBy field="username"/>
+      <Threshold>
+        <UniqueCount field="destinationIP" operator="greaterThan" value="1" window="60"/>
+      </Threshold>
+      <Actions>
+        <CreateOffense category="Lateral Movement" severity="8"/>
+      </Actions>
+    </Rule>
+
+  </RuleGroup>
+
+  <!-- ================================================================= -->
+  <!-- Rule Group: Data Exfiltration -->
+  <!-- ================================================================= -->
+
+  <RuleGroup name="Data Exfiltration Detections">
+
+    <Rule id="CR-Exfil-001" enabled="true" type="offense">
+      <Name>Anomalous Outbound Data Volume</Name>
+      <Description>Unusually large outbound data transfer detected from internal host.</Description>
+      <Severity>7</Severity>
+      <MITREAttack>T1048</MITREAttack>
+      <Tests>
+        <Test buildingBlock="BB-InternalToExternal"/>
+        <Test field="totalBytesOut" operator="greaterThan" value="104857600"/>
+      </Tests>
+      <GroupBy field="sourceIP"/>
+      <Threshold>
+        <EventCount operator="greaterThan" value="1" window="60"/>
+      </Threshold>
+      <Actions>
+        <CreateOffense category="Data Exfiltration" severity="7"/>
+      </Actions>
+    </Rule>
+
+    <Rule id="CR-DNSTunnel-002" enabled="true" type="offense">
+      <Name>DNS Tunneling Suspected</Name>
+      <Description>High volume of long DNS queries to single domain indicates DNS tunneling.</Description>
+      <Severity>8</Severity>
+      <MITREAttack>T1048.003</MITREAttack>
+      <Tests>
+        <Test field="category" operator="equals" value="DNS"/>
+        <Test field="queryLength" operator="greaterThan" value="50"/>
+      </Tests>
+      <GroupBy field="sourceIP"/>
+      <Threshold>
+        <EventCount operator="greaterThan" value="100" window="60"/>
+        <UniqueCount field="queryName" operator="greaterThan" value="50"/>
+      </Threshold>
+      <Actions>
+        <CreateOffense category="Data Exfiltration" severity="8"/>
+      </Actions>
+    </Rule>
+
+  </RuleGroup>
+
+  <!-- ================================================================= -->
+  <!-- Rule Group: Ransomware -->
+  <!-- ================================================================= -->
+
+  <RuleGroup name="Ransomware Detection">
+
+    <Rule id="CR-Ransom-001" enabled="true" type="offense">
+      <Name>Ransomware - Shadow Copy Deletion</Name>
+      <Description>Volume shadow copy deletion detected - critical ransomware indicator.</Description>
+      <Severity>10</Severity>
+      <MITREAttack>T1490</MITREAttack>
+      <Tests>
+        <Test field="EventID" operator="equals" value="4688"/>
+        <Or>
+          <And>
+            <Test field="Application" operator="contains" value="vssadmin.exe"/>
+            <Test field="CommandLine" operator="contains" value="delete shadows"/>
+          </And>
+          <And>
+            <Test field="Application" operator="contains" value="wmic.exe"/>
+            <Test field="CommandLine" operator="contains" value="shadowcopy delete"/>
+          </And>
+          <And>
+            <Test field="Application" operator="contains" value="bcdedit.exe"/>
+            <Test field="CommandLine" operator="contains" value="recoveryenabled no"/>
+          </And>
+        </Or>
+      </Tests>
+      <Actions>
+        <CreateOffense category="Ransomware" severity="10"/>
+        <SendEmail to="soc-critical@org.com,ir-team@org.com" template="RansomwareAlert"/>
+        <ExecuteScript name="IsolateHost" parameter="sourceIP"/>
+      </Actions>
+    </Rule>
+
+  </RuleGroup>
+
+</CustomRules>

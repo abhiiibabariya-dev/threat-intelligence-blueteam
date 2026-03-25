@@ -1,0 +1,141 @@
+<dashboard version="1.1" theme="dark">
+  <label>SOC Operations Overview</label>
+  <description>Real-time security operations center dashboard with critical alerts, attack trends, and MITRE ATT&amp;CK coverage</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="timeRange" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="severity" searchWhenChanged="true">
+      <label>Severity</label>
+      <choice value="*">All</choice>
+      <choice value="Critical">Critical</choice>
+      <choice value="High">High</choice>
+      <choice value="Medium">Medium</choice>
+      <choice value="Low">Low</choice>
+      <default>*</default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <single>
+        <title>Critical Alerts (24h)</title>
+        <search>
+          <query>index=notable severity="Critical" earliest=-24h | stats count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,5,20]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>High Alerts (24h)</title>
+        <search>
+          <query>index=notable severity="High" earliest=-24h | stats count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f"]</option>
+        <option name="rangeValues">[0,10]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Open Incidents</title>
+        <search>
+          <query>index=notable status!="closed" | stats count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Mean Time to Respond (hours)</title>
+        <search>
+          <query>index=notable status="closed" | eval response_time=(_time - info_min_time)/3600 | stats avg(response_time) as MTTR | eval MTTR=round(MTTR,1)</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Alert Trend by Severity</title>
+        <search>
+          <query>index=notable severity=$severity$ | timechart span=1h count by severity</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>MITRE ATT&amp;CK Tactic Distribution</title>
+        <search>
+          <query>index=notable | eval mitre_tactic=mvindex(split(mitre_attack,","),0) | stats count by mitre_tactic | sort -count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.legend.placement">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Top 10 Most Attacked Hosts</title>
+        <search>
+          <query>index=notable severity IN ("Critical","High") | stats count as AlertCount, dc(rule_name) as UniqueRules, values(rule_name) as Rules by dest | sort -AlertCount | head 10</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Top Attack Sources</title>
+        <search>
+          <query>index=notable severity IN ("Critical","High") | stats count as Attacks, dc(dest) as Targets, values(rule_name) as Rules by src | sort -Attacks | head 10</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Recent Critical/High Alerts</title>
+        <search>
+          <query>index=notable severity IN ("Critical","High") | sort -_time | head 20 | table _time, rule_name, severity, src, dest, user, status, mitre_attack</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

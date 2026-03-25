@@ -1,0 +1,122 @@
+<!-- Wazuh Detection Rules: Defense Evasion -->
+<!-- MITRE ATT&CK Tactic: TA0005 - Defense Evasion -->
+<!-- Rule IDs: 100180-100199 -->
+
+<group name="defense_evasion,mitre_ta0005,">
+
+  <!-- T1070.001 - Windows Event Log Cleared -->
+  <rule id="100180" level="14">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">1102</field>
+    <description>Defense Evasion: Windows Security event log cleared by $(win.eventdata.subjectUserName)</description>
+    <mitre>
+      <id>T1070.001</id>
+    </mitre>
+    <group>log_clearing,critical,pci_dss_10.2.6,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- T1562.001 - Disable Windows Defender -->
+  <rule id="100181" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(Set-MpPreference\s+-Disable|DisableRealtimeMonitoring\s+\$?true|DisableAntiSpyware|sc\s+stop\s+WinDefend|net\s+stop\s+WinDefend)</field>
+    <description>Defense Evasion: Windows Defender disabled - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+    <group>disable_defender,critical,</group>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- T1562.004 - Firewall Rule Modification -->
+  <rule id="100182" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)netsh\s+advfirewall\s+set\s+.*state\s+off|netsh\s+firewall\s+set\s+opmode\s+disable|Set-NetFirewallProfile.*-Enabled\s+False</field>
+    <description>Defense Evasion: Windows Firewall disabled - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1562.004</id>
+    </mitre>
+    <group>firewall_disabled,</group>
+  </rule>
+
+  <!-- T1070.004 - File Deletion to Hide Artifacts -->
+  <rule id="100183" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(del\s+/[fFsS]|Remove-Item\s+-Force|cipher\s+/w|sdelete|Eraser)</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(\\\\temp\\\\|\\\\appdata\\\\|\\\\programdata\\\\|\\.exe|\\.dll|\\.ps1|\\.bat)</field>
+    <description>Defense Evasion: Suspicious file deletion - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <group>file_deletion,artifact_cleanup,</group>
+  </rule>
+
+  <!-- T1036.005 - Masquerading: Match Legitimate Name or Location -->
+  <rule id="100184" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\\\(temp|appdata|programdata|downloads|public)\\\\(svchost|csrss|lsass|winlogon|services|smss|explorer)\.exe</field>
+    <description>Defense Evasion: Process masquerading as system binary from unusual path - $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1036.005</id>
+    </mitre>
+    <group>masquerading,suspicious_location,</group>
+  </rule>
+
+  <!-- T1055 - Process Injection via CreateRemoteThread (Sysmon EID 8) -->
+  <rule id="100185" level="14">
+    <if_sid>61610</if_sid>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)(explorer|svchost|lsass|winlogon|csrss)\.exe$</field>
+    <description>Defense Evasion: Process injection into $(win.eventdata.targetImage) from $(win.eventdata.sourceImage)</description>
+    <mitre>
+      <id>T1055</id>
+    </mitre>
+    <group>process_injection,critical,</group>
+  </rule>
+
+  <!-- T1218.001 - Compiled HTML File Execution -->
+  <rule id="100186" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)hh\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\.chm</field>
+    <description>Defense Evasion: CHM file execution via hh.exe - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1218.001</id>
+    </mitre>
+    <group>lolbas,chm_execution,</group>
+  </rule>
+
+  <!-- T1070.006 - Timestomping -->
+  <rule id="100187" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(timestomp|Set-ItemProperty.*CreationTime|Set-ItemProperty.*LastWriteTime|\$\.CreationTime\s*=)</field>
+    <description>Defense Evasion: File timestamp manipulation (timestomping) detected</description>
+    <mitre>
+      <id>T1070.006</id>
+    </mitre>
+    <group>timestomping,anti_forensics,</group>
+  </rule>
+
+  <!-- T1218.003 - CMSTP Execution -->
+  <rule id="100188" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)cmstp\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)/ni\s+/s</field>
+    <description>Defense Evasion: CMSTP bypass execution detected</description>
+    <mitre>
+      <id>T1218.003</id>
+    </mitre>
+    <group>lolbas,cmstp,uac_bypass,</group>
+  </rule>
+
+  <!-- Linux: History File Cleared -->
+  <rule id="100189" level="12">
+    <if_sid>533</if_sid>
+    <match type="pcre2">(?i)history\s+-c|unset\s+HISTFILE|HISTSIZE=0|rm.*\.bash_history|truncate.*\.bash_history</match>
+    <description>Defense Evasion: Shell history cleared or disabled</description>
+    <mitre>
+      <id>T1070.003</id>
+    </mitre>
+    <group>linux_evasion,history_clearing,</group>
+  </rule>
+
+</group>

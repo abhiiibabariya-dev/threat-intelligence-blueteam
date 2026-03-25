@@ -1,0 +1,168 @@
+# Exabeam Fusion - Insider Threat Detection Rules (UEBA Focus)
+# Leverages Exabeam's behavioral analytics and Smart Timelines
+
+---
+rules:
+  - rule_name: "EXA-IT-001: Anomalous Off-Hours Access"
+    description: "User accessing critical systems outside their normal working hours pattern"
+    severity: medium
+    risk_score: 60
+    mitre_attack: [T1078]
+    trigger:
+      type: anomaly
+      model: user_activity_hours
+      conditions:
+        - field: access_time
+          deviation: 3_sigma
+        - field: resource_sensitivity
+          operator: in
+          values: [high, critical]
+    entity: src_user
+    smart_timeline: true
+    response:
+      - add_risk_score: 20
+      - log_to_insider_threat_dashboard
+
+  - rule_name: "EXA-IT-002: Data Hoarding Behavior"
+    description: "User downloading or accessing unusually large volumes of data"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1074.001]
+    trigger:
+      type: anomaly
+      model: user_data_access_volume
+      conditions:
+        - field: bytes_downloaded
+          deviation: 4_sigma
+        - field: files_accessed
+          deviation: 3_sigma
+      time_window: 24h
+    entity: src_user
+    peer_group: department
+    response:
+      - create_notable_event
+      - compare_to_peer_group
+      - alert_data_loss_prevention
+
+  - rule_name: "EXA-IT-003: Privilege Escalation Abuse"
+    description: "User leveraging elevated privileges for non-standard activities"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1078.002]
+    trigger:
+      type: sequence
+      conditions:
+        - step1:
+            field: event_type
+            value: privilege_elevation
+        - step2:
+            field: resource_accessed
+            deviation: first_time_access
+            time_after_step1: 30m
+    entity: src_user
+    response:
+      - create_notable_event
+      - review_privilege_justification
+
+  - rule_name: "EXA-IT-004: Impossible Travel"
+    description: "User authenticating from geographically distant locations within impossible timeframe"
+    severity: high
+    risk_score: 85
+    mitre_attack: [T1078]
+    trigger:
+      type: anomaly
+      model: user_geo_velocity
+      conditions:
+        - field: login_locations
+          check: geo_velocity
+          max_speed_kmh: 900
+      time_window: 24h
+    entity: src_user
+    response:
+      - create_notable_event
+      - force_mfa_reauthentication
+      - suspend_sessions
+
+  - rule_name: "EXA-IT-005: Bulk File Download Before Departure"
+    description: "Employee with upcoming termination/resignation downloading large amounts of data"
+    severity: critical
+    risk_score: 95
+    mitre_attack: [T1567]
+    trigger:
+      type: correlation
+      conditions:
+        - field: user_hr_status
+          operator: in
+          values: [notice_period, termination_pending, resigned]
+        - field: files_downloaded
+          operator: greater_than
+          value: 100
+      time_window: 7d
+    entity: src_user
+    response:
+      - create_critical_incident
+      - notify_hr_manager
+      - restrict_data_access
+      - preserve_evidence
+
+  - rule_name: "EXA-IT-006: Peer Group Anomaly - Access Pattern"
+    description: "User accessing resources significantly different from their peer group baseline"
+    severity: medium
+    risk_score: 65
+    mitre_attack: [T1078]
+    trigger:
+      type: anomaly
+      model: peer_group_resource_access
+      peer_group: [department, job_title, location]
+      conditions:
+        - field: resources_accessed
+          deviation: 3_sigma_from_peers
+    entity: src_user
+    response:
+      - add_risk_score: 25
+      - generate_peer_comparison_report
+
+  - rule_name: "EXA-IT-007: Policy Violation - USB Data Transfer"
+    description: "Sensitive data copied to removable media"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1052.001]
+    trigger:
+      type: real_time
+      data_source: dlp
+      conditions:
+        - field: destination_type
+          operator: equals
+          value: removable_media
+        - field: data_classification
+          operator: in
+          values: [confidential, restricted, pii, phi]
+    entity: src_user
+    response:
+      - create_notable_event
+      - block_transfer
+      - notify_security_team
+
+  - rule_name: "EXA-IT-008: Email Exfiltration to Personal Account"
+    description: "User forwarding corporate emails to personal email addresses"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1048.003]
+    trigger:
+      type: correlation
+      data_source: email
+      conditions:
+        - field: recipient_domain
+          operator: in
+          values: [gmail.com, yahoo.com, hotmail.com, outlook.com, protonmail.com]
+        - field: attachment_count
+          operator: greater_than
+          value: 0
+      time_window: 24h
+      threshold: 5
+      group_by: [sender]
+    entity: sender
+    response:
+      - create_notable_event
+      - check_dlp_classification
+      - notify_manager

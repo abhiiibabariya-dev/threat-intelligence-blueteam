@@ -1,0 +1,82 @@
+# Elastic SIEM Detection Rules: Exfiltration
+# MITRE ATT&CK: T1048, T1567, T1041
+
+[rule]
+rule_id = "e1a05001-0001-4000-8000-000000000001"
+risk_score = 70
+severity = "high"
+name = "DNS Tunneling - Unusually Long DNS Queries"
+description = "Detects DNS queries with abnormally long subdomain labels indicating possible DNS tunneling for data exfiltration."
+type = "query"
+index = ["packetbeat-*", "filebeat-*"]
+language = "kuery"
+query = '''dns.question.name: *and dns.question.type: (A or TXT or CNAME or NULL)'''
+tags = ["Exfiltration", "T1048.003"]
+note = "Post-filter in investigation: Check for subdomain length > 40 characters, high query volume to single base domain, encoded-looking subdomains."
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1048"
+name = "Exfiltration Over Alternative Protocol"
+reference = "https://attack.mitre.org/techniques/T1048/"
+[[rule.threat.technique.subtechnique]]
+id = "T1048.003"
+name = "Exfiltration Over Unencrypted Non-C2 Protocol"
+reference = "https://attack.mitre.org/techniques/T1048/003/"
+[rule.threat.tactic]
+id = "TA0010"
+name = "Exfiltration"
+reference = "https://attack.mitre.org/tactics/TA0010/"
+
+[rule_2]
+rule_id = "e1a05001-0002-4000-8000-000000000002"
+risk_score = 55
+severity = "medium"
+name = "Upload to Cloud Storage Service"
+description = "Detects HTTP POST/PUT requests to known cloud storage services indicating potential data exfiltration."
+type = "query"
+index = ["packetbeat-*", "filebeat-*", "logs-*"]
+language = "kuery"
+query = '''(http.request.method: POST or http.request.method: PUT) and url.domain: (*.dropbox.com or *.drive.google.com or *mega.nz or *.box.com or *.wetransfer.com or *file.io or *transfer.sh)'''
+tags = ["Exfiltration", "T1567"]
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+[[rule_2.threat.technique]]
+id = "T1567"
+name = "Exfiltration Over Web Service"
+reference = "https://attack.mitre.org/techniques/T1567/"
+[rule_2.threat.tactic]
+id = "TA0010"
+name = "Exfiltration"
+reference = "https://attack.mitre.org/tactics/TA0010/"
+
+[rule_3]
+rule_id = "e1a05001-0003-4000-8000-000000000003"
+risk_score = 65
+severity = "medium"
+name = "Data Staging - Archive Creation Before Transfer"
+description = "Detects creation of archive files (zip, rar, 7z) potentially used for staging data before exfiltration."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+process where event.type == "start" and
+  (process.name : ("rar.exe", "7z.exe", "zip.exe", "tar.exe") or
+   (process.name : "powershell.exe" and process.args : "*Compress-Archive*")) and
+  process.args : ("*\\Documents\\*", "*\\Desktop\\*", "*\\Downloads\\*", "*password*", "*confidential*", "*secret*")
+'''
+tags = ["Exfiltration", "Collection", "T1560"]
+
+[rule_4]
+rule_id = "e1a05001-0004-4000-8000-000000000004"
+risk_score = 60
+severity = "medium"
+name = "Large Outbound Network Transfer"
+description = "Detects processes sending unusually large amounts of data to external destinations."
+type = "query"
+index = ["packetbeat-*", "logs-*"]
+language = "kuery"
+query = '''destination.bytes > 104857600 and not destination.ip: (10.0.0.0/8 or 172.16.0.0/12 or 192.168.0.0/16)'''
+tags = ["Exfiltration", "T1041"]

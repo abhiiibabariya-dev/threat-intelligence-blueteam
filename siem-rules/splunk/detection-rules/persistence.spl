@@ -1,0 +1,325 @@
+` ============================================================================
+` Splunk SPL Detection Rules - Persistence (TA0003)
+` ============================================================================
+` These rules detect adversary techniques for maintaining access to
+` compromised systems, mapped to MITRE ATT&CK Persistence tactic.
+`
+` Required Data Sources:
+`   - Windows Security Event Logs (WinEventLog:Security)
+`   - Sysmon (XmlWinEventLog:Microsoft-Windows-Sysmon/Operational)
+`   - Windows System Event Logs
+`   - Windows PowerShell logs
+`
+` Usage: Deploy as saved searches or ES correlation searches in Splunk.
+` ============================================================================
+
+
+` ============================================================================
+` Rule 1: Scheduled Task Creation for Persistence
+` ============================================================================
+` Rule Name:    persistence-scheduled-task-creation
+` Description:  Detects creation of scheduled tasks that may be used for
+`               persistence. Monitors for schtasks.exe and at.exe usage,
+`               as well as Task Scheduler Event IDs that indicate new task
+`               registration. Excludes common legitimate tasks by filtering
+`               on task paths and known system tasks.
+` MITRE ATT&CK: T1053.005 - Scheduled Task/Job: Scheduled Task
+` Tactic:       Persistence (TA0003), Execution (TA0002)
+` Severity:     Medium
+` Data Sources: Sysmon Event ID 1 (Process Create), Windows Security
+`               Event ID 4698 (Scheduled Task Created), Task Scheduler
+`               Operational logs
+` False Positives: Software installations, Windows Update, Group Policy
+`                  scheduled tasks, SCCM
+` ============================================================================
+
+index=windows
+    (sourcetype="WinEventLog:Security" EventCode=4698)
+    OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+        (Image="*\\schtasks.exe" AND CommandLine="*/create*")
+        OR (Image="*\\at.exe"))
+| eval detection_source=case(
+    EventCode=4698, "security_event_log",
+    match(Image, "(?i)schtasks"), "schtasks_process",
+    match(Image, "(?i)at.exe"), "at_command",
+    1=1, "other")
+| eval task_detail=case(
+    EventCode=4698, Task_Name,
+    1=1, CommandLine)
+| eval acting_user=coalesce(Account_Name, User, "unknown")
+| where NOT match(task_detail, "(?i)(\\\\Microsoft\\\\Windows\\\\|\\\\Google\\\\Update|\\\\Mozilla\\\\Firefox)")
+| where NOT match(acting_user, "(?i)(SYSTEM|LOCAL SERVICE|NETWORK SERVICE)")
+| eval has_suspicious_action=if(
+    match(task_detail, "(?i)(powershell|cmd\.exe|wscript|cscript|mshta|rundll32|regsvr32|certutil|bitsadmin|msiexec)"),
+    "yes", "no")
+| stats count as task_creation_count
+        values(detection_source) as sources
+        values(task_detail) as task_details
+        values(has_suspicious_action) as suspicious_actions
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval severity=if(match(mvjoin(suspicious_actions, ","), "yes"), "HIGH", "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, task_details, sources, task_creation_count,
+        severity, suspicious_actions, first_seen, last_seen
+| sort -severity, -task_creation_count
+
+
+` ============================================================================
+` Rule 2: Registry Run Key Modification for Persistence
+` ============================================================================
+` Rule Name:    persistence-registry-run-key-modification
+` Description:  Detects modifications to Windows Registry Run/RunOnce keys,
+`               which execute programs at user logon. Adversaries set these
+`               keys to establish persistence. Monitors Sysmon Event ID 13
+`               (Registry Value Set) for key paths commonly abused.
+` MITRE ATT&CK: T1547.001 - Boot or Logon Autostart Execution: Registry
+`               Run Keys / Startup Folder
+` Tactic:       Persistence (TA0003), Privilege Escalation (TA0004)
+` Severity:     High
+` Data Sources: Sysmon Event ID 13 (RegistryEvent - Value Set),
+`               Sysmon Event ID 12 (RegistryEvent - Create/Delete)
+` False Positives: Software installations adding legitimate startup entries,
+`                  Group Policy modifications, AV/EDR auto-start
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+    (EventCode=13 OR EventCode=12)
+    (TargetObject="*\\CurrentVersion\\Run\\*"
+     OR TargetObject="*\\CurrentVersion\\RunOnce\\*"
+     OR TargetObject="*\\CurrentVersion\\RunOnceEx\\*"
+     OR TargetObject="*\\CurrentVersion\\Explorer\\Shell Folders*"
+     OR TargetObject="*\\CurrentVersion\\Explorer\\User Shell Folders*"
+     OR TargetObject="*\\CurrentVersion\\Policies\\Explorer\\Run\\*"
+     OR TargetObject="*\\CurrentVersion\\Run*")
+| eval registry_path=TargetObject
+| eval registry_value=Details
+| eval modifying_process=Image
+| eval acting_user=User
+| where NOT match(modifying_process, "(?i)(msiexec|setup|install|update|chrome|firefox|teams|onedrive|defender)")
+| eval suspicious_value=if(
+    match(registry_value, "(?i)(powershell|cmd\.exe|wscript|cscript|mshta|rundll32|regsvr32|certutil|\\\\temp\\\\|\\\\appdata\\\\local\\\\temp)"),
+    "yes", "no")
+| stats count as modification_count
+        values(registry_path) as registry_keys_modified
+        values(registry_value) as values_set
+        values(modifying_process) as processes
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval severity=if(match(mvjoin(values_set, ","), "(?i)(powershell|cmd\.exe|wscript|cscript|mshta|rundll32|regsvr32|certutil|temp)"), "HIGH", "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, registry_keys_modified, values_set, processes,
+        modification_count, severity, first_seen, last_seen
+| sort -severity, -modification_count
+
+
+` ============================================================================
+` Rule 3: New Windows Service Creation for Persistence
+` ============================================================================
+` Rule Name:    persistence-new-service-creation
+` Description:  Detects creation of new Windows services, a common
+`               persistence and privilege escalation technique. Adversaries
+`               create services that run malicious executables or DLLs at
+`               system startup. Monitors Windows System Event ID 7045
+`               (Service Installed) and filters out known legitimate
+`               services.
+` MITRE ATT&CK: T1543.003 - Create or Modify System Process: Windows Service
+` Tactic:       Persistence (TA0003), Privilege Escalation (TA0004)
+` Severity:     Medium
+` Data Sources: Windows System Event Log (Event ID 7045, 7034),
+`               Sysmon Event ID 1
+` False Positives: Software installations, driver installations, legitimate
+`                  IT management tools
+` ============================================================================
+
+index=windows sourcetype="WinEventLog:System" EventCode=7045
+| eval service_name=Service_Name
+| eval service_path=coalesce(ImagePath, Service_File_Name, "unknown")
+| eval service_type=Service_Type
+| eval start_type=Service_Start_Type
+| eval service_account=coalesce(Service_Account, "LocalSystem")
+| where NOT match(service_name, "(?i)(Windows Update|gupdate|MBAMService|WinDefend|MpKsl|SentinelAgent|CrowdStrike|Tanium|cbdefense)")
+| eval suspicious_path=case(
+    match(service_path, "(?i)(\\\\temp\\\\|\\\\tmp\\\\|\\\\appdata\\\\|\\\\users\\\\.*\\\\desktop|\\\\downloads\\\\)"), "suspicious_location",
+    match(service_path, "(?i)(cmd\.exe|powershell|wscript|cscript|mshta|rundll32|regsvr32)"), "suspicious_binary",
+    match(service_path, "(?i)\\.(bat|vbs|js|ps1|hta)"), "suspicious_extension",
+    NOT match(service_path, "(?i)(program files|windows|system32)"), "non_standard_path",
+    1=1, "normal")
+| where suspicious_path!="normal"
+| stats count as install_count
+        values(service_path) as service_paths
+        values(service_account) as service_accounts
+        values(start_type) as start_types
+        values(suspicious_path) as risk_indicators
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, service_name
+| eval severity=case(
+    match(mvjoin(risk_indicators, ","), "suspicious_binary"), "CRITICAL",
+    match(mvjoin(risk_indicators, ","), "suspicious_location"), "HIGH",
+    1=1, "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, service_name, service_paths, service_accounts, start_types,
+        risk_indicators, severity, first_seen, last_seen
+| sort -severity
+
+
+` ============================================================================
+` Rule 4: Startup Folder Modification for Persistence
+` ============================================================================
+` Rule Name:    persistence-startup-folder-modification
+` Description:  Detects files being written to Windows Startup folders.
+`               Programs placed in these folders execute automatically when
+`               a user logs on. Adversaries drop malicious scripts, LNK
+`               files, or executables to achieve persistence.
+` MITRE ATT&CK: T1547.001 - Boot or Logon Autostart Execution: Registry
+`               Run Keys / Startup Folder
+` Tactic:       Persistence (TA0003)
+` Severity:     High
+` Data Sources: Sysmon Event ID 11 (FileCreate), Sysmon Event ID 1
+`               (Process Create - for file copy operations)
+` False Positives: Legitimate application shortcuts created during
+`                  installation, Group Policy startup scripts
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
+    (TargetFilename="*\\Start Menu\\Programs\\Startup\\*"
+     OR TargetFilename="*\\Start Menu\\Programs\\StartUp\\*"
+     OR TargetFilename="*\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\*"
+     OR TargetFilename="*\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\StartUp\\*")
+| eval file_dropped=TargetFilename
+| eval dropping_process=Image
+| eval acting_user=User
+| eval file_extension=lower(mvindex(split(TargetFilename, "."), -1))
+| eval suspicious_extension=if(
+    file_extension IN ("exe", "bat", "cmd", "vbs", "js", "ps1", "hta", "scr", "pif", "wsf"),
+    "yes", "no")
+| where NOT match(dropping_process, "(?i)(explorer\.exe|msiexec|setup|install)")
+    OR suspicious_extension="yes"
+| stats count as file_drop_count
+        values(file_dropped) as files_created
+        values(dropping_process) as creating_processes
+        values(file_extension) as extensions
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval severity=if(match(mvjoin(extensions, ","), "(exe|bat|cmd|vbs|js|ps1|hta|scr)"), "HIGH", "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, files_created, creating_processes, extensions,
+        file_drop_count, severity, first_seen, last_seen
+| sort -severity, -file_drop_count
+
+
+` ============================================================================
+` Rule 5: WMI Event Subscription Persistence
+` ============================================================================
+` Rule Name:    persistence-wmi-event-subscription
+` Description:  Detects creation of WMI event subscriptions used for
+`               persistence. Adversaries create WMI event consumers,
+`               filters, and bindings to execute code when specific system
+`               events occur (logon, time-based, process start). This is a
+`               fileless persistence technique. Monitors Sysmon Event IDs
+`               19, 20, 21 for WMI event activity.
+` MITRE ATT&CK: T1546.003 - Event Triggered Execution: Windows Management
+`               Instrumentation Event Subscription
+` Tactic:       Persistence (TA0003), Privilege Escalation (TA0004)
+` Severity:     High
+` Data Sources: Sysmon Event ID 19 (WmiEvent - Filter),
+`               Event ID 20 (WmiEvent - Consumer),
+`               Event ID 21 (WmiEvent - Binding)
+` False Positives: SCCM WMI-based monitoring, some AV/EDR products, Dell
+`                  BIOS update utilities
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+    (EventCode=19 OR EventCode=20 OR EventCode=21)
+| eval wmi_event_type=case(
+    EventCode=19, "EventFilter",
+    EventCode=20, "EventConsumer",
+    EventCode=21, "FilterToConsumerBinding",
+    1=1, "unknown")
+| eval wmi_name=coalesce(Name, "unnamed")
+| eval wmi_query=coalesce(Query, "N/A")
+| eval wmi_destination=coalesce(Destination, "N/A")
+| eval acting_user=User
+| where NOT match(wmi_name, "(?i)(SCM Event|BVTFilter|TSLogonFilter|Dell|HP|Lenovo)")
+| eval suspicious_consumer=if(
+    match(wmi_destination, "(?i)(powershell|cmd|wscript|cscript|mshta|rundll32|ActiveScriptEventConsumer|CommandLineEventConsumer)"),
+    "yes", "no")
+| stats count as wmi_events
+        values(wmi_event_type) as event_types
+        values(wmi_name) as subscription_names
+        values(wmi_query) as filter_queries
+        values(wmi_destination) as consumer_destinations
+        values(suspicious_consumer) as suspicious_flags
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval has_all_components=if(
+    mvcount(mvfilter(match(event_types, "EventFilter"))) > 0
+    AND mvcount(mvfilter(match(event_types, "EventConsumer"))) > 0,
+    "complete_subscription", "partial")
+| eval severity=case(
+    match(mvjoin(suspicious_flags, ","), "yes"), "CRITICAL",
+    has_all_components="complete_subscription", "HIGH",
+    1=1, "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, event_types, subscription_names, filter_queries,
+        consumer_destinations, has_all_components, severity, first_seen, last_seen
+| sort -severity
+
+
+` ============================================================================
+` Rule 6: BITS Jobs for Persistence
+` ============================================================================
+` Rule Name:    persistence-bits-job-creation
+` Description:  Detects creation of Background Intelligent Transfer Service
+`               (BITS) jobs that may be used for persistence or file download.
+`               BITS jobs survive reboots and can be used to execute commands
+`               via the SetNotifyCmdLine callback. Monitors for bitsadmin.exe
+`               usage and suspicious BITS operational log events.
+` MITRE ATT&CK: T1197 - BITS Jobs
+` Tactic:       Persistence (TA0003), Defense Evasion (TA0005)
+` Severity:     Medium
+` Data Sources: Sysmon Event ID 1 (Process Create), BITS Operational logs
+` False Positives: Windows Update, SCCM software distribution, legitimate
+`                  software updaters
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+    Image="*\\bitsadmin.exe"
+    (CommandLine="*/create*"
+     OR CommandLine="*/addfile*"
+     OR CommandLine="*/SetNotifyCmdLine*"
+     OR CommandLine="*/setcustomheaders*"
+     OR CommandLine="*/resume*"
+     OR CommandLine="*/transfer*")
+| eval acting_user=User
+| eval cmdline=CommandLine
+| eval parent=ParentImage
+| eval has_notify=if(match(cmdline, "(?i)SetNotifyCmdLine"), "yes", "no")
+| eval has_download=if(match(cmdline, "(?i)(addfile|transfer).*http"), "yes", "no")
+| stats count as bits_commands
+        values(cmdline) as commands
+        values(parent) as parent_processes
+        values(has_notify) as notify_callback
+        values(has_download) as download_activity
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval severity=case(
+    match(mvjoin(notify_callback, ","), "yes"), "HIGH",
+    match(mvjoin(download_activity, ","), "yes"), "MEDIUM",
+    1=1, "LOW")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, commands, parent_processes, bits_commands,
+        notify_callback, download_activity, severity, first_seen, last_seen
+| sort -severity, -bits_commands

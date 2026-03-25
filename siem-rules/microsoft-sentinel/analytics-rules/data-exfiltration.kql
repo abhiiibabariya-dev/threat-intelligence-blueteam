@@ -1,0 +1,177 @@
+// =============================================================================
+// Microsoft Sentinel Analytics Rules - Data Exfiltration
+// =============================================================================
+// Description:  Detect data exfiltration attempts including large file uploads,
+//               unusual SharePoint/OneDrive activity, and email forwarding rules.
+// MITRE ATT&CK: T1048, T1567, T1114
+// Severity:     Medium to High
+// Data Sources:  OfficeActivity, DeviceNetworkEvents, DeviceFileEvents, CommonSecurityLog
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Rule 1: Mass File Download from SharePoint/OneDrive
+// MITRE: T1530 - Data from Cloud Storage
+// Severity: High
+// ---------------------------------------------------------------------------
+let timeWindow = 1h;
+let downloadThreshold = 50;
+OfficeActivity
+| where TimeGenerated >= ago(1d)
+| where Operation in ("FileDownloaded", "FileSyncDownloadedFull")
+| where RecordType in ("SharePointFileOperation", "OneDrive")
+| summarize
+    DownloadCount = count(),
+    UniqueFiles = dcount(OfficeObjectId),
+    TotalSizeMB = round(sum(todouble(parse_json(tostring(AdditionalProperties)).SizeInBytes)) / 1048576.0, 1),
+    FileSamples = make_set(OfficeObjectId, 10),
+    SiteUrls = make_set(Site_Url, 5),
+    FirstDownload = min(TimeGenerated),
+    LastDownload = max(TimeGenerated)
+    by UserId, ClientIP, bin(TimeGenerated, timeWindow)
+| where DownloadCount >= downloadThreshold
+| project
+    TimeGenerated = LastDownload,
+    AlertName = "Mass File Download from SharePoint/OneDrive",
+    UserId,
+    ClientIP,
+    DownloadCount,
+    UniqueFiles,
+    TotalSizeMB,
+    FileSamples,
+    SiteUrls,
+    Duration = LastDownload - FirstDownload
+
+// ---------------------------------------------------------------------------
+// Rule 2: Suspicious Email Forwarding Rule Created
+// MITRE: T1114.003 - Email Collection: Email Forwarding Rule
+// Severity: High
+// ---------------------------------------------------------------------------
+OfficeActivity
+| where TimeGenerated >= ago(1d)
+| where Operation in ("New-InboxRule", "Set-InboxRule", "New-TransportRule", "Set-TransportRule")
+| extend
+    Parameters = parse_json(Parameters)
+| mv-expand Parameters
+| where Parameters.Name in ("ForwardTo", "ForwardAsAttachmentTo", "RedirectTo")
+| extend
+    ForwardingAddress = tostring(Parameters.Value),
+    RuleName = tostring(parse_json(tostring(Parameters)).Name)
+| where ForwardingAddress !endswith "@yourdomain.com"  // External forwarding
+| project
+    TimeGenerated,
+    AlertName = "Suspicious Email Forwarding Rule",
+    UserId,
+    ClientIP,
+    Operation,
+    ForwardingAddress,
+    UserAgent
+
+// ---------------------------------------------------------------------------
+// Rule 3: Large Data Upload to Cloud Storage Services
+// MITRE: T1567 - Exfiltration Over Web Service
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let cloudStorageDomains = dynamic([
+    "dropbox.com", "drive.google.com", "onedrive.live.com",
+    "mega.nz", "mediafire.com", "box.com", "wetransfer.com",
+    "sendspace.com", "anonfiles.com", "file.io",
+    "transfer.sh", "gofile.io", "uploadfiles.io"
+]);
+let uploadThresholdBytes = 52428800;  // 50 MB
+DeviceNetworkEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType == "ConnectionSuccess"
+| where RemoteUrl has_any (cloudStorageDomains)
+| join kind=inner (
+    CommonSecurityLog
+    | where TimeGenerated >= ago(1d)
+    | where SentBytes > uploadThresholdBytes
+    | project SourceIP, DestinationIP, SentBytes, TimeGenerated
+) on $left.LocalIP == $right.SourceIP, $left.RemoteIP == $right.DestinationIP
+| summarize
+    TotalUploadMB = round(sum(SentBytes) / 1048576.0, 1),
+    ConnectionCount = count(),
+    Services = make_set(RemoteUrl, 5)
+    by DeviceName, LocalIP, bin(TimeGenerated, 1h)
+| where TotalUploadMB > 50
+| project
+    TimeGenerated,
+    AlertName = "Large Upload to Cloud Storage Service",
+    DeviceName,
+    SourceIP = LocalIP,
+    TotalUploadMB,
+    ConnectionCount,
+    CloudServices = Services
+
+// ---------------------------------------------------------------------------
+// Rule 4: Sensitive File Access Anomaly
+// MITRE: T1039 - Data from Network Shared Drive
+// Severity: Medium
+// ---------------------------------------------------------------------------
+let sensitiveExtensions = dynamic([
+    ".xlsx", ".docx", ".pdf", ".pptx", ".csv",
+    ".sql", ".bak", ".mdb", ".accdb", ".key",
+    ".pem", ".pfx", ".kdbx", ".psafe3"
+]);
+let sensitiveKeywords = dynamic([
+    "confidential", "secret", "password", "credential",
+    "financial", "salary", "ssn", "tax", "bank",
+    "customer", "patient", "classified"
+]);
+DeviceFileEvents
+| where TimeGenerated >= ago(1d)
+| where ActionType in ("FileRead", "FileAccessed", "FileCopied")
+| where FileName has_any (sensitiveExtensions)
+    or FolderPath has_any (sensitiveKeywords)
+| summarize
+    FileAccessCount = count(),
+    UniqueFiles = dcount(FileName),
+    UniqueFolders = dcount(FolderPath),
+    FileList = make_set(FileName, 15),
+    FolderList = make_set(FolderPath, 5)
+    by DeviceName, InitiatingProcessAccountName, bin(TimeGenerated, 1h)
+| where FileAccessCount > 30 and UniqueFiles > 10
+| project
+    TimeGenerated,
+    AlertName = "Bulk Sensitive File Access",
+    DeviceName,
+    User = InitiatingProcessAccountName,
+    FileAccessCount,
+    UniqueFiles,
+    UniqueFolders,
+    FileList,
+    FolderList
+
+// ---------------------------------------------------------------------------
+// Rule 5: DNS Exfiltration via Long Subdomain Queries
+// MITRE: T1048.003 - Exfiltration Over Alternative Protocol: DNS
+// Severity: High
+// ---------------------------------------------------------------------------
+DnsEvents
+| where TimeGenerated >= ago(1d)
+| extend
+    SubdomainParts = split(Name, "."),
+    FullDomainLength = strlen(Name),
+    Labels = array_length(split(Name, ".")),
+    TopDomain = strcat(tostring(split(Name, ".")[-2]), ".", tostring(split(Name, ".")[-1]))
+| where FullDomainLength > 50 or Labels > 5
+| where QueryType in ("TXT", "A", "CNAME", "NULL")
+| summarize
+    QueryCount = count(),
+    AvgQueryLength = round(avg(FullDomainLength), 0),
+    MaxQueryLength = max(FullDomainLength),
+    UniqueSubdomains = dcount(Name),
+    SampleQueries = make_set(Name, 5),
+    ClientIPs = make_set(ClientIP, 5)
+    by TopDomain
+| where QueryCount > 50 and UniqueSubdomains > 20
+| project
+    TimeGenerated = now(),
+    AlertName = "Potential DNS Data Exfiltration",
+    SuspiciousDomain = TopDomain,
+    QueryCount,
+    UniqueSubdomains,
+    AvgQueryLength,
+    MaxQueryLength,
+    SampleQueries,
+    AffectedHosts = ClientIPs

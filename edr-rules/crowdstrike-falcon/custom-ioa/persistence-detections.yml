@@ -1,0 +1,127 @@
+# =============================================================================
+# CrowdStrike Falcon Custom IOA Rules: Persistence
+# MITRE ATT&CK: T1547, T1053, T1546, T1574
+# =============================================================================
+
+rules:
+  - rule_name: "Registry Run Key Persistence"
+    description: "Detects non-standard processes modifying registry run keys"
+    mitre_technique: "T1547.001"
+    mitre_tactic: "Persistence"
+    severity: "Medium"
+    platform: "Windows"
+    ioa_type: "Registry Modification"
+    enabled: true
+    detection_logic:
+      registry_path_contains:
+        - "\\CurrentVersion\\Run"
+        - "\\CurrentVersion\\RunOnce"
+        - "\\Winlogon\\Shell"
+        - "\\Winlogon\\Userinit"
+      exclude_process_name:
+        - "explorer.exe"
+        - "msiexec.exe"
+        - "svchost.exe"
+      action: "Detect"
+
+  - rule_name: "Suspicious Scheduled Task Creation"
+    description: "Detects scheduled task creation with suspicious commands"
+    mitre_technique: "T1053.005"
+    mitre_tactic: "Persistence"
+    severity: "Medium"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      process_name: "schtasks.exe"
+      command_line_contains:
+        - "/create"
+      command_line_also_contains:
+        - "powershell"
+        - "cmd.exe"
+        - "wscript"
+        - "mshta"
+        - "http://"
+        - "https://"
+        - "bypass"
+        - "-enc"
+      action: "Detect"
+
+  - rule_name: "WMI Event Subscription Persistence"
+    description: "Detects WMI event subscription creation for fileless persistence"
+    mitre_technique: "T1546.003"
+    mitre_tactic: "Persistence"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      command_line_contains:
+        - "__EventFilter"
+        - "__EventConsumer"
+        - "__FilterToConsumerBinding"
+        - "ActiveScriptEventConsumer"
+        - "CommandLineEventConsumer"
+      action: "Detect"
+
+  - rule_name: "Suspicious Service Installation"
+    description: "Detects service creation with suspicious binary paths"
+    mitre_technique: "T1543.003"
+    mitre_tactic: "Persistence"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      process_name: "sc.exe"
+      command_line_contains:
+        - "create"
+        - "binPath"
+      command_line_also_contains:
+        - "powershell"
+        - "cmd.exe"
+        - "\\Temp\\"
+        - "\\AppData\\"
+        - "http"
+      action: "Detect"
+
+  - rule_name: "DLL Search Order Hijacking Setup"
+    description: "Detects DLLs written to system directories by non-system processes"
+    mitre_technique: "T1574.001"
+    mitre_tactic: "Persistence"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "File Write"
+    enabled: true
+    detection_logic:
+      file_path_contains:
+        - "C:\\Windows\\System32\\"
+        - "C:\\Windows\\SysWOW64\\"
+      file_extension: ".dll"
+      exclude_process_name:
+        - "TrustedInstaller.exe"
+        - "TiWorker.exe"
+        - "msiexec.exe"
+      action: "Detect"
+
+  - rule_name: "Startup Folder File Drop"
+    description: "Detects executable files placed in startup folders"
+    mitre_technique: "T1547.001"
+    mitre_tactic: "Persistence"
+    severity: "Medium"
+    platform: "Windows"
+    ioa_type: "File Write"
+    enabled: true
+    detection_logic:
+      file_path_contains:
+        - "\\Start Menu\\Programs\\Startup\\"
+      file_extension:
+        - ".exe"
+        - ".bat"
+        - ".cmd"
+        - ".vbs"
+        - ".lnk"
+        - ".ps1"
+      exclude_process_name:
+        - "explorer.exe"
+      action: "Detect"

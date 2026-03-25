@@ -1,0 +1,70 @@
+# Securonix Spotter Queries - Insider Threat Detection
+# Leverages Securonix UEBA capabilities
+# MITRE ATT&CK: Multiple tactics
+
+# SQ-IT-001: Anomalous Off-Hours Access (T1078)
+index = activity AND categoryobject = "Authentication" AND eventoutcome = "Success"
+| where hour(datetime) < 6 OR hour(datetime) > 22
+| stats count() as access_count by accountname, devicename
+| where access_count > 5
+| sort -access_count
+| fields accountname, devicename, access_count
+
+# SQ-IT-002: Bulk File Download (T1074.001)
+index = activity AND categoryobject = "File Access" AND categoryoutcome = "Read"
+| stats count() as files_accessed, sum(bytesout) as total_bytes by accountname
+| where files_accessed > 100 OR total_bytes > 1073741824
+| sort -total_bytes
+| fields accountname, files_accessed, total_bytes, datetime
+
+# SQ-IT-003: Email to Personal Account with Attachments (T1048.003)
+index = activity AND categoryobject = "Email" AND categoryoutcome = "Sent"
+| where recipientaddress MATCHES ".*(gmail|yahoo|hotmail|outlook|protonmail)\\.com.*"
+| where resourcecustomfield3 > 0
+| stats count() as emails_sent, sum(resourcecustomfield3) as total_attachments by accountname
+| where emails_sent > 3
+| fields accountname, emails_sent, total_attachments
+
+# SQ-IT-004: USB Data Exfiltration (T1052.001)
+index = activity AND categoryobject = "Removable Media"
+| where categoryoutcome = "Write" AND bytesout > 52428800
+| stats sum(bytesout) as total_bytes, count() as write_events by accountname, devicename
+| sort -total_bytes
+| fields accountname, devicename, total_bytes, write_events
+
+# SQ-IT-005: Impossible Travel Detection (T1078)
+index = activity AND categoryobject = "Authentication" AND eventoutcome = "Success"
+| stats earliest(datetime) as first_login, latest(datetime) as last_login, dc(sourcelocation) as unique_locations, values(sourcelocation) as locations by accountname
+| where unique_locations > 1 AND timediff(last_login, first_login) < 7200
+| fields accountname, locations, first_login, last_login, unique_locations
+
+# SQ-IT-006: Cloud Storage Upload Spike (T1567.002)
+index = activity AND destinationhostname MATCHES ".*(dropbox|drive\\.google|onedrive|box\\.com|mega\\.nz).*"
+| stats sum(bytesout) as total_uploaded by accountname
+| where total_uploaded > 104857600
+| sort -total_uploaded
+| fields accountname, total_uploaded, datetime
+
+# SQ-IT-007: Privilege Escalation Outside Change Window (T1078.002)
+index = activity AND categoryobject = "Privilege" AND categoryoutcome = "Escalation"
+| where NOT inchangewindow(datetime)
+| stats count() as escalations by accountname, devicename
+| fields accountname, devicename, escalations, datetime
+
+# SQ-IT-008: Resignation Risk - Data Hoarding Pattern
+index = activity AND accountname IN ($resignation_watchlist)
+| where categoryobject IN ("File Access", "Email Sent", "Removable Media", "Cloud Upload")
+| stats count() as total_events, dc(categoryobject) as event_types, sum(bytesout) as bytes_transferred by accountname
+| where total_events > 50
+| sort -bytes_transferred
+| fields accountname, total_events, event_types, bytes_transferred
+
+# SQ-IT-009: Peer Group Anomaly - Resource Access
+index = activity AND categoryobject = "Resource Access"
+| stats dc(objectname) as resources_accessed by accountname, department
+| join department [
+    index = activity AND categoryobject = "Resource Access"
+    | stats avg(dc(objectname)) as dept_avg by department
+]
+| where resources_accessed > dept_avg * 3
+| fields accountname, department, resources_accessed, dept_avg

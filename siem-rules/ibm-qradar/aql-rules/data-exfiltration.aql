@@ -1,0 +1,132 @@
+-- =============================================================================
+-- IBM QRadar AQL Rules: Data Exfiltration
+-- =============================================================================
+-- Description:  Detect data exfiltration via large transfers, DNS tunneling,
+--               and unusual protocol usage.
+-- MITRE ATT&CK: T1048 (Exfiltration Over Alternative Protocol),
+--               T1567 (Exfiltration Over Web Service)
+-- Severity:     Medium to Critical
+-- Log Sources:  Firewall, Proxy, DNS, DLP
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Rule 1: Large Outbound Data Transfer
+-- MITRE: T1048 - Exfiltration Over Alternative Protocol
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    destinationip AS "Destination IP",
+    SUM(sourcebytes) AS "Total Bytes Sent",
+    SUM(sourcebytes)/1048576 AS "Total MB Sent",
+    COUNT(*) AS "Connection Count",
+    COUNT(DISTINCT destinationip) AS "Unique Destinations",
+    DATEFORMAT(MIN(starttime), 'yyyy-MM-dd HH:mm:ss') AS "First Transfer",
+    DATEFORMAT(MAX(starttime), 'yyyy-MM-dd HH:mm:ss') AS "Last Transfer"
+FROM flows
+WHERE direction = 'R2L' OR direction = 'L2R'
+    AND sourcebytes > 0
+    AND INCIDR('10.0.0.0/8', sourceip)
+    AND NOT INCIDR('10.0.0.0/8', destinationip)
+GROUP BY sourceip, destinationip
+HAVING SUM(sourcebytes) > 104857600  -- > 100 MB
+ORDER BY "Total Bytes Sent" DESC
+LAST 1 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 2: DNS Tunneling Detection
+-- MITRE: T1048.003 - Exfiltration Over Alternative Protocol: DNS
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    "QueryName" AS "DNS Query",
+    LENGTH("QueryName") AS "Query Length",
+    COUNT(*) AS "Query Count",
+    COUNT(DISTINCT "QueryName") AS "Unique Queries",
+    AVG(LENGTH("QueryName")) AS "Avg Query Length"
+FROM events
+WHERE category = 'DNS'
+    AND LENGTH("QueryName") > 50
+    AND "QueryType" IN ('A', 'TXT', 'CNAME', 'NULL')
+GROUP BY sourceip, "QueryName"
+HAVING COUNT(*) > 100
+    AND COUNT(DISTINCT "QueryName") > 50
+ORDER BY "Query Count" DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 3: Upload to Cloud Storage Services
+-- MITRE: T1567 - Exfiltration Over Web Service
+-- Severity: Medium
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    username AS "User",
+    destinationip AS "Destination",
+    "URL" AS "URL",
+    SUM(sourcebytes) AS "Bytes Uploaded",
+    SUM(sourcebytes)/1048576 AS "MB Uploaded",
+    COUNT(*) AS "Requests"
+FROM events
+WHERE category = 'Web'
+    AND "RequestMethod" IN ('POST', 'PUT')
+    AND (
+        "URL" ILIKE '%dropbox.com%' OR
+        "URL" ILIKE '%drive.google.com%' OR
+        "URL" ILIKE '%onedrive.live.com%' OR
+        "URL" ILIKE '%mega.nz%' OR
+        "URL" ILIKE '%wetransfer.com%' OR
+        "URL" ILIKE '%box.com/api%' OR
+        "URL" ILIKE '%file.io%' OR
+        "URL" ILIKE '%transfer.sh%'
+    )
+GROUP BY sourceip, username, destinationip, "URL"
+HAVING SUM(sourcebytes) > 10485760  -- > 10 MB
+ORDER BY "Bytes Uploaded" DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 4: Unusual Protocol for Data Transfer
+-- MITRE: T1048 - Exfiltration Over Alternative Protocol
+-- Severity: Medium
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Source IP",
+    destinationip AS "Destination IP",
+    protocolid AS "Protocol",
+    destinationport AS "Dest Port",
+    SUM(sourcebytes) AS "Bytes Out",
+    SUM(sourcebytes)/1048576 AS "MB Out",
+    COUNT(*) AS "Connections"
+FROM flows
+WHERE protocolid NOT IN (6, 17)  -- Not TCP/UDP
+    AND sourcebytes > 10240
+    AND INCIDR('10.0.0.0/8', sourceip)
+    AND NOT INCIDR('10.0.0.0/8', destinationip)
+GROUP BY sourceip, destinationip, protocolid, destinationport
+HAVING SUM(sourcebytes) > 1048576  -- > 1 MB
+ORDER BY "Bytes Out" DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 5: Email-based Data Exfiltration
+-- MITRE: T1048.002 - Exfiltration Over Asymmetric Encrypted Non-C2 Protocol
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Sender IP",
+    username AS "Sender",
+    "Recipient" AS "Recipient",
+    "AttachmentSize" AS "Attachment Size",
+    "AttachmentName" AS "Attachment",
+    COUNT(*) AS "Email Count",
+    SUM("AttachmentSize") AS "Total Attachment Bytes"
+FROM events
+WHERE category = 'Email'
+    AND "AttachmentSize" > 5242880  -- > 5 MB
+    AND "Recipient" NOT LIKE '%@yourdomain.com'
+GROUP BY sourceip, username, "Recipient", "AttachmentSize", "AttachmentName"
+HAVING SUM("AttachmentSize") > 26214400  -- > 25 MB total
+ORDER BY "Total Attachment Bytes" DESC
+LAST 24 HOURS

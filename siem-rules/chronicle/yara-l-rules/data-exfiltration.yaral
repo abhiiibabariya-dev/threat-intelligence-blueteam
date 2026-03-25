@@ -1,0 +1,133 @@
+// =============================================================================
+// Google Chronicle SIEM - YARA-L 2.0 Rules: Data Exfiltration
+// =============================================================================
+// MITRE ATT&CK: T1048 (Exfiltration Over Alternative Protocol)
+// =============================================================================
+
+rule large_outbound_transfer {
+  meta:
+    author = "Blue Team"
+    description = "Detects unusually large outbound data transfers"
+    mitre_attack = "T1048"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $transfer.metadata.event_type = "NETWORK_CONNECTION"
+    $transfer.target.ip_is_internal = false
+    $transfer.network.sent_bytes > 104857600  // > 100 MB
+    $transfer.principal.hostname = $hostname
+    $transfer.principal.ip = $src_ip
+
+  match:
+    $hostname over 1h
+
+  outcome:
+    $risk_score = 75
+    $total_bytes = sum($transfer.network.sent_bytes)
+    $unique_destinations = count_distinct($transfer.target.ip)
+    $destinations = array_distinct($transfer.target.ip)
+
+  condition:
+    $transfer
+}
+
+rule cloud_storage_exfiltration {
+  meta:
+    author = "Blue Team"
+    description = "Detects large uploads to cloud storage services"
+    mitre_attack = "T1567"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $upload.metadata.event_type = "NETWORK_HTTP"
+    $upload.network.http.method = "POST" or $upload.network.http.method = "PUT"
+    (
+      re.regex($upload.target.url, `dropbox\.com`) = true or
+      re.regex($upload.target.url, `drive\.google\.com`) = true or
+      re.regex($upload.target.url, `onedrive\.live\.com`) = true or
+      re.regex($upload.target.url, `mega\.nz`) = true or
+      re.regex($upload.target.url, `wetransfer\.com`) = true or
+      re.regex($upload.target.url, `file\.io`) = true
+    )
+    $upload.network.sent_bytes > 10485760  // > 10 MB
+    $upload.principal.hostname = $hostname
+    $upload.principal.user.userid = $user
+
+  match:
+    $hostname, $user over 1h
+
+  outcome:
+    $risk_score = 80
+    $total_uploaded = sum($upload.network.sent_bytes)
+    $services = array_distinct($upload.target.url)
+
+  condition:
+    $upload
+}
+
+rule dns_data_exfiltration {
+  meta:
+    author = "Blue Team"
+    description = "Detects data exfiltration via DNS queries with encoded data"
+    mitre_attack = "T1048.003"
+    severity = "HIGH"
+    priority = "HIGH"
+
+  events:
+    $dns.metadata.event_type = "NETWORK_DNS"
+    $dns.network.dns.questions.type = 16 or  // TXT
+    $dns.network.dns.questions.type = 1     // A
+    re.regex($dns.network.dns.questions.name, `^[a-zA-Z0-9+/=]{20,}\.`) = true
+    $dns.principal.ip = $src_ip
+
+  match:
+    $src_ip over 1h
+
+  outcome:
+    $risk_score = 85
+    $query_count = count($dns.metadata.id)
+    $unique_queries = count_distinct($dns.network.dns.questions.name)
+
+  condition:
+    $dns and $query_count > 50 and $unique_queries > 30
+}
+
+rule staging_then_transfer {
+  meta:
+    author = "Blue Team"
+    description = "Detects file compression/staging followed by large outbound transfer"
+    mitre_attack = "T1560,T1048"
+    severity = "CRITICAL"
+    priority = "HIGH"
+
+  events:
+    // Stage 1: Compression/archiving activity
+    $stage.metadata.event_type = "PROCESS_LAUNCH"
+    (
+      $stage.principal.process.file.full_path = /.*\\(rar|7z|zip|tar)\.exe$/ nocase or
+      $stage.principal.process.command_line = /.*Compress-Archive.*/ nocase
+    )
+    $stage.principal.hostname = $hostname
+
+    // Stage 2: Large outbound transfer
+    $exfil.metadata.event_type = "NETWORK_CONNECTION"
+    $exfil.target.ip_is_internal = false
+    $exfil.network.sent_bytes > 52428800  // > 50 MB
+    $exfil.principal.hostname = $hostname
+
+    $stage.metadata.event_timestamp.seconds < $exfil.metadata.event_timestamp.seconds
+
+  match:
+    $hostname over 2h
+
+  outcome:
+    $risk_score = 90
+    $staging_commands = array_distinct($stage.principal.process.command_line)
+    $transfer_destinations = array_distinct($exfil.target.ip)
+    $bytes_transferred = sum($exfil.network.sent_bytes)
+
+  condition:
+    $stage and $exfil
+}

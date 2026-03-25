@@ -1,0 +1,117 @@
+<!-- Wazuh Detection Rules: Discovery -->
+<!-- MITRE ATT&CK Tactic: TA0007 - Discovery -->
+<!-- Rule IDs: 100245-100259 -->
+
+<group name="discovery,mitre_ta0007,">
+
+  <!-- T1087.001 - Local Account Discovery -->
+  <rule id="100245" level="6">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(net\s+user($|\s)|net\s+localgroup|wmic\s+useraccount|Get-LocalUser|Get-LocalGroupMember)</field>
+    <description>Discovery: Local account enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1087.001</id>
+    </mitre>
+    <group>account_discovery,enumeration,</group>
+  </rule>
+
+  <!-- T1087.002 - Domain Account Discovery -->
+  <rule id="100246" level="8">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(net\s+user\s+/domain|net\s+group\s+/domain|dsquery|Get-ADUser|Get-ADGroup|ldapsearch|adfind)</field>
+    <description>Discovery: Domain account enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1087.002</id>
+    </mitre>
+    <group>ad_enumeration,domain_discovery,</group>
+  </rule>
+
+  <!-- T1018 - Remote System Discovery -->
+  <rule id="100247" level="8">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(net\s+view|ping\s+-n\s+1.*\d+\.\d+\.\d+|arp\s+-a|nbtstat\s+-[nNrR]|nltest\s+/dclist|dsquery\s+computer|Get-ADComputer)</field>
+    <description>Discovery: Remote system enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1018</id>
+    </mitre>
+    <group>network_discovery,host_enumeration,</group>
+  </rule>
+
+  <!-- T1046 - Network Service Scanning -->
+  <rule id="100248" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(nmap|masscan|zmap|Advanced.IP.Scanner|angry.?ip|Test-NetConnection.*-Port|portqry)</field>
+    <description>Discovery: Network port scanning tool detected - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+    <group>port_scanning,network_scan,</group>
+  </rule>
+
+  <!-- T1082 - System Information Discovery -->
+  <rule id="100249" level="6">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(systeminfo|hostname|whoami\s+/all|ver($|\s)|wmic\s+(os|computersystem|bios)\s+get)</field>
+    <description>Discovery: System information gathering - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1082</id>
+    </mitre>
+    <group>system_discovery,</group>
+  </rule>
+
+  <!-- T1083 - File and Directory Discovery -->
+  <rule id="100250" level="6">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(dir\s+/[sS].*\.(doc|xls|pdf|pst|key|pem|pfx)|tree\s+/[fF]|Get-ChildItem.*-Recurse.*\.(doc|xls|pdf))</field>
+    <description>Discovery: Sensitive file search - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1083</id>
+    </mitre>
+    <group>file_discovery,sensitive_file_search,</group>
+  </rule>
+
+  <!-- T1049 - System Network Connections Discovery -->
+  <rule id="100251" level="6">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(netstat\s+-[aAbBnNoOpPtT]|Get-NetTCPConnection|ss\s+-[tlnp])</field>
+    <description>Discovery: Network connection enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1049</id>
+    </mitre>
+    <group>network_connections_discovery,</group>
+  </rule>
+
+  <!-- T1069.002 - Domain Groups Discovery -->
+  <rule id="100252" level="8">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(net\s+group.*domain\s+admins|net\s+group.*enterprise\s+admins|Get-ADGroupMember.*Domain\s+Admins|adfind.*-b.*CN=Domain\s+Admins)</field>
+    <description>Discovery: Domain admin group enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1069.002</id>
+    </mitre>
+    <group>ad_enumeration,privilege_discovery,</group>
+  </rule>
+
+  <!-- T1016 - System Network Configuration Discovery -->
+  <rule id="100253" level="6">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(ipconfig\s+/all|route\s+print|nslookup|Get-DnsClientServerAddress|Get-NetIPConfiguration)</field>
+    <description>Discovery: Network configuration enumeration - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1016</id>
+    </mitre>
+    <group>network_config_discovery,</group>
+  </rule>
+
+  <!-- Bulk Discovery - Multiple Discovery Commands in Short Time -->
+  <rule id="100254" level="12" frequency="5" timeframe="300">
+    <if_matched_group>discovery</if_matched_group>
+    <same_source_ip/>
+    <description>Discovery: Multiple reconnaissance commands from same host - possible automated enumeration</description>
+    <mitre>
+      <id>T1087</id>
+    </mitre>
+    <group>bulk_discovery,automated_recon,</group>
+  </rule>
+
+</group>

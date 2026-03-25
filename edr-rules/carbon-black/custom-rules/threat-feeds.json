@@ -1,0 +1,57 @@
+{
+  "threat_feeds": [
+    {
+      "feed_name": "Malicious Hash Blocklist",
+      "description": "Known malware file hashes for blocking and alerting",
+      "feed_type": "binary",
+      "indicator_type": "md5",
+      "source": "Internal Threat Intelligence",
+      "update_frequency": "hourly",
+      "action": "alert_and_block",
+      "enabled": true,
+      "reports": [
+        {
+          "id": "ransomware-hashes-001",
+          "title": "Known Ransomware Binary Hashes",
+          "severity": 100,
+          "iocs_v2": [
+            {"type": "md5", "values": ["PLACEHOLDER_HASH_1"]},
+            {"type": "sha256", "values": ["PLACEHOLDER_HASH_2"]}
+          ],
+          "tags": ["ransomware", "T1486"]
+        }
+      ]
+    },
+    {
+      "feed_name": "C2 IP Blocklist",
+      "description": "Known command and control infrastructure IPs",
+      "feed_type": "network",
+      "indicator_type": "ipv4",
+      "source": "External TI Feed",
+      "update_frequency": "4_hours",
+      "action": "alert",
+      "enabled": true,
+      "reports": [
+        {
+          "id": "c2-ips-001",
+          "title": "Known C2 Server IPs",
+          "severity": 85,
+          "iocs_v2": [
+            {"type": "ipv4", "values": ["PLACEHOLDER_IP"]}
+          ],
+          "tags": ["c2", "T1071"]
+        }
+      ]
+    },
+    {
+      "feed_name": "Suspicious Domain Feed",
+      "description": "Newly registered and suspicious domains",
+      "feed_type": "network",
+      "indicator_type": "dns",
+      "source": "External TI Feed",
+      "update_frequency": "daily",
+      "action": "alert",
+      "enabled": true
+    }
+  ]
+}

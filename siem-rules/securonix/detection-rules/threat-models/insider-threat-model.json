@@ -1,0 +1,101 @@
+{
+  "threat_model": {
+    "name": "Insider Threat Detection Model",
+    "version": "1.0",
+    "description": "Comprehensive insider threat detection using UEBA behavioral analytics",
+    "risk_indicators": [
+      {
+        "id": "IT-RI-001",
+        "name": "Abnormal Data Access Volume",
+        "type": "volumetric_anomaly",
+        "data_source": "file_access",
+        "baseline": "30_day_rolling",
+        "deviation_threshold": 3,
+        "peer_group": "department",
+        "risk_score": 25,
+        "description": "User accessing significantly more files than department peers"
+      },
+      {
+        "id": "IT-RI-002",
+        "name": "Off-Hours Activity",
+        "type": "temporal_anomaly",
+        "data_source": "authentication",
+        "baseline": "user_work_pattern",
+        "deviation_threshold": 2,
+        "risk_score": 15,
+        "description": "Activity outside user's normal working hours"
+      },
+      {
+        "id": "IT-RI-003",
+        "name": "Impossible Travel",
+        "type": "geo_anomaly",
+        "data_source": "authentication",
+        "max_travel_speed_kmh": 900,
+        "risk_score": 30,
+        "description": "Login from geographically distant location within impossible timeframe"
+      },
+      {
+        "id": "IT-RI-004",
+        "name": "USB Data Transfer",
+        "type": "policy_violation",
+        "data_source": "endpoint_dlp",
+        "threshold_bytes": 52428800,
+        "risk_score": 35,
+        "description": "Large data transfer to removable media"
+      },
+      {
+        "id": "IT-RI-005",
+        "name": "Personal Email Forwarding",
+        "type": "policy_violation",
+        "data_source": "email",
+        "personal_domains": ["gmail.com", "yahoo.com", "hotmail.com", "protonmail.com"],
+        "risk_score": 25,
+        "description": "Forwarding corporate data to personal email accounts"
+      },
+      {
+        "id": "IT-RI-006",
+        "name": "Cloud Upload Anomaly",
+        "type": "volumetric_anomaly",
+        "data_source": "network",
+        "cloud_services": ["dropbox.com", "drive.google.com", "onedrive.live.com", "mega.nz"],
+        "baseline": "30_day_rolling",
+        "deviation_threshold": 4,
+        "risk_score": 30,
+        "description": "Abnormal volume of uploads to cloud storage"
+      },
+      {
+        "id": "IT-RI-007",
+        "name": "First-Time Resource Access",
+        "type": "behavioral_anomaly",
+        "data_source": "resource_access",
+        "risk_score": 10,
+        "description": "User accessing resources never accessed before"
+      },
+      {
+        "id": "IT-RI-008",
+        "name": "HR Risk Flag",
+        "type": "contextual",
+        "data_source": "hr_feed",
+        "conditions": ["resignation_notice", "pip", "termination_pending"],
+        "risk_multiplier": 2.0,
+        "description": "User flagged by HR for departure or performance issues"
+      }
+    ],
+    "risk_scoring": {
+      "method": "cumulative_weighted",
+      "thresholds": {
+        "low": {"min": 0, "max": 30},
+        "medium": {"min": 31, "max": 60},
+        "high": {"min": 61, "max": 85},
+        "critical": {"min": 86, "max": 100}
+      },
+      "decay_rate_hours": 168,
+      "peer_group_fields": ["department", "job_title", "location"]
+    },
+    "response_actions": {
+      "medium": ["add_to_watchlist", "notify_manager"],
+      "high": ["create_case", "notify_security_team", "increase_monitoring"],
+      "critical": ["create_incident", "restrict_access", "notify_ciso", "preserve_evidence"]
+    }
+  }
+}

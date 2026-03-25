@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- McAfee ESM Correlation Rules - Lateral Movement (TA0008) -->
+<CorrelationRules>
+
+  <CorrelationRule name="ESM-LM-001: PsExec Service Install" severity="80" enabled="true">
+    <Description>PsExec service installed on remote host</Description>
+    <MITREAttack>T1021.002</MITREAttack>
+    <Filter operator="AND">
+      <FilterCondition field="EVENT_ID" operator="EQUALS" value="7045"/>
+      <FilterCondition field="SERVICE_NAME" operator="REGEX" value="(?i)psexe(svc|c)"/>
+    </Filter>
+    <Correlation><TimeWindow value="60"/><Threshold count="1"/></Correlation>
+    <Actions><Action type="createAlarm" assignee="SOC-L2" priority="HIGH"/></Actions>
+  </CorrelationRule>
+
+  <CorrelationRule name="ESM-LM-002: WMI Remote Process" severity="80" enabled="true">
+    <Description>WMI provider spawning suspicious child processes</Description>
+    <MITREAttack>T1047</MITREAttack>
+    <Filter operator="AND">
+      <FilterCondition field="PARENT_PROCESS" operator="EQUALS" value="wmiprvse.exe"/>
+      <FilterCondition field="PROCESS" operator="IN" value="cmd.exe,powershell.exe,pwsh.exe,mshta.exe"/>
+    </Filter>
+    <Correlation><TimeWindow value="60"/><Threshold count="1"/></Correlation>
+    <Actions><Action type="createAlarm" assignee="SOC-L2" priority="HIGH"/></Actions>
+  </CorrelationRule>
+
+  <CorrelationRule name="ESM-LM-003: RDP Multi-Host" severity="75" enabled="true">
+    <Description>RDP connections to multiple internal hosts from single source</Description>
+    <MITREAttack>T1021.001</MITREAttack>
+    <Filter operator="AND">
+      <FilterCondition field="DST_PORT" operator="EQUALS" value="3389"/>
+      <FilterCondition field="EVENT_ID" operator="EQUALS" value="4624"/>
+      <FilterCondition field="LOGON_TYPE" operator="EQUALS" value="10"/>
+    </Filter>
+    <Correlation>
+      <TimeWindow value="3600"/>
+      <GroupBy field="SRC_IP"/>
+      <UniqueValues field="DST_IP" minimum="3"/>
+    </Correlation>
+    <Actions><Action type="createAlarm" assignee="SOC-L2" priority="HIGH"/></Actions>
+  </CorrelationRule>
+
+  <CorrelationRule name="ESM-LM-004: Admin Share Access" severity="70" enabled="true">
+    <Description>Access to administrative shares from non-admin workstation</Description>
+    <MITREAttack>T1021.002</MITREAttack>
+    <Filter operator="AND">
+      <FilterCondition field="EVENT_ID" operator="EQUALS" value="5140"/>
+      <FilterCondition field="SHARE_NAME" operator="REGEX" value="(?i)(ADMIN\$|C\$)"/>
+    </Filter>
+    <Correlation><TimeWindow value="60"/><GroupBy field="SRC_IP"/><Threshold count="1"/></Correlation>
+    <Actions><Action type="createAlarm" assignee="SOC-L1" priority="MEDIUM"/></Actions>
+  </CorrelationRule>
+
+  <CorrelationRule name="ESM-LM-005: Pass-the-Hash" severity="90" enabled="true">
+    <Description>NTLM logon with NewCredentials type - Pass-the-Hash indicator</Description>
+    <MITREAttack>T1550.002</MITREAttack>
+    <Filter operator="AND">
+      <FilterCondition field="EVENT_ID" operator="EQUALS" value="4624"/>
+      <FilterCondition field="LOGON_TYPE" operator="EQUALS" value="9"/>
+      <FilterCondition field="AUTH_PACKAGE" operator="EQUALS" value="Negotiate"/>
+    </Filter>
+    <Correlation><TimeWindow value="60"/><Threshold count="1"/></Correlation>
+    <Actions><Action type="createAlarm" assignee="SOC-L3" priority="CRITICAL"/></Actions>
+  </CorrelationRule>
+
+</CorrelationRules>

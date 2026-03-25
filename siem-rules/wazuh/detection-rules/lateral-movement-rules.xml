@@ -1,0 +1,123 @@
+<!-- Wazuh Detection Rules: Lateral Movement -->
+<!-- MITRE ATT&CK Tactic: TA0008 - Lateral Movement -->
+<!-- Rule IDs: 100140-100159 -->
+
+<group name="lateral_movement,mitre_ta0008,">
+
+  <!-- T1021.002 - PsExec Remote Execution -->
+  <rule id="100140" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)psexesvc\.exe|PSEXESVC\.exe</field>
+    <description>Lateral Movement: PsExec remote execution detected - child process $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+    <group>psexec,remote_execution,</group>
+  </rule>
+
+  <!-- T1021.002 - PsExec Service Installation -->
+  <rule id="100141" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">7045</field>
+    <field name="win.eventdata.serviceName" type="pcre2">(?i)PSEXESVC|psexec</field>
+    <description>Lateral Movement: PsExec service installed on this host</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+    <group>psexec,service_install,</group>
+  </rule>
+
+  <!-- T1047 - WMI Remote Process Creation -->
+  <rule id="100142" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)wmiprvse\.exe</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)cmd\.exe|powershell\.exe|pwsh\.exe|mshta\.exe</field>
+    <description>Lateral Movement: WMI spawned suspicious process $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1047</id>
+    </mitre>
+    <group>wmi_lateral,remote_execution,</group>
+  </rule>
+
+  <!-- T1021.001 - RDP Connection from Unusual Source -->
+  <rule id="100143" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">4624</field>
+    <field name="win.eventdata.logonType">10</field>
+    <description>Lateral Movement: RDP login from $(win.eventdata.ipAddress) as $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1021.001</id>
+    </mitre>
+    <group>rdp_login,remote_desktop,</group>
+  </rule>
+
+  <!-- T1021.002 - SMB/Windows Admin Shares -->
+  <rule id="100144" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">5140</field>
+    <field name="win.eventdata.shareName" type="pcre2">(?i)\\\\.*\\\\(ADMIN\$|C\$|IPC\$)</field>
+    <description>Lateral Movement: Admin share $(win.eventdata.shareName) accessed from $(win.eventdata.ipAddress)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+    <group>smb_admin_shares,</group>
+  </rule>
+
+  <!-- T1021.006 - WinRM Remote Execution -->
+  <rule id="100145" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)wsmprovhost\.exe</field>
+    <description>Lateral Movement: WinRM remote execution - process $(win.eventdata.image) spawned via WinRM</description>
+    <mitre>
+      <id>T1021.006</id>
+    </mitre>
+    <group>winrm,remote_execution,</group>
+  </rule>
+
+  <!-- T1021.004 - SSH Lateral Movement -->
+  <rule id="100146" level="8">
+    <if_sid>5715</if_sid>
+    <description>Lateral Movement: SSH successful login from $(srcip) as $(dstuser)</description>
+    <mitre>
+      <id>T1021.004</id>
+    </mitre>
+    <group>ssh_lateral,</group>
+  </rule>
+
+  <!-- T1563.002 - RDP Session Hijacking -->
+  <rule id="100147" level="14">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)tscon\s+\d+\s+/dest:</field>
+    <description>Lateral Movement: RDP session hijacking attempt via tscon</description>
+    <mitre>
+      <id>T1563.002</id>
+    </mitre>
+    <group>rdp_hijacking,critical,</group>
+  </rule>
+
+  <!-- T1550.002 - Pass the Hash -->
+  <rule id="100148" level="14">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">4624</field>
+    <field name="win.eventdata.logonType">9</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">seclogo</field>
+    <description>Lateral Movement: Potential Pass-the-Hash - NewCredentials logon by $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1550.002</id>
+    </mitre>
+    <group>pass_the_hash,credential_abuse,</group>
+  </rule>
+
+  <!-- T1021.003 - DCOM Lateral Movement -->
+  <rule id="100149" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)mmc\.exe|dllhost\.exe</field>
+    <field name="win.eventdata.parentCommandLine" type="pcre2">(?i)/Processid:\{[A-F0-9-]+\}</field>
+    <description>Lateral Movement: DCOM-based remote execution detected</description>
+    <mitre>
+      <id>T1021.003</id>
+    </mitre>
+    <group>dcom_lateral,</group>
+  </rule>
+
+</group>

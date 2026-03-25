@@ -1,0 +1,27 @@
+// InsightIDR LEQL Queries - Exfiltration (TA0010)
+
+// IDR-EX-001: Cloud Storage Tool (T1567.002)
+where(process_name IN ["rclone.exe", "megasync.exe", "gdrive.exe", "onedrive.exe"])
+groupby(host, account, process_name)
+calculate(count)
+
+// IDR-EX-002: DNS Tunneling (T1048.001)
+where(query_length > 50 AND query_type IN ["TXT", "NULL"])
+groupby(source_address)
+calculate(count)
+having(count > 20)
+
+// IDR-EX-003: Certutil Download (T1105)
+where(process_name = "certutil.exe" AND command_line ICONTAINS "urlcache" AND command_line ICONTAINS "http")
+groupby(host, command_line)
+calculate(count)
+
+// IDR-EX-004: Large FTP Transfer (T1048.003)
+where(destination_port IN [20, 21] AND bytes_out > 52428800)
+groupby(source_address, destination_address, account)
+calculate(sum:bytes_out)
+
+// IDR-EX-005: Archive Creation (T1560.001)
+where(command_line ICONTAINS-ANY ["7z a", "rar a", "zip -r", "Compress-Archive", "tar czf"])
+groupby(host, account, command_line)
+calculate(count)

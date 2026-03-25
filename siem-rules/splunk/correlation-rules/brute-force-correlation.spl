@@ -1,0 +1,108 @@
+` ===================================================================
+` Splunk Correlation Rule: Distributed Brute Force Attack Detection
+` ===================================================================
+` Description:  Correlates failed authentication events across multiple
+`               hosts and accounts to detect distributed brute-force campaigns.
+` MITRE ATT&CK: T1110 - Brute Force
+`   Sub-techniques: T1110.001 (Password Guessing), T1110.003 (Password Spraying)
+` Severity:     High
+` Data Sources: Windows Security (4625), Linux Auth, VPN, Web Auth logs
+` Schedule:     Every 15 minutes
+` Alert Action: Create notable event, send to SOC queue
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Search 1: Windows Distributed Brute Force (Real-time)
+` Detects multiple failed logons from a single source across multiple accounts
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4625
+| stats count as FailedAttempts,
+        dc(TargetUserName) as UniqueAccounts,
+        values(TargetUserName) as TargetAccounts,
+        earliest(_time) as FirstAttempt,
+        latest(_time) as LastAttempt,
+        dc(ComputerName) as TargetHosts
+    by IpAddress, LogonType
+| where FailedAttempts >= 15 AND UniqueAccounts >= 3
+| eval AttackDuration_min=round((LastAttempt-FirstAttempt)/60,1)
+| eval Severity=case(
+    FailedAttempts > 100 AND UniqueAccounts > 20, "Critical",
+    FailedAttempts > 50 AND UniqueAccounts > 10, "High",
+    FailedAttempts > 25, "Medium",
+    1=1, "Low"
+)
+| eval MITREAttack="T1110"
+| eval AlertName="Distributed Brute Force Attack"
+| table _time, AlertName, IpAddress, FailedAttempts, UniqueAccounts,
+        TargetAccounts, TargetHosts, AttackDuration_min, LogonType, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 2: Password Spray Detection
+` Many accounts targeted with few attempts each from a single source
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4625
+| bin _time span=30m
+| stats count as FailedAttempts,
+        dc(TargetUserName) as UniqueAccounts,
+        values(TargetUserName) as Accounts
+    by _time, IpAddress
+| where UniqueAccounts > 10 AND FailedAttempts / UniqueAccounts < 3
+| eval AttackType="Password Spray"
+| eval MITREAttack="T1110.003"
+
+` ---------------------------------------------------------------------------
+` Search 3: Brute Force Followed by Successful Login (Correlation)
+` Correlates failed attempts with subsequent success - indicates compromise
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security (EventCode=4625 OR EventCode=4624)
+| eval Status=case(EventCode=4625, "Failure", EventCode=4624, "Success")
+| transaction IpAddress, TargetUserName maxspan=1h
+| where eventcount > 5
+| eval HasFailure=if(searchmatch("Status=Failure"), 1, 0)
+| eval HasSuccess=if(searchmatch("Status=Success"), 1, 0)
+| where HasFailure=1 AND HasSuccess=1
+| eval FailureCount=mvcount(mvfilter(match(Status, "Failure")))
+| where FailureCount > 5
+| eval AlertName="Brute Force Succeeded - Account Compromised"
+| eval Severity="Critical"
+| eval MITREAttack="T1110"
+| table _time, AlertName, IpAddress, TargetUserName, FailureCount, eventcount, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 4: Multi-Protocol Brute Force (VPN + RDP + Web)
+` Correlates brute force across multiple authentication systems
+` ---------------------------------------------------------------------------
+(index=wineventlog EventCode=4625)
+    OR (index=vpn sourcetype=vpn_auth action=failure)
+    OR (index=web sourcetype=access_combined status=401)
+| eval auth_source=case(
+    sourcetype="WinEventLog:Security", "Windows",
+    sourcetype="vpn_auth", "VPN",
+    sourcetype="access_combined", "WebApp"
+)
+| stats count as TotalAttempts,
+        dc(auth_source) as ProtocolsUsed,
+        values(auth_source) as Protocols,
+        dc(user) as UniqueAccounts,
+        earliest(_time) as FirstSeen,
+        latest(_time) as LastSeen
+    by src_ip
+| where TotalAttempts >= 20 AND ProtocolsUsed >= 2
+| eval AlertName="Multi-Protocol Brute Force"
+| eval Severity="High"
+| eval MITREAttack="T1110"
+| table _time, AlertName, src_ip, TotalAttempts, ProtocolsUsed, Protocols,
+        UniqueAccounts, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 5: Account Lockout Surge (Indicator of Brute Force)
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4740
+| stats count as LockoutCount,
+        dc(TargetUserName) as LockedAccounts,
+        values(TargetUserName) as AccountList
+    by src, _time span=15m
+| where LockoutCount >= 5
+| eval AlertName="Mass Account Lockout - Possible Brute Force"
+| eval Severity=if(LockoutCount > 20, "Critical", "High")
+| eval MITREAttack="T1110"

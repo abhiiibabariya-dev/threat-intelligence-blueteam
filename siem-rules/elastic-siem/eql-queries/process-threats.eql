@@ -1,0 +1,213 @@
+// =============================================================================
+// Elastic EQL Queries: Process-Based Threat Detection
+// MITRE ATT&CK Tactics: TA0002 (Execution), TA0005 (Defense Evasion)
+// Use in: Elastic Security > Timeline > Correlation or Detection Rules
+// =============================================================================
+
+
+// =============================================================================
+// Query 1: Suspicious Parent-Child Process Relationships
+// Description: Detects anomalous parent-child process trees that indicate
+//   exploitation, macro execution, or malware spawning. Examples include
+//   Office applications spawning shells, browsers launching system tools,
+//   or services spawning user-level processes.
+// MITRE ATT&CK: T1059 (Command and Scripting Interpreter),
+//   T1204.002 (Malicious File)
+// Severity: High
+// =============================================================================
+
+sequence by host.id with maxspan=30s
+  [process where event.type == "start" and
+   process.name : ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe",
+                    "msaccess.exe", "mspub.exe", "visio.exe")]
+  [process where event.type == "start" and
+   process.parent.name : ("winword.exe", "excel.exe", "powerpnt.exe",
+                           "outlook.exe", "msaccess.exe", "mspub.exe", "visio.exe") and
+   process.name : ("cmd.exe", "powershell.exe", "pwsh.exe", "wscript.exe",
+                    "cscript.exe", "mshta.exe", "regsvr32.exe", "rundll32.exe",
+                    "certutil.exe", "bitsadmin.exe", "schtasks.exe",
+                    "wmic.exe", "net.exe", "net1.exe")];
+
+
+// =============================================================================
+// Query 2: Living-off-the-Land Binary (LOLBin) Abuse
+// Description: Detects abuse of legitimate Windows binaries (LOLBins) for
+//   downloading, executing, or proxying malicious payloads. These binaries
+//   are trusted by default and often bypass application whitelisting.
+// MITRE ATT&CK: T1218 (System Binary Proxy Execution),
+//   T1105 (Ingress Tool Transfer)
+// Severity: High
+// =============================================================================
+
+process where event.type == "start" and
+(
+  // certutil downloading or decoding
+  (process.name : "certutil.exe" and
+   process.args : ("-urlcache", "-decode", "-decodehex", "-encode",
+                    "urlcache", "decode", "decodehex") and
+   process.args : ("-f", "-split")) or
+
+  // mshta executing remote content
+  (process.name : "mshta.exe" and
+   process.args : ("http*", "javascript:*", "vbscript:*", "about:*")) or
+
+  // regsvr32 with scrobj.dll (Squiblydoo)
+  (process.name : "regsvr32.exe" and
+   process.args : ("/s", "/u", "/i:http*", "scrobj.dll")) or
+
+  // rundll32 executing unusual DLLs or JavaScript
+  (process.name : "rundll32.exe" and
+   process.args : ("javascript:*", "http*", "\\\\*",
+                    "C:\\Users\\*", "C:\\Temp\\*", "C:\\ProgramData\\*")) or
+
+  // bitsadmin for download
+  (process.name : "bitsadmin.exe" and
+   process.args : ("/transfer", "/addfile", "/SetNotifyCmdLine") and
+   process.args : "http*") or
+
+  // cmstp bypass
+  (process.name : "cmstp.exe" and
+   process.args : ("/s", "/ni")) or
+
+  // msxsl.exe XSLT script processing
+  (process.name : "msxsl.exe") or
+
+  // wmic process call create
+  (process.name : "wmic.exe" and
+   process.args : "process" and process.args : "call" and process.args : "create") or
+
+  // forfiles command execution
+  (process.name : "forfiles.exe" and process.args : "/c" and
+   process.command_line : ("*cmd*", "*powershell*", "*mshta*"))
+);
+
+
+// =============================================================================
+// Query 3: Process Hollowing Indicators
+// Description: Detects process hollowing (RunPE) where a legitimate process is
+//   created in a suspended state and its memory is replaced with malicious
+//   code. Identified by processes created suspended then resumed, or by
+//   image load mismatches.
+// MITRE ATT&CK: T1055.012 (Process Hollowing)
+// Severity: Critical
+// =============================================================================
+
+sequence by host.id, process.entity_id with maxspan=5s
+  [process where event.type == "start" and
+   // Common hollowing targets: suspended system processes
+   process.name : ("svchost.exe", "RuntimeBroker.exe", "dllhost.exe",
+                    "WerFault.exe", "conhost.exe", "notepad.exe",
+                    "explorer.exe", "iexplore.exe") and
+   // Spawned by non-standard parent
+   not process.parent.executable : (
+     "C:\\Windows\\System32\\services.exe",
+     "C:\\Windows\\System32\\svchost.exe",
+     "C:\\Windows\\System32\\smss.exe",
+     "C:\\Windows\\System32\\wininit.exe",
+     "C:\\Windows\\explorer.exe",
+     "C:\\Windows\\System32\\sihost.exe"
+   )]
+  [any where
+   // Thread created or image loaded in the hollowed process
+   (event.category : "library" or
+    (event.code == "8" and winlog.event_data.StartFunction != null))];
+
+
+// =============================================================================
+// Query 4: Unusual Process Execution Chains
+// Description: Detects multi-stage process execution chains commonly used in
+//   attacks: initial access through a document or script, followed by
+//   reconnaissance, privilege escalation, or persistence commands. Tracks
+//   chains of 3+ processes in sequence.
+// MITRE ATT&CK: T1059 (Command and Scripting Interpreter),
+//   T1106 (Native API)
+// Severity: High
+// =============================================================================
+
+sequence by host.id with maxspan=2m
+  // Stage 1: Initial script interpreter or document handler
+  [process where event.type == "start" and
+   process.name : ("wscript.exe", "cscript.exe", "mshta.exe", "powershell.exe",
+                    "pwsh.exe", "cmd.exe") and
+   process.parent.name : ("explorer.exe", "winword.exe", "excel.exe",
+                           "outlook.exe", "svchost.exe")]
+  // Stage 2: Reconnaissance or staging
+  [process where event.type == "start" and
+   process.name : ("whoami.exe", "systeminfo.exe", "ipconfig.exe", "net.exe",
+                    "net1.exe", "nltest.exe", "tasklist.exe", "qprocess.exe",
+                    "nslookup.exe", "dsquery.exe", "arp.exe", "route.exe",
+                    "netstat.exe") and
+   process.parent.name : ("cmd.exe", "powershell.exe", "pwsh.exe",
+                           "wscript.exe", "cscript.exe", "mshta.exe")]
+  // Stage 3: Action on objectives
+  [process where event.type == "start" and
+   process.name : ("schtasks.exe", "at.exe", "reg.exe", "sc.exe",
+                    "netsh.exe", "wmic.exe", "bitsadmin.exe",
+                    "certutil.exe", "rundll32.exe") and
+   process.parent.name : ("cmd.exe", "powershell.exe", "pwsh.exe")];
+
+
+// =============================================================================
+// Query 5: Script Interpreter Abuse
+// Description: Detects abuse of built-in script interpreters (PowerShell,
+//   WScript, CScript, MSHTA) with suspicious arguments including
+//   encoded commands, execution policy bypasses, download cradles,
+//   and in-memory execution patterns.
+// MITRE ATT&CK: T1059.001 (PowerShell), T1059.005 (Visual Basic),
+//   T1059.007 (JavaScript)
+// Severity: High
+// =============================================================================
+
+process where event.type == "start" and
+(
+  // PowerShell encoded commands or suspicious flags
+  (process.name : ("powershell.exe", "pwsh.exe") and
+   (
+     process.args : ("-enc", "-EncodedCommand", "-ec") or
+     (process.args : "-ExecutionPolicy" and
+      process.args : ("Bypass", "Unrestricted")) or
+     process.args : ("-nop", "-NoProfile") and process.args : ("-w", "-WindowStyle") and
+       process.args : ("hidden", "1") or
+     process.command_line : ("*IEX*", "*Invoke-Expression*",
+                              "*DownloadString*", "*DownloadFile*",
+                              "*Net.WebClient*", "*Start-BitsTransfer*",
+                              "*Invoke-WebRequest*", "*iwr*",
+                              "*[Convert]::FromBase64String*",
+                              "*New-Object IO.MemoryStream*",
+                              "*IO.Compression.GzipStream*",
+                              "*Reflection.Assembly*::Load*")
+   )) or
+
+  // WScript/CScript executing from suspicious locations
+  (process.name : ("wscript.exe", "cscript.exe") and
+   process.args : ("C:\\Users\\*\\AppData\\*", "C:\\Temp\\*",
+                    "C:\\ProgramData\\*", "\\\\*", "http*") and
+   not process.args : ("C:\\Users\\*\\AppData\\Local\\Microsoft\\*")) or
+
+  // MSHTA inline script execution
+  (process.name : "mshta.exe" and
+   process.command_line : ("*javascript:*", "*vbscript:*",
+                            "*<script*", "*ActiveXObject*",
+                            "*GetObject*", "*http*"))
+);
+
+
+// =============================================================================
+// Query 6: Suspicious Windows Management Instrumentation (WMI) Execution
+// Description: Detects WMI-based process creation and lateral execution
+//   patterns. WMI is commonly abused for fileless execution, lateral
+//   movement, and persistence via event subscriptions.
+// MITRE ATT&CK: T1047 (Windows Management Instrumentation)
+// Severity: Medium
+// =============================================================================
+
+sequence by host.id with maxspan=30s
+  [process where event.type == "start" and
+   process.name : "WmiPrvSE.exe"]
+  [process where event.type == "start" and
+   process.parent.name : "WmiPrvSE.exe" and
+   process.name : ("cmd.exe", "powershell.exe", "pwsh.exe",
+                    "mshta.exe", "rundll32.exe", "regsvr32.exe",
+                    "cscript.exe", "wscript.exe", "certutil.exe") and
+   not process.command_line : ("*\\Windows\\CCM\\*", "*SCCM*",
+                                "*Configuration Manager*")];

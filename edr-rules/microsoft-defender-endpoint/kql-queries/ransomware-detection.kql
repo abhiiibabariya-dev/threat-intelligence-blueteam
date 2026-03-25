@@ -1,0 +1,93 @@
+// =============================================================================
+// Microsoft Defender for Endpoint - Ransomware Detection
+// MITRE ATT&CK: T1486 (Data Encrypted), T1490 (Inhibit Recovery)
+// Severity: Critical
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Query 1: Shadow Copy Deletion (Pre-Ransomware Indicator)
+// MITRE: T1490
+// ---------------------------------------------------------------------------
+DeviceProcessEvents
+| where Timestamp > ago(1h)
+| where (FileName =~ "vssadmin.exe" and ProcessCommandLine has "delete shadows")
+    or (FileName =~ "wmic.exe" and ProcessCommandLine has "shadowcopy delete")
+    or (FileName =~ "bcdedit.exe" and ProcessCommandLine has_any ("recoveryenabled no", "bootstatuspolicy ignoreallfailures"))
+    or (FileName =~ "wbadmin.exe" and ProcessCommandLine has "delete catalog")
+    or (FileName =~ "powershell.exe" and ProcessCommandLine has "Get-WmiObject" and ProcessCommandLine has "Win32_ShadowCopy" and ProcessCommandLine has "Delete")
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName, InitiatingProcessCommandLine
+| extend AlertTitle = "RANSOMWARE - Recovery Inhibition Detected"
+
+// ---------------------------------------------------------------------------
+// Query 2: Mass File Encryption Detection
+// MITRE: T1486
+// ---------------------------------------------------------------------------
+DeviceFileEvents
+| where Timestamp > ago(1h)
+| where ActionType in ("FileRenamed", "FileModified", "FileCreated")
+| summarize
+    FileCount = count(),
+    UniqueExtensions = dcount(tostring(split(FileName, ".")[-1])),
+    UniqueFolders = dcount(FolderPath),
+    SampleFiles = make_set(FileName, 10),
+    NewExtensions = make_set(tostring(split(FileName, ".")[-1]), 10)
+    by DeviceName, InitiatingProcessFileName, bin(Timestamp, 5m)
+| where FileCount > 100 and UniqueFolders > 5
+| extend AlertTitle = "RANSOMWARE - Mass File Modification Detected"
+
+// ---------------------------------------------------------------------------
+// Query 3: Ransom Note File Creation
+// MITRE: T1486
+// ---------------------------------------------------------------------------
+DeviceFileEvents
+| where Timestamp > ago(1h)
+| where ActionType == "FileCreated"
+| where FileName matches regex @"(?i)(readme|decrypt|restore|recover|how_to|ransom|locked|unlock).*\.(txt|html|hta)"
+| summarize NoteCount = count(), Folders = dcount(FolderPath),
+    NoteNames = make_set(FileName, 5)
+    by DeviceName, InitiatingProcessFileName
+| where NoteCount > 3
+| extend AlertTitle = "RANSOMWARE - Ransom Note File Created"
+
+// ---------------------------------------------------------------------------
+// Query 4: Combined Ransomware Kill Chain Detection
+// Multi-stage: recon -> disable recovery -> encrypt
+// ---------------------------------------------------------------------------
+let shadowDeleteHosts = DeviceProcessEvents
+| where Timestamp > ago(2h)
+| where (FileName =~ "vssadmin.exe" and ProcessCommandLine has "delete shadows")
+    or (FileName =~ "wmic.exe" and ProcessCommandLine has "shadowcopy delete")
+| distinct DeviceName;
+let massFileChangeHosts = DeviceFileEvents
+| where Timestamp > ago(2h)
+| summarize FileCount = count() by DeviceName, bin(Timestamp, 10m)
+| where FileCount > 200
+| distinct DeviceName;
+shadowDeleteHosts
+| join kind=inner massFileChangeHosts on DeviceName
+| project DeviceName
+| extend AlertTitle = "CRITICAL: Active Ransomware Attack - Multiple Indicators"
+| extend ResponseAction = "IMMEDIATE HOST ISOLATION REQUIRED"
+
+// ---------------------------------------------------------------------------
+// Query 5: Lateral Spread Pre-Ransomware
+// Detects SMB/admin share access spree before encryption
+// ---------------------------------------------------------------------------
+DeviceNetworkEvents
+| where Timestamp > ago(2h)
+| where RemotePort == 445
+| where ActionType == "ConnectionSuccess"
+| summarize
+    TargetCount = dcount(RemoteIP),
+    Targets = make_set(RemoteIP, 20),
+    ConnectionCount = count()
+    by DeviceName, InitiatingProcessFileName, bin(Timestamp, 15m)
+| where TargetCount > 5
+| join kind=inner (
+    DeviceProcessEvents
+    | where Timestamp > ago(2h)
+    | where ProcessCommandLine has_any ("vssadmin", "wmic", "shadowcopy", "bcdedit")
+    | distinct DeviceName
+) on DeviceName
+| extend AlertTitle = "RANSOMWARE - Lateral Spread with Recovery Inhibition"

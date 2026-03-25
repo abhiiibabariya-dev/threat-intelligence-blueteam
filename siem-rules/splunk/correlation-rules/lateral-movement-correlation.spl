@@ -1,0 +1,134 @@
+` ===================================================================
+` Splunk Correlation Rule: Lateral Movement Detection
+` ===================================================================
+` Description:  Correlates authentication, process creation, and network
+`               connections to detect pass-the-hash, pass-the-ticket,
+`               and other lateral movement techniques.
+` MITRE ATT&CK: T1550 (Use Alternate Authentication Material)
+`   Sub-techniques: T1550.002 (Pass the Hash), T1550.003 (Pass the Ticket)
+`   Related: T1021 (Remote Services), T1047 (WMI)
+` Severity:     High
+` Data Sources: Windows Security, Sysmon, Network
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Search 1: Pass-the-Hash Detection
+` Logon Type 9 (NewCredentials) or Type 3 with NTLM + non-standard process
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4624 LogonType=9
+| eval PtHIndicator="NewCredentials Logon"
+| append [
+    search index=wineventlog sourcetype=WinEventLog:Security EventCode=4624
+        LogonType=3 AuthenticationPackageName=NTLM
+    | where NOT match(TargetUserName, "\$$")
+    | eval PtHIndicator="NTLM Network Logon"
+]
+| stats count as LogonCount,
+        dc(TargetServerName) as TargetHosts,
+        values(TargetServerName) as HostList,
+        values(PtHIndicator) as Indicators,
+        earliest(_time) as FirstSeen,
+        latest(_time) as LastSeen
+    by SubjectUserName, IpAddress
+| where LogonCount > 3 AND TargetHosts > 2
+| eval AlertName="Possible Pass-the-Hash Activity"
+| eval Severity="High"
+| eval MITREAttack="T1550.002"
+| table _time, AlertName, SubjectUserName, IpAddress, LogonCount,
+        TargetHosts, HostList, Indicators, Severity, MITREAttack
+
+` ---------------------------------------------------------------------------
+` Search 2: Pass-the-Ticket / Kerberos Anomalies
+` Detect ticket usage without corresponding TGT request
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security
+    (EventCode=4768 OR EventCode=4769 OR EventCode=4770)
+| eval TicketType=case(
+    EventCode=4768, "TGT_Request",
+    EventCode=4769, "ServiceTicket_Request",
+    EventCode=4770, "TGT_Renewal"
+)
+| stats count(eval(TicketType="TGT_Request")) as TGT_Count,
+        count(eval(TicketType="ServiceTicket_Request")) as ST_Count,
+        dc(ServiceName) as UniqueServices,
+        values(ServiceName) as ServiceList
+    by TargetUserName, IpAddress, _time span=1h
+| where ST_Count > 5 AND TGT_Count = 0
+| eval AlertName="Pass-the-Ticket Suspected - Service Tickets Without TGT"
+| eval Severity="High"
+| eval MITREAttack="T1550.003"
+
+` ---------------------------------------------------------------------------
+` Search 3: Lateral Movement Chain Detection
+` Correlates logon -> process exec -> outbound connection on target
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4624 LogonType=3
+| rename TargetUserName as user, ComputerName as dest
+| join type=inner user dest [
+    search index=wineventlog sourcetype=WinEventLog:Security EventCode=4688
+    | rename TargetUserName as user, ComputerName as dest
+    | where NewProcessName IN ("*\\cmd.exe", "*\\powershell.exe",
+        "*\\psexec.exe", "*\\wmic.exe", "*\\mshta.exe")
+    | eval dest_process=NewProcessName
+]
+| stats count,
+        dc(dest) as HopsCount,
+        values(dest) as HopChain,
+        values(dest_process) as ToolsUsed,
+        earliest(_time) as ChainStart,
+        latest(_time) as ChainEnd
+    by user, IpAddress
+| where HopsCount >= 2
+| eval ChainDuration_min=round((ChainEnd - ChainStart)/60, 1)
+| eval AlertName="Lateral Movement Chain Detected"
+| eval Severity=case(HopsCount >= 5, "Critical", HopsCount >= 3, "High", 1=1, "Medium")
+| eval MITREAttack="T1021,T1550"
+
+` ---------------------------------------------------------------------------
+` Search 4: PsExec / SMB-based Lateral Movement
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security
+    (EventCode=5145 ShareName="\\\\*\\IPC$" RelativeTargetName="PSEXESVC*")
+    OR (EventCode=7045 ServiceName="PSEXESVC")
+| stats count,
+        dc(ComputerName) as TargetSystems,
+        values(ComputerName) as Targets,
+        earliest(_time) as FirstSeen,
+        latest(_time) as LastSeen
+    by SubjectUserName, IpAddress
+| where TargetSystems >= 2
+| eval AlertName="PsExec Lateral Movement Detected"
+| eval Severity="High"
+| eval MITREAttack="T1021.002,T1570"
+
+` ---------------------------------------------------------------------------
+` Search 5: WMI Remote Execution (Lateral Movement)
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4688
+    (NewProcessName="*\\wmiprvse.exe" OR ParentProcessName="*\\wmiprvse.exe")
+| where ParentProcessName="*\\wmiprvse.exe"
+| stats count as ProcessCount,
+        dc(ComputerName) as TargetHosts,
+        values(ComputerName) as Targets,
+        values(NewProcessName) as SpawnedProcesses
+    by SubjectUserName
+| where TargetHosts >= 2
+| eval AlertName="WMI Remote Process Execution"
+| eval Severity="High"
+| eval MITREAttack="T1047"
+
+` ---------------------------------------------------------------------------
+` Search 6: RDP Lateral Movement (Unusual RDP Sessions)
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security EventCode=4624 LogonType=10
+| stats count as RDPSessions,
+        dc(ComputerName) as UniqueTargets,
+        values(ComputerName) as Targets,
+        earliest(_time) as FirstSession,
+        latest(_time) as LastSession
+    by TargetUserName, IpAddress
+| where UniqueTargets >= 3
+| eval SessionDuration_h=round((LastSession - FirstSession)/3600, 1)
+| eval AlertName="RDP-based Lateral Movement"
+| eval Severity=case(UniqueTargets >= 5, "High", 1=1, "Medium")
+| eval MITREAttack="T1021.001"

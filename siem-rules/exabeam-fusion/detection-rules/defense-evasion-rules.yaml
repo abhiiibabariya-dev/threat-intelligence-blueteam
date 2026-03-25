@@ -1,0 +1,99 @@
+# Exabeam Fusion - Defense Evasion Detection Rules
+# MITRE ATT&CK Tactic: TA0005
+---
+rules:
+  - rule_name: "EXA-DE-001: Security Log Cleared"
+    description: "Windows Security event log cleared - evidence destruction"
+    severity: critical
+    risk_score: 95
+    mitre_attack: [T1070.001]
+    trigger:
+      type: real_time
+      data_source: windows_security
+      conditions:
+        - field: event_id
+          operator: equals
+          value: 1102
+    entity: src_user
+    response: [create_critical_incident, preserve_backup_logs, notify_soc]
+
+  - rule_name: "EXA-DE-002: Windows Defender Disabled"
+    description: "Real-time protection or Windows Defender service disabled"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1562.001]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches_any
+          values:
+            - "*Set-MpPreference*-DisableRealtimeMonitoring*"
+            - "*sc stop WinDefend*"
+            - "*DisableAntiSpyware*"
+    entity: host
+    response: [create_critical_incident, re_enable_defender]
+
+  - rule_name: "EXA-DE-003: Process Masquerading"
+    description: "System binary name running from non-standard path"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1036.005]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: process_name
+          operator: in
+          values: [svchost.exe, csrss.exe, lsass.exe, explorer.exe, services.exe]
+        - field: process_path
+          operator: not_matches
+          value: "C:\\Windows\\System32\\*"
+    entity: host
+    response: [create_notable_event, kill_process, collect_sample]
+
+  - rule_name: "EXA-DE-004: AMSI Bypass Attempt"
+    description: "PowerShell AMSI bypass technique detected"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1562.001]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches_any
+          values: ["*amsiInitFailed*", "*AmsiUtils*", "*amsiContext*"]
+    entity: host
+    response: [create_critical_incident, kill_process]
+
+  - rule_name: "EXA-DE-005: Timestomping Detected"
+    description: "File timestamp manipulation to evade forensic analysis"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1070.006]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches_any
+          values: ["*timestomp*", "*CreationTime*=*", "*LastWriteTime*=*"]
+    entity: host
+    response: [create_notable_event, preserve_mft_evidence]
+
+  - rule_name: "EXA-DE-006: Firewall Rule Disabled"
+    description: "Host firewall disabled or rules modified"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1562.004]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: command_line
+          operator: matches_any
+          values: ["*netsh*firewall*disable*", "*netsh*advfirewall*off*", "*Set-NetFirewallProfile*False*"]
+    entity: host
+    response: [create_notable_event, re_enable_firewall]

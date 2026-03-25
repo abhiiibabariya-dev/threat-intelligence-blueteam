@@ -1,0 +1,31 @@
+// InsightIDR LEQL Queries - Execution (TA0002)
+
+// IDR-EXE-001: Encoded PowerShell (T1059.001)
+where(process_name IN ["powershell.exe", "pwsh.exe"] AND command_line ICONTAINS "-enc")
+groupby(host, account, command_line)
+calculate(count)
+
+// IDR-EXE-002: Office Macro Execution (T1204.002)
+where(parent_process_name IN ["winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe"] AND process_name IN ["cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe"])
+groupby(host, parent_process_name, process_name, command_line)
+calculate(count)
+
+// IDR-EXE-003: LOLBAS Execution (T1218)
+where(process_name IN ["certutil.exe", "mshta.exe", "regsvr32.exe", "rundll32.exe", "cmstp.exe"] AND command_line ICONTAINS-ANY ["http", "-urlcache", "scrobj", "javascript"])
+groupby(host, process_name, command_line)
+calculate(count)
+
+// IDR-EXE-004: Suspicious Script (T1059.005)
+where(process_name IN ["wscript.exe", "cscript.exe"] AND command_line ICONTAINS-ANY ["\\temp\\", "\\appdata\\", "\\downloads\\"])
+groupby(host, command_line)
+calculate(count)
+
+// IDR-EXE-005: PowerShell Download Cradle (T1059.001)
+where(process_name = "powershell.exe" AND command_line ICONTAINS-ANY ["Invoke-WebRequest", "DownloadString", "DownloadFile", "Net.WebClient", "Start-BitsTransfer"])
+groupby(host, account, command_line)
+calculate(count)
+
+// IDR-EXE-006: Mshta HTA Execution (T1218.005)
+where(process_name = "mshta.exe" AND command_line ICONTAINS-ANY ["http", "javascript", "vbscript"])
+groupby(host, command_line)
+calculate(count)

@@ -1,0 +1,735 @@
+---
+# CrowdStrike Falcon Custom IOA Rules - Process-Based Detections
+# Version: 1.0
+# Last Updated: 2026-03-24
+# MITRE ATT&CK Version: 14.1
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Custom IOA rules for detecting process-based threats including credential
+    theft, process injection, fileless malware, and post-exploitation tooling.
+  platform: CrowdStrike Falcon
+  min_sensor_version: "6.40"
+
+rules:
+
+  # ============================================================================
+  # Rule 1: Suspicious PowerShell Execution
+  # ============================================================================
+  - rule_name: "Suspicious PowerShell Encoded or Obfuscated Execution"
+    rule_id: "CS-PROC-001"
+    description: >
+      Detects PowerShell execution with encoded commands, download cradles,
+      AMSI bypass attempts, or execution policy bypasses commonly used in
+      initial access and post-exploitation scenarios.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Execution
+      technique: T1059.001
+      technique_name: "Command and Scripting Interpreter: PowerShell"
+      sub_techniques:
+        - T1059.001
+      additional_mappings:
+        - T1140  # Deobfuscate/Decode Files or Information
+        - T1027  # Obfuscated Files or Information
+    platform:
+      - Windows
+    detection_logic:
+      process_name:
+        - "powershell.exe"
+        - "pwsh.exe"
+      command_line_contains_any:
+        - "-EncodedCommand"
+        - "-enc "
+        - "-ec "
+        - "FromBase64String"
+        - "System.Net.WebClient"
+        - "DownloadString"
+        - "DownloadFile"
+        - "Invoke-Expression"
+        - "IEX("
+        - "iex "
+        - "-nop -w hidden"
+        - "bypass -noprofile"
+        - "Net.Sockets.TCPClient"
+        - "AmsiUtils"
+        - "amsiInitFailed"
+        - "Reflection.Assembly"
+        - "::Load("
+        - "Add-MpPreference -ExclusionPath"
+        - "Set-MpPreference -DisableRealtimeMonitoring"
+      exclude:
+        parent_process:
+          - "sccm_agent.exe"
+          - "ConfigMgrClient.exe"
+        command_line_contains:
+          - "Microsoft\\ConfigMgr"
+    response_actions:
+      - action: detect
+        description: Generate detection alert
+      - action: quarantine
+        description: Network-contain the host if severity threshold met
+      - action: collect_artifacts
+        description: >
+          Collect PowerShell script block logs, command history, and
+          prefetch files for the triggering process
+    false_positive_guidance: >
+      SCCM/ConfigMgr deployments, legitimate automation scripts using
+      encoded commands, and some vendor software installers may trigger this rule.
+      Tune exclusions based on parent process and script content.
+
+  # ============================================================================
+  # Rule 2: LSASS Credential Dumping
+  # ============================================================================
+  - rule_name: "LSASS Memory Access for Credential Dumping"
+    rule_id: "CS-PROC-002"
+    description: >
+      Detects unauthorized access to the LSASS process memory, which is the
+      primary technique for extracting credentials from Windows systems.
+      Covers both direct memory access and known tooling patterns.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Credential Access
+      technique: T1003.001
+      technique_name: "OS Credential Dumping: LSASS Memory"
+      additional_mappings:
+        - T1003.002  # Security Account Manager
+        - T1003.003  # NTDS
+    platform:
+      - Windows
+    detection_logic:
+      target_process: "lsass.exe"
+      access_rights_any:
+        - PROCESS_VM_READ
+        - PROCESS_ALL_ACCESS
+        - PROCESS_QUERY_INFORMATION
+      source_process_exclude:
+        - "csfalcon*.exe"
+        - "MsMpEng.exe"
+        - "svchost.exe"
+        - "WerFault.exe"
+      additional_indicators:
+        command_line_contains_any:
+          - "sekurlsa"
+          - "lsadump"
+          - "procdump"
+          - "procdump64"
+          - "comsvcs.dll"
+          - "MiniDump"
+          - "MiniDumpWriteDump"
+          - "Out-Minidump"
+          - "nanodump"
+          - "handlekatz"
+          - "pypykatz"
+        file_writes:
+          - "*.dmp"
+          - "lsass*.dmp"
+          - "debug*.bin"
+      suspicious_parent_processes:
+        - "rundll32.exe"
+        - "cmd.exe"
+        - "powershell.exe"
+        - "wscript.exe"
+        - "cscript.exe"
+        - "mshta.exe"
+        - "certutil.exe"
+    response_actions:
+      - action: prevent
+        description: Block the LSASS access attempt
+      - action: quarantine
+        description: Immediately network-isolate the host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Escalate to SOC immediately. LSASS credential dumping is a strong
+          indicator of active compromise and lateral movement preparation.
+      - action: collect_artifacts
+        description: >
+          Capture memory dump of source process, collect Windows Security
+          event logs (4656, 4663, 4703), and enumerate all authenticated sessions.
+    false_positive_guidance: >
+      Legitimate security tools performing credential audits may trigger this rule.
+      Add verified security tooling to the source_process_exclude list.
+      Windows Credential Guard should be enabled as a complementary control.
+
+  # ============================================================================
+  # Rule 3: Living-off-the-Land Binary Abuse
+  # ============================================================================
+  - rule_name: "LOLBin Abuse for Execution and Defense Evasion"
+    rule_id: "CS-PROC-003"
+    description: >
+      Detects abuse of legitimate Windows binaries (LOLBins) for downloading,
+      executing, or proxying malicious payloads. These binaries are trusted by
+      default and frequently abused to bypass application whitelisting.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Defense Evasion
+      technique: T1218
+      technique_name: "System Binary Proxy Execution"
+      additional_mappings:
+        - T1218.001  # Compiled HTML File
+        - T1218.003  # CMSTP
+        - T1218.005  # Mshta
+        - T1218.010  # Regsvr32
+        - T1218.011  # Rundll32
+        - T1216.001  # PubPrn
+        - T1127.001  # MSBuild
+    platform:
+      - Windows
+    detection_logic:
+      rules:
+        - name: "Certutil Download/Decode"
+          process_name: "certutil.exe"
+          command_line_contains_any:
+            - "-urlcache"
+            - "-verifyctl"
+            - "-encode"
+            - "-decode"
+            - "-decodehex"
+            - "split"
+
+        - name: "Mshta Suspicious Execution"
+          process_name: "mshta.exe"
+          command_line_contains_any:
+            - "javascript:"
+            - "vbscript:"
+            - "http://"
+            - "https://"
+            - "about:app"
+
+        - name: "Regsvr32 Squiblydoo"
+          process_name: "regsvr32.exe"
+          command_line_contains_any:
+            - "/s /n /u /i:"
+            - "scrobj.dll"
+            - "http://"
+            - "https://"
+
+        - name: "Rundll32 Suspicious DLL Load"
+          process_name: "rundll32.exe"
+          command_line_contains_any:
+            - "javascript:"
+            - "http://"
+            - "https://"
+            - "comsvcs.dll"
+            - "MiniDump"
+            - "Shell32.dll,Control_RunDLL"
+            - "pcwutl.dll"
+
+        - name: "MSBuild Inline Task Execution"
+          process_name: "MSBuild.exe"
+          parent_process_not:
+            - "devenv.exe"
+            - "explorer.exe"
+          command_line_contains_any:
+            - ".xml"
+            - ".csproj"
+            - ".proj"
+
+        - name: "WMIC Remote Execution"
+          process_name: "wmic.exe"
+          command_line_contains_any:
+            - "process call create"
+            - "/node:"
+            - "os get"
+            - "format:"
+            - "http"
+
+        - name: "BITSAdmin Download"
+          process_name: "bitsadmin.exe"
+          command_line_contains_any:
+            - "/transfer"
+            - "/create"
+            - "/addfile"
+            - "http://"
+            - "https://"
+
+    response_actions:
+      - action: detect
+        description: Generate high-severity alert with full process tree
+      - action: collect_artifacts
+        description: >
+          Capture the downloaded or decoded payload, collect prefetch data,
+          and enumerate network connections from the host.
+    false_positive_guidance: >
+      Certutil is legitimately used for certificate operations. MSBuild is
+      used by developers. Validate against the parent process and user context
+      before escalation.
+
+  # ============================================================================
+  # Rule 4: Ransomware Behavior Indicators
+  # ============================================================================
+  - rule_name: "Ransomware Encryption Behavior Detection"
+    rule_id: "CS-PROC-004"
+    description: >
+      Detects behavioral indicators consistent with ransomware execution,
+      including mass file modification, shadow copy deletion, backup
+      disruption, and ransom note creation patterns.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Impact
+      technique: T1486
+      technique_name: "Data Encrypted for Impact"
+      additional_mappings:
+        - T1490  # Inhibit System Recovery
+        - T1489  # Service Stop
+        - T1529  # System Shutdown/Reboot
+    platform:
+      - Windows
+    detection_logic:
+      behavioral_indicators:
+        - name: "Shadow Copy Deletion"
+          process_any:
+            - "vssadmin.exe"
+            - "wmic.exe"
+            - "wbadmin.exe"
+            - "bcdedit.exe"
+            - "powershell.exe"
+          command_line_contains_any:
+            - "delete shadows"
+            - "shadowcopy delete"
+            - "resize shadowstorage"
+            - "delete catalog"
+            - "recoveryenabled no"
+            - "bootstatuspolicy ignoreallfailures"
+            - "Get-WmiObject Win32_ShadowCopy"
+            - "Remove-WmiObject"
+
+        - name: "Mass File Rename/Encryption"
+          file_operations:
+            rename_threshold: 100
+            rename_window_seconds: 60
+            extension_change: true
+            common_ransom_extensions:
+              - ".encrypted"
+              - ".locked"
+              - ".crypto"
+              - ".enc"
+              - ".crypt"
+              - ".locky"
+              - ".cerber"
+              - ".zepto"
+              - ".zzzzz"
+
+        - name: "Backup Service Disruption"
+          command_line_contains_any:
+            - "net stop"
+            - "sc stop"
+            - "sc config"
+            - "taskkill /f /im"
+          target_services:
+            - "vss"
+            - "sql"
+            - "svc$"
+            - "memtas"
+            - "mepocs"
+            - "backup"
+            - "GxVss"
+            - "GxBlr"
+            - "GxCVD"
+            - "GxCIMgr"
+
+        - name: "Ransom Note Creation"
+          file_creation_pattern:
+            - "README*.txt"
+            - "DECRYPT*.txt"
+            - "RECOVER*.txt"
+            - "HOW_TO_DECRYPT*"
+            - "HELP_RECOVER*"
+            - "YOUR_FILES*"
+            - "*RANSOM*"
+            - "*PAYMENT*"
+          creation_threshold: 5
+          creation_window_seconds: 120
+
+    response_actions:
+      - action: prevent
+        description: Kill the offending process immediately
+      - action: quarantine
+        description: Network-isolate the host within 30 seconds
+      - action: alert_soc
+        priority: P1
+        description: >
+          Activate ransomware incident response playbook. Identify patient
+          zero, scope affected systems, and preserve forensic evidence.
+      - action: snapshot
+        description: Trigger emergency volume shadow copy if possible
+    false_positive_guidance: >
+      Legitimate encryption software, disk cleanup utilities, and some backup
+      solutions may trigger individual indicators. The rule is designed to
+      require multiple behavioral indicators to reduce false positives.
+
+  # ============================================================================
+  # Rule 5: Fileless Malware Indicators
+  # ============================================================================
+  - rule_name: "Fileless Malware via Dynamic Code Injection"
+    rule_id: "CS-PROC-005"
+    description: >
+      Detects fileless malware techniques where malicious code is loaded
+      directly into process memory using DLL injection into legitimate
+      processes, avoiding on-disk artifacts.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Defense Evasion
+      technique: T1055.001
+      technique_name: "Process Injection: Dynamic-link Library Injection"
+      additional_mappings:
+        - T1620  # Reflective Code Loading
+        - T1027.011  # Fileless Storage
+    platform:
+      - Windows
+    detection_logic:
+      indicators:
+        - name: "Reflective DLL Loading"
+          api_calls:
+            - "VirtualAllocEx"
+            - "WriteProcessMemory"
+            - "CreateRemoteThread"
+            - "NtMapViewOfSection"
+          source_process_suspicious:
+            parent_mismatch: true
+            unsigned_binary: true
+
+        - name: "PowerShell Reflective Loading"
+          process_name:
+            - "powershell.exe"
+            - "pwsh.exe"
+          command_line_contains_any:
+            - "[System.Reflection.Assembly]::Load"
+            - "[Reflection.Assembly]::Load"
+            - "Invoke-ReflectivePEInjection"
+            - "PE-Inject"
+
+        - name: ".NET In-Memory Execution"
+          process_name: "w3wp.exe"
+          child_process:
+            - "cmd.exe"
+            - "powershell.exe"
+          memory_indicators:
+            clr_loaded: true
+            no_disk_artifact: true
+
+        - name: "WMI Script Execution"
+          process_name: "wmiprvse.exe"
+          child_process_any:
+            - "powershell.exe"
+            - "cmd.exe"
+            - "cscript.exe"
+            - "wscript.exe"
+            - "mshta.exe"
+
+    response_actions:
+      - action: detect
+        description: Alert with full memory forensic context
+      - action: collect_artifacts
+        description: >
+          Capture process memory dump of the target process, enumerate
+          loaded modules, and collect ETW trace data for .NET assemblies.
+    false_positive_guidance: >
+      Some legitimate .NET applications perform in-memory assembly loading.
+      WMI-based management tools may spawn scripting children. Baseline
+      normal behavior before enforcement.
+
+  # ============================================================================
+  # Rule 6: Process Injection Techniques
+  # ============================================================================
+  - rule_name: "Process Injection via Multiple Techniques"
+    rule_id: "CS-PROC-006"
+    description: >
+      Detects various process injection techniques including classic DLL
+      injection, process hollowing, APC injection, and thread execution
+      hijacking used to execute code within the address space of another process.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Defense Evasion
+      technique: T1055
+      technique_name: "Process Injection"
+      additional_mappings:
+        - T1055.001  # DLL Injection
+        - T1055.002  # Portable Executable Injection
+        - T1055.003  # Thread Execution Hijacking
+        - T1055.004  # Asynchronous Procedure Call
+        - T1055.012  # Process Hollowing
+    platform:
+      - Windows
+    detection_logic:
+      techniques:
+        - name: "Classic DLL Injection"
+          api_sequence:
+            - "OpenProcess"
+            - "VirtualAllocEx"
+            - "WriteProcessMemory"
+            - "CreateRemoteThread"
+          source_process_not:
+            - "csrss.exe"
+            - "lsass.exe"
+            - "services.exe"
+
+        - name: "Process Hollowing"
+          indicators:
+            - process_created_suspended: true
+            - memory_unmapped_and_remapped: true
+            - thread_context_modified: true
+          api_sequence:
+            - "CreateProcess(CREATE_SUSPENDED)"
+            - "NtUnmapViewOfSection"
+            - "VirtualAllocEx"
+            - "WriteProcessMemory"
+            - "SetThreadContext"
+            - "ResumeThread"
+
+        - name: "APC Injection"
+          api_sequence:
+            - "OpenThread"
+            - "VirtualAllocEx"
+            - "WriteProcessMemory"
+            - "QueueUserAPC"
+          target_process_any:
+            - "explorer.exe"
+            - "svchost.exe"
+            - "RuntimeBroker.exe"
+
+        - name: "Thread Execution Hijacking"
+          api_sequence:
+            - "OpenThread"
+            - "SuspendThread"
+            - "SetThreadContext"
+            - "ResumeThread"
+
+        - name: "Extra Window Memory Injection (EWM)"
+          api_sequence:
+            - "GetWindowLong"
+            - "SetWindowLong"
+            - "SendNotifyMessage"
+          target: "explorer.exe shell tray window"
+
+    response_actions:
+      - action: prevent
+        description: Block the injection attempt and kill source process
+      - action: detect
+        description: >
+          Generate critical alert with source and target process details,
+          API call sequence, and injected memory content hash
+      - action: collect_artifacts
+        description: >
+          Dump memory of both source and target processes. Collect loaded
+          module lists and compare against known-good baselines.
+    false_positive_guidance: >
+      Some legitimate applications use process injection for inter-process
+      communication. Application virtualization, accessibility tools, and
+      input method editors may trigger false positives. Verify the source
+      process signature and context.
+
+  # ============================================================================
+  # Rule 7: Cobalt Strike Beacon Detection
+  # ============================================================================
+  - rule_name: "Cobalt Strike Beacon Activity Detection"
+    rule_id: "CS-PROC-007"
+    description: >
+      Detects indicators of Cobalt Strike beacon execution, including named
+      pipe patterns, malleable C2 profile artifacts, spawn-to process
+      behavior, and characteristic post-exploitation commands.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Command and Control
+      technique: T1071.001
+      technique_name: "Application Layer Protocol: Web Protocols"
+      additional_mappings:
+        - T1055.001  # DLL Injection
+        - T1055.012  # Process Hollowing
+        - T1059.001  # PowerShell
+        - T1071.004  # DNS
+        - T1573.002  # Asymmetric Cryptography
+    platform:
+      - Windows
+    detection_logic:
+      indicators:
+        - name: "Default Named Pipes"
+          named_pipe_patterns:
+            - "\\MSSE-*"
+            - "\\msagent_*"
+            - "\\postex_*"
+            - "\\postex_ssh_*"
+            - "\\status_*"
+            - "\\mojo.*"
+            - "\\interprocess_*"
+            - "\\lsarpc_*"
+
+        - name: "Spawn-To Process Anomalies"
+          spawn_to_processes:
+            - "rundll32.exe"
+            - "dllhost.exe"
+            - "gpupdate.exe"
+            - "mstsc.exe"
+          anomaly_conditions:
+            - no_command_line_args: true
+            - unusual_parent: true
+            - network_connection_established: true
+            - injected_threads_detected: true
+
+        - name: "Post-Exploitation Commands"
+          command_patterns:
+            - process_name: "cmd.exe"
+              command_line_contains_any:
+                - "net group \"domain admins\" /domain"
+                - "nltest /dclist:"
+                - "nltest /domain_trusts"
+                - "net view /domain"
+                - "whoami /all"
+                - "quser"
+                - "qwinsta"
+                - "net localgroup administrators"
+            - rapid_execution:
+                count: 3
+                window_seconds: 10
+
+        - name: "Beacon Sleep Pattern"
+          network_behavior:
+            periodic_callback: true
+            jitter_range: "0-40%"
+            http_request_patterns:
+              - uri_length_consistent: true
+              - cookie_based_data_exfil: true
+              - malleable_profile_match: true
+
+        - name: "In-Memory .NET Execution"
+          indicators:
+            - inline_execute_assembly: true
+            - clr_loaded_into_unmanaged_process: true
+            - target_processes:
+                - "rundll32.exe"
+                - "dllhost.exe"
+                - "searchprotocolhost.exe"
+
+    response_actions:
+      - action: prevent
+        description: Kill beacon process and block associated named pipes
+      - action: quarantine
+        description: Immediately network-isolate the compromised host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Cobalt Strike beacon detected. Initiate full IR investigation.
+          Identify C2 infrastructure, scope lateral movement, and hunt
+          for additional beacons across the environment.
+      - action: threat_hunt
+        description: >
+          Search for the same named pipe patterns, C2 domains/IPs, and
+          beacon configuration artifacts across all endpoints.
+    false_positive_guidance: >
+      Named pipe patterns may overlap with legitimate software. The
+      spawn-to detection should be correlated with other indicators. Default
+      Cobalt Strike configurations are more easily detected; customized
+      malleable profiles require additional tuning.
+
+  # ============================================================================
+  # Rule 8: Mimikatz Execution Indicators
+  # ============================================================================
+  - rule_name: "Mimikatz Credential Harvesting Tool Detection"
+    rule_id: "CS-PROC-008"
+    description: >
+      Detects execution of Mimikatz and its variants through command-line
+      signatures, module names, binary indicators, and behavioral patterns
+      associated with credential harvesting.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Credential Access
+      technique: T1003
+      technique_name: "OS Credential Dumping"
+      additional_mappings:
+        - T1003.001  # LSASS Memory
+        - T1003.002  # Security Account Manager
+        - T1003.004  # LSA Secrets
+        - T1003.005  # Cached Domain Credentials
+        - T1558.003  # Kerberoasting
+        - T1550.002  # Pass the Hash
+        - T1550.003  # Pass the Ticket
+    platform:
+      - Windows
+    detection_logic:
+      indicators:
+        - name: "Mimikatz Command-Line Keywords"
+          command_line_contains_any:
+            - "sekurlsa::logonpasswords"
+            - "sekurlsa::wdigest"
+            - "sekurlsa::kerberos"
+            - "sekurlsa::msv"
+            - "sekurlsa::credman"
+            - "lsadump::sam"
+            - "lsadump::secrets"
+            - "lsadump::cache"
+            - "lsadump::dcsync"
+            - "kerberos::golden"
+            - "kerberos::silver"
+            - "kerberos::ptt"
+            - "privilege::debug"
+            - "token::elevate"
+            - "vault::cred"
+            - "dpapi::masterkey"
+            - "misc::skeleton"
+            - "crypto::capi"
+
+        - name: "Mimikatz Binary Indicators"
+          binary_signatures:
+            - internal_name: "mimikatz"
+            - internal_name: "mimilib"
+            - internal_name: "mimidrv"
+            - original_filename: "mimikatz.exe"
+            - file_description_contains: "mimikatz"
+            - imphash:
+                - "3EB3B5B05FB5C4B1E69ECC8F91F60C7A"
+
+        - name: "Mimikatz Variant Detection"
+          process_name_any:
+            - "mimikatz.exe"
+            - "mimi32.exe"
+            - "mimi64.exe"
+            - "m.exe"
+            - "mk.exe"
+          alternate_detection:
+            - powershell_invoke:
+                - "Invoke-Mimikatz"
+                - "Invoke-MimiKittenz"
+            - script_block_contains:
+                - "DumpCreds"
+                - "DumpCerts"
+                - "privilege::debug"
+
+        - name: "DCSync Detection"
+          directory_replication_indicators:
+            - source_not_domain_controller: true
+            - replication_request: "DS-Replication-Get-Changes-All"
+          event_ids:
+            - 4662  # Object access
+            - 4624  # Logon
+
+    response_actions:
+      - action: prevent
+        description: Terminate process and quarantine binary
+      - action: quarantine
+        description: Network-isolate the host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Mimikatz execution confirmed. Assume all credentials on the host
+          are compromised. Initiate password reset for all accounts that
+          were authenticated on this system. Check for Golden/Silver ticket
+          creation and DCSync activity.
+      - action: credential_reset
+        description: >
+          Reset KRBTGT twice (with 12-hour interval), reset all service
+          account passwords, and force password change for all users who
+          logged into the compromised host.
+    false_positive_guidance: >
+      Penetration testing tools may include Mimikatz modules. Coordinate
+      with red team activities. Some security assessment tools include
+      similar credential testing capabilities.

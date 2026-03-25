@@ -1,0 +1,127 @@
+// Microsoft 365 Defender - Cross-Workload Advanced Hunting Queries
+// Queries span: Defender for Endpoint, Identity, Office 365, Cloud Apps
+
+// ── Credential Access ──
+
+// M365-CA-001: Password Spray Across Tenants (T1110.003)
+IdentityLogonEvents
+| where ActionType == "LogonFailed"
+| where Timestamp > ago(1h)
+| summarize FailedAttempts = count(), UniqueAccounts = dcount(AccountUpn), Accounts = make_set(AccountUpn, 10) by IPAddress
+| where UniqueAccounts > 5
+| sort by UniqueAccounts desc
+
+// M365-CA-002: Suspicious OAuth App Consent (T1550.001)
+CloudAppEvents
+| where ActionType == "Consent to application."
+| where Timestamp > ago(7d)
+| extend AppName = tostring(RawEventData.Target[4].ID)
+| extend Permissions = tostring(RawEventData.ModifiedProperties[4].NewValue)
+| where Permissions has_any ("Mail.Read", "Files.ReadWrite.All", "Directory.ReadWrite.All")
+| project Timestamp, AccountDisplayName, AppName, Permissions
+
+// ── Execution ──
+
+// M365-EXE-001: Encoded PowerShell (T1059.001)
+DeviceProcessEvents
+| where FileName in ("powershell.exe", "pwsh.exe")
+| where ProcessCommandLine has "-enc"
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName
+
+// M365-EXE-002: Office Macro Execution Chain (T1204.002)
+DeviceProcessEvents
+| where InitiatingProcessFileName in ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe")
+| where FileName in ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe", "certutil.exe")
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName, FileName, ProcessCommandLine
+
+// ── Lateral Movement ──
+
+// M365-LM-001: RDP Lateral Movement Chain (T1021.001)
+DeviceLogonEvents
+| where LogonType == "RemoteInteractive"
+| where Timestamp > ago(24h)
+| summarize TargetCount = dcount(DeviceName), Targets = make_set(DeviceName, 10) by RemoteIP, AccountName
+| where TargetCount > 2
+
+// M365-LM-002: PsExec Detection (T1021.002)
+DeviceProcessEvents
+| where InitiatingProcessFileName == "psexesvc.exe"
+| project Timestamp, DeviceName, FileName, ProcessCommandLine, AccountName
+
+// ── Persistence ──
+
+// M365-PER-001: Mailbox Forwarding Rule (T1114.003)
+CloudAppEvents
+| where ActionType in ("New-InboxRule", "Set-InboxRule")
+| where RawEventData has_any ("ForwardTo", "RedirectTo", "ForwardAsAttachmentTo")
+| extend ForwardTo = tostring(RawEventData.Parameters[2].Value)
+| project Timestamp, AccountDisplayName, ActionType, ForwardTo
+
+// M365-PER-002: Service Principal Creation (T1136.003)
+AuditLogs
+| where OperationName == "Add service principal"
+| extend AppName = tostring(TargetResources[0].displayName)
+| project TimeGenerated, InitiatedBy = tostring(InitiatedBy.user.userPrincipalName), AppName
+
+// ── Exfiltration ──
+
+// M365-EX-001: Mass File Download from SharePoint (T1567)
+CloudAppEvents
+| where ActionType == "FileDownloaded"
+| where Application == "Microsoft SharePoint Online"
+| summarize DownloadCount = count(), TotalSize = sum(toint(RawEventData.FileSizeBytes)) by AccountDisplayName, bin(Timestamp, 1h)
+| where DownloadCount > 50 or TotalSize > 1073741824
+| sort by TotalSize desc
+
+// M365-EX-002: Email Exfiltration to External (T1048.003)
+EmailEvents
+| where Timestamp > ago(24h)
+| where EmailDirection == "Outbound"
+| where RecipientEmailAddress !endswith "company.com"
+| where AttachmentCount > 0
+| summarize EmailCount = count(), UniqueRecipients = dcount(RecipientEmailAddress) by SenderFromAddress
+| where EmailCount > 10
+
+// ── Defense Evasion ──
+
+// M365-DE-001: Defender AV Tamper (T1562.001)
+DeviceEvents
+| where ActionType in ("TamperingAttempt", "AntivirusScanCancelled")
+| project Timestamp, DeviceName, ActionType, FileName, AccountName
+
+// M365-DE-002: Conditional Access Policy Change (T1562)
+AuditLogs
+| where OperationName has "conditional access policy"
+| where Result == "success"
+| project TimeGenerated, InitiatedBy = tostring(InitiatedBy.user.userPrincipalName), OperationName
+
+// ── Identity Threats ──
+
+// M365-ID-001: Impossible Travel (T1078)
+IdentityLogonEvents
+| where ActionType == "LogonSuccess"
+| summarize Locations = make_set(Location), LocationCount = dcount(Location) by AccountUpn, bin(Timestamp, 2h)
+| where LocationCount > 1
+
+// M365-ID-002: Privileged Role Assignment (T1098)
+IdentityDirectoryEvents
+| where ActionType == "Add member to role"
+| where TargetAccountDisplayName has_any ("Global Administrator", "Security Administrator")
+| project Timestamp, AccountDisplayName, TargetAccountDisplayName, Application
+
+// ── Cloud App Security ──
+
+// M365-CAS-001: Risky Sign-In followed by Data Access
+let RiskySignIns = IdentityLogonEvents | where RiskLevelDuringSignIn in ("high","medium") | project AccountUpn, RiskyTime = Timestamp, IPAddress;
+CloudAppEvents
+| where ActionType in ("FileDownloaded","FileUploaded","FileMoved")
+| join kind=inner RiskySignIns on $left.AccountDisplayName == $right.AccountUpn
+| where Timestamp between (RiskyTime .. (RiskyTime + 2h))
+| project Timestamp, AccountDisplayName, ActionType, IPAddress, Application
+
+// ── Ransomware ──
+
+// M365-RAN-001: Shadow Copy Deletion + Mass File Rename
+DeviceProcessEvents
+| where ProcessCommandLine has_any ("vssadmin delete shadows", "wmic shadowcopy delete", "bcdedit /set recoveryenabled no")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName

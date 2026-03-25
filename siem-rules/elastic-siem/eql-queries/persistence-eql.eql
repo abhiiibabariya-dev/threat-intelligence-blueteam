@@ -1,0 +1,67 @@
+// =============================================================================
+// Elastic EQL Queries: Persistence Sequences
+// MITRE ATT&CK: T1547, T1053, T1543, T1546
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Sequence 1: Suspicious Process -> Registry Run Key Modification
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=2m
+  [process where event.type == "start" and
+    process.name : ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe") and
+    process.parent.name : ("winword.exe", "excel.exe", "outlook.exe", "wmiprvse.exe")]
+  [registry where event.type == "change" and
+    registry.path : ("*\\CurrentVersion\\Run\\*", "*\\CurrentVersion\\RunOnce\\*")]
+
+// ---------------------------------------------------------------------------
+// Sequence 2: Malicious Scheduled Task Lifecycle
+// Task creation -> Task-spawned suspicious process
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=30m
+  [process where event.type == "start" and
+    process.name : "schtasks.exe" and process.args : "/create"]
+  [process where event.type == "start" and
+    process.parent.name : ("taskeng.exe", "taskhostw.exe") and
+    process.name : ("cmd.exe", "powershell.exe", "wscript.exe", "mshta.exe")]
+
+// ---------------------------------------------------------------------------
+// Sequence 3: Service Installation -> Service Process Execution
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=5m
+  [process where event.type == "start" and
+    process.name : "sc.exe" and
+    process.args : "create"]
+  [process where event.type == "start" and
+    process.parent.name : "services.exe" and
+    not process.name : "svchost.exe" and
+    not process.executable : ("?:\\Windows\\System32\\*", "?:\\Program Files\\*")]
+
+// ---------------------------------------------------------------------------
+// Sequence 4: DLL Written to System Directory + Loaded
+// Potential DLL search order hijacking setup
+// ---------------------------------------------------------------------------
+sequence by host.name, file.name with maxspan=5m
+  [file where event.type == "creation" and
+    file.extension : "dll" and
+    file.path : ("?:\\Windows\\System32\\*", "?:\\Windows\\SysWOW64\\*", "?:\\Windows\\*") and
+    not process.name : ("TrustedInstaller.exe", "TiWorker.exe", "msiexec.exe")]
+  [library where dll.name != null]
+
+// ---------------------------------------------------------------------------
+// Sequence 5: WMI Persistence - Event Subscription Creation
+// ---------------------------------------------------------------------------
+sequence by host.name with maxspan=2m
+  [process where event.type == "start" and
+    (process.name : "wmic.exe" and process.args : ("*__EventFilter*", "*__EventConsumer*")) or
+    (process.name : "powershell.exe" and process.args : ("*Register-WmiEvent*", "*Set-WmiInstance*"))]
+  [registry where event.type == "change" and
+    registry.path : "*\\WMI\\*"]
+
+// ---------------------------------------------------------------------------
+// Single Query: Startup Folder Persistence
+// File dropped in startup folder by non-explorer process
+// ---------------------------------------------------------------------------
+file where event.type == "creation" and
+  file.path : "*\\Start Menu\\Programs\\Startup\\*" and
+  file.extension : ("exe", "bat", "cmd", "vbs", "lnk", "ps1", "hta", "js") and
+  not process.name : "explorer.exe"

@@ -1,0 +1,141 @@
+# =============================================================================
+# CrowdStrike Falcon Custom IOA Rules: Defense Evasion
+# MITRE ATT&CK: T1055, T1036, T1562
+# =============================================================================
+
+rules:
+  - rule_name: "Process Injection - CreateRemoteThread in Critical Process"
+    description: "Detects remote thread injection into critical system processes"
+    mitre_technique: "T1055.003"
+    mitre_tactic: "Defense Evasion"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Injection"
+    enabled: true
+    detection_logic:
+      target_process_name:
+        - "lsass.exe"
+        - "svchost.exe"
+        - "explorer.exe"
+        - "winlogon.exe"
+        - "csrss.exe"
+      exclude_source_process:
+        - "csrss.exe"
+        - "lsass.exe"
+        - "MsMpEng.exe"
+      action: "Detect"
+
+  - rule_name: "Process Masquerading - System Binary from Wrong Path"
+    description: "Detects system binaries running from non-standard locations"
+    mitre_technique: "T1036.005"
+    mitre_tactic: "Defense Evasion"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      process_name:
+        - "svchost.exe"
+        - "lsass.exe"
+        - "csrss.exe"
+        - "services.exe"
+        - "smss.exe"
+        - "conhost.exe"
+      exclude_process_path:
+        - "C:\\Windows\\System32\\"
+        - "C:\\Windows\\SysWOW64\\"
+      action: "Detect & Block"
+
+  - rule_name: "AMSI Bypass Attempt"
+    description: "Detects attempts to bypass AMSI (Antimalware Scan Interface)"
+    mitre_technique: "T1562.001"
+    mitre_tactic: "Defense Evasion"
+    severity: "Critical"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      command_line_contains:
+        - "AmsiUtils"
+        - "amsiInitFailed"
+        - "AmsiScanBuffer"
+        - "amsi.dll"
+        - "SetProtectedState"
+      action: "Detect & Block"
+
+  - rule_name: "ETW Patching for Log Evasion"
+    description: "Detects ETW (Event Tracing for Windows) tampering to evade logging"
+    mitre_technique: "T1562.006"
+    mitre_tactic: "Defense Evasion"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      command_line_contains:
+        - "EtwEventWrite"
+        - "NtTraceEvent"
+        - "logman stop"
+        - "logman delete"
+        - "Remove-EtwTraceProvider"
+      action: "Detect"
+
+  - rule_name: "Windows Event Log Cleared"
+    description: "Detects clearing of Windows event logs"
+    mitre_technique: "T1070.001"
+    mitre_tactic: "Defense Evasion"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      command_line_contains:
+        - "wevtutil cl"
+        - "Clear-EventLog"
+        - "Remove-EventLog"
+      action: "Detect"
+
+  - rule_name: "Windows Defender Disabled"
+    description: "Detects attempts to disable Windows Defender"
+    mitre_technique: "T1562.001"
+    mitre_tactic: "Defense Evasion"
+    severity: "Critical"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      command_line_contains:
+        - "Set-MpPreference -DisableRealtimeMonitoring"
+        - "DisableAntiSpyware"
+        - "sc stop WinDefend"
+        - "sc config WinDefend start=disabled"
+        - "Set-MpPreference -DisableIOAVProtection"
+      action: "Detect & Block"
+
+  - rule_name: "LOLBin Abuse - Suspicious Command"
+    description: "Detects living-off-the-land binary abuse for download/execution"
+    mitre_technique: "T1218"
+    mitre_tactic: "Defense Evasion"
+    severity: "High"
+    platform: "Windows"
+    ioa_type: "Process Creation"
+    enabled: true
+    detection_logic:
+      process_name:
+        - "mshta.exe"
+        - "certutil.exe"
+        - "regsvr32.exe"
+        - "rundll32.exe"
+        - "msbuild.exe"
+        - "cmstp.exe"
+        - "installutil.exe"
+      command_line_contains:
+        - "http://"
+        - "https://"
+        - "javascript:"
+        - "vbscript:"
+        - "/i:http"
+        - "-decode"
+        - "-urlcache"
+        - "scrobj.dll"
+      action: "Detect"

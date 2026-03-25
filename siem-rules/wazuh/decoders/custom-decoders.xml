@@ -1,0 +1,80 @@
+<!-- Custom Wazuh Decoders -->
+<!-- Extend default decoders for additional log sources -->
+
+<!-- Custom Nginx Access Log Decoder -->
+<decoder name="custom-nginx-access">
+  <parent>nginx-errorlog</parent>
+  <prematch>^\d+.\d+.\d+.\d+ - </prematch>
+  <regex>^(\d+.\d+.\d+.\d+) - (\S+) \[(\S+ \S+)\] "(\S+) (\S+) (\S+)" (\d+) (\d+) "(\S+)" "(\.+)"</regex>
+  <order>srcip,srcuser,timestamp,protocol,url,http_version,status,extra_data,referer,agent</order>
+</decoder>
+
+<!-- Custom Windows PowerShell ScriptBlock Logging -->
+<decoder name="custom-powershell-scriptblock">
+  <parent>windows</parent>
+  <prematch>Microsoft-Windows-PowerShell/Operational</prematch>
+  <regex offset="after_parent">EventID: (\d+).*ScriptBlockText: (\.+)</regex>
+  <order>event_id,extra_data</order>
+</decoder>
+
+<!-- Custom Sysmon Process Create (Event ID 1) Enhancement -->
+<decoder name="custom-sysmon-process">
+  <parent>windows</parent>
+  <prematch>Microsoft-Windows-Sysmon/Operational</prematch>
+  <regex offset="after_parent">EventID: 1.*Image: (\S+).*CommandLine: (\.+?)(?:\s+CurrentDirectory|\s+User)</regex>
+  <order>program_name,extra_data</order>
+</decoder>
+
+<!-- Custom Apache ModSecurity Decoder -->
+<decoder name="custom-modsecurity">
+  <prematch>^ModSecurity:</prematch>
+  <regex>ModSecurity: (\S+)\. (\.*?) \[file "(\S+)"\] \[line "(\d+)"\] \[id "(\d+)"\].*\[uri "(\S+)"\]</regex>
+  <order>action,extra_data,program_name,system_name,id,url</order>
+</decoder>
+
+<!-- Custom Suricata EVE JSON Decoder -->
+<decoder name="custom-suricata-eve">
+  <prematch>^{"timestamp":</prematch>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- Custom Zeek/Bro Connection Log -->
+<decoder name="custom-zeek-conn">
+  <prematch>^\d+\.\d+\t</prematch>
+  <regex>^(\S+)\t(\S+)\t(\S+)\t(\d+)\t(\S+)\t(\d+)\t(\S+)\t</regex>
+  <order>timestamp,extra_data,srcip,srcport,dstip,dstport,protocol</order>
+</decoder>
+
+<!-- Custom Linux Auditd Decoder Enhancement -->
+<decoder name="custom-auditd-execve">
+  <parent>auditd</parent>
+  <prematch>type=EXECVE</prematch>
+  <regex offset="after_parent">a0="(\S+)".*a1="(\S+)"</regex>
+  <order>program_name,extra_data</order>
+</decoder>
+
+<!-- Custom Cloud Trail Decoder -->
+<decoder name="custom-aws-cloudtrail">
+  <prematch>^{"eventVersion":</prematch>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- Custom Azure Activity Log Decoder -->
+<decoder name="custom-azure-activity">
+  <prematch>^{"time":</prematch>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- Custom FortiGate Firewall Decoder -->
+<decoder name="custom-fortigate">
+  <prematch>^date=\d+-\d+-\d+ time=</prematch>
+  <regex>srcip=(\d+.\d+.\d+.\d+) srcport=(\d+) dstip=(\d+.\d+.\d+.\d+) dstport=(\d+) .* action="(\S+)"</regex>
+  <order>srcip,srcport,dstip,dstport,action</order>
+</decoder>
+
+<!-- Custom Palo Alto Firewall Decoder -->
+<decoder name="custom-paloalto">
+  <prematch>^1,\d{4}/\d{2}/\d{2}</prematch>
+  <regex>,TRAFFIC,</regex>
+  <order>extra_data</order>
+</decoder>

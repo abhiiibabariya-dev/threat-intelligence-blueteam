@@ -1,0 +1,56 @@
+# LogRhythm - Exfiltration Detection Rules
+---
+rules:
+  - rule_name: "LR-EX-001: DNS Exfiltration"
+    rule_type: statistical
+    severity: high
+    risk_rating: 8
+    mitre: [T1048.001]
+    filter: {protocol: DNS, query_type_any: [TXT, NULL]}
+    statistical: {field: query_name, calculation: average_length, time_window_seconds: 3600, standard_deviations: 3, group_by: [origin_host_name]}
+    actions: [create_alarm, smartresponse: "Block DNS"]
+
+  - rule_name: "LR-EX-002: Large Outbound Transfer"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1041]
+    filter: {direction: "Local to Remote", bytes_out_greater_than: 524288000}
+    threshold: {count: 1, time_window_seconds: 3600}
+    actions: [create_alarm, smartresponse: "Capture Traffic"]
+
+  - rule_name: "LR-EX-003: Cloud Upload Tool"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1567.002]
+    filter: {process_any: [rclone.exe, megasync.exe, gdrive.exe], bytes_out_greater_than: 104857600}
+    threshold: {count: 1, time_window_seconds: 300}
+    actions: [create_alarm, smartresponse: "Kill Process"]
+
+  - rule_name: "LR-EX-004: FTP/SFTP Data Transfer"
+    rule_type: threshold
+    severity: medium
+    risk_rating: 6
+    mitre: [T1048.003]
+    filter: {destination_port_any: [20, 21, 22], direction: "Local to Remote", bytes_out_greater_than: 52428800}
+    threshold: {count: 1, time_window_seconds: 3600}
+    actions: [create_alarm]
+
+  - rule_name: "LR-EX-005: Data Staging Detected"
+    rule_type: threshold
+    severity: medium
+    risk_rating: 6
+    mitre: [T1560.001]
+    filter: {command_contains_any: ["7z a", "rar a", "zip -r", "Compress-Archive", "tar czf"]}
+    threshold: {count: 3, time_window_seconds: 600, group_by: [origin_host_name]}
+    actions: [create_alarm]
+
+  - rule_name: "LR-EX-006: Encrypted Channel Exfiltration"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1048.002]
+    filter: {command_contains_any: ["openssl s_client", "ncat --ssl", "socat openssl"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]

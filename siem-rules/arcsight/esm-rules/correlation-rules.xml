@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ArcSight ESM Correlation Rules
+  Description: Multi-event correlation rules for threat detection
+  MITRE ATT&CK: Multiple techniques
+  Author: Blue Team
+-->
+<Rules xmlns="http://www.arcsight.com/esm/rules">
+
+  <!-- ================================================================= -->
+  <!-- Rule 1: Distributed Brute Force Attack -->
+  <!-- MITRE: T1110 - Brute Force -->
+  <!-- ================================================================= -->
+  <Rule id="brute-force-distributed" enabled="true" priority="8">
+    <Name>Distributed Brute Force Attack Detection</Name>
+    <Description>Detects multiple failed authentication attempts from a single source targeting multiple accounts within a time window.</Description>
+    <Type>Junction</Type>
+    <RuleGroup>Threat Detection/Credential Access</RuleGroup>
+    <MatchConditions>
+      <Condition field="categoryBehavior" operator="equals" value="/Authentication/Verify"/>
+      <Condition field="categoryOutcome" operator="equals" value="/Failure"/>
+    </MatchConditions>
+    <Aggregation>
+      <GroupBy>sourceAddress</GroupBy>
+      <Threshold field="targetUserName" operator="distinctCount" value="3"/>
+      <Threshold field="eventId" operator="count" value="15"/>
+      <TimeWindow unit="minutes">60</TimeWindow>
+    </Aggregation>
+    <Actions>
+      <Action type="createCorrelationEvent">
+        <Severity>8</Severity>
+        <Name>Distributed Brute Force from ${sourceAddress}</Name>
+        <MITREAttack>T1110</MITREAttack>
+      </Action>
+      <Action type="addToActiveList">
+        <ActiveList>Brute Force Sources</ActiveList>
+        <TTL unit="hours">24</TTL>
+      </Action>
+    </Actions>
+  </Rule>
+
+  <!-- ================================================================= -->
+  <!-- Rule 2: Lateral Movement Chain -->
+  <!-- MITRE: T1021, T1550 -->
+  <!-- ================================================================= -->
+  <Rule id="lateral-movement-chain" enabled="true" priority="9">
+    <Name>Lateral Movement Chain Detection</Name>
+    <Description>Correlates successful network logons followed by process execution on multiple target hosts.</Description>
+    <Type>Chain</Type>
+    <RuleGroup>Threat Detection/Lateral Movement</RuleGroup>
+    <ChainLinks>
+      <Link order="1" alias="NetworkLogon">
+        <MatchConditions>
+          <Condition field="categoryBehavior" operator="equals" value="/Authentication/Verify"/>
+          <Condition field="categoryOutcome" operator="equals" value="/Success"/>
+          <Condition field="deviceCustomString1" operator="equals" value="3"/>
+        </MatchConditions>
+      </Link>
+      <Link order="2" alias="ProcessExecution" withinSeconds="300">
+        <MatchConditions>
+          <Condition field="categoryBehavior" operator="equals" value="/Execute/Start"/>
+          <Condition field="destinationProcessName" operator="contains" value="cmd.exe,powershell.exe,wmic.exe,psexec.exe"/>
+        </MatchConditions>
+        <Correlation>
+          <Field left="NetworkLogon.destinationAddress" right="ProcessExecution.sourceAddress"/>
+          <Field left="NetworkLogon.targetUserName" right="ProcessExecution.sourceUserName"/>
+        </Correlation>
+      </Link>
+    </ChainLinks>
+    <Aggregation>
+      <GroupBy>sourceUserName</GroupBy>
+      <Threshold field="destinationAddress" operator="distinctCount" value="2"/>
+      <TimeWindow unit="minutes">60</TimeWindow>
+    </Aggregation>
+    <Actions>
+      <Action type="createCorrelationEvent">
+        <Severity>9</Severity>
+        <Name>Lateral Movement Chain by ${sourceUserName}</Name>
+        <MITREAttack>T1021,T1550</MITREAttack>
+      </Action>
+      <Action type="createCase">
+        <CaseTemplate>Lateral Movement Investigation</CaseTemplate>
+      </Action>
+    </Actions>
+  </Rule>
+
+  <!-- ================================================================= -->
+  <!-- Rule 3: Data Exfiltration Pattern -->
+  <!-- MITRE: T1048 -->
+  <!-- ================================================================= -->
+  <Rule id="data-exfiltration" enabled="true" priority="8">
+    <Name>Data Exfiltration - Large Outbound Transfer</Name>
+    <Description>Detects unusually large outbound data transfers to external destinations.</Description>
+    <Type>Simple</Type>
+    <RuleGroup>Threat Detection/Exfiltration</RuleGroup>
+    <MatchConditions>
+      <Condition field="categoryBehavior" operator="equals" value="/Communicate/Query"/>
+      <Condition field="bytesOut" operator="greaterThan" value="104857600"/>
+      <Condition field="sourceAddress" operator="inSubnet" value="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"/>
+      <Condition field="destinationAddress" operator="notInSubnet" value="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"/>
+    </MatchConditions>
+    <Actions>
+      <Action type="createCorrelationEvent">
+        <Severity>8</Severity>
+        <Name>Large Outbound Transfer from ${sourceAddress} to ${destinationAddress}</Name>
+        <MITREAttack>T1048</MITREAttack>
+      </Action>
+    </Actions>
+  </Rule>
+
+  <!-- ================================================================= -->
+  <!-- Rule 4: Credential Dumping Detection -->
+  <!-- MITRE: T1003 -->
+  <!-- ================================================================= -->
+  <Rule id="credential-dumping" enabled="true" priority="10">
+    <Name>Credential Dumping Tool Detected</Name>
+    <Description>Detects execution of known credential dumping tools or techniques.</Description>
+    <Type>Simple</Type>
+    <RuleGroup>Threat Detection/Credential Access</RuleGroup>
+    <MatchConditions>
+      <Condition field="categoryBehavior" operator="equals" value="/Execute/Start"/>
+      <Or>
+        <Condition field="requestUrl" operator="contains" value="mimikatz"/>
+        <Condition field="requestUrl" operator="contains" value="sekurlsa"/>
+        <Condition field="requestUrl" operator="contains" value="lsadump"/>
+        <Condition field="deviceCustomString1" operator="contains" value="procdump"/>
+        <Condition field="deviceCustomString1" operator="contains" value="comsvcs.dll,MiniDump"/>
+      </Or>
+    </MatchConditions>
+    <Actions>
+      <Action type="createCorrelationEvent">
+        <Severity>10</Severity>
+        <Name>Credential Dumping on ${sourceAddress}</Name>
+        <MITREAttack>T1003</MITREAttack>
+      </Action>
+      <Action type="sendNotification">
+        <NotificationGroup>SOC-Critical</NotificationGroup>
+      </Action>
+    </Actions>
+  </Rule>
+
+  <!-- ================================================================= -->
+  <!-- Rule 5: Ransomware Behavior -->
+  <!-- MITRE: T1486, T1490 -->
+  <!-- ================================================================= -->
+  <Rule id="ransomware-behavior" enabled="true" priority="10">
+    <Name>Ransomware Behavior Indicators</Name>
+    <Description>Detects shadow copy deletion and backup tampering indicative of ransomware.</Description>
+    <Type>Simple</Type>
+    <RuleGroup>Threat Detection/Impact</RuleGroup>
+    <MatchConditions>
+      <Condition field="categoryBehavior" operator="equals" value="/Execute/Start"/>
+      <Or>
+        <And>
+          <Condition field="destinationProcessName" operator="contains" value="vssadmin"/>
+          <Condition field="deviceCustomString1" operator="contains" value="delete shadows"/>
+        </And>
+        <And>
+          <Condition field="destinationProcessName" operator="contains" value="wmic"/>
+          <Condition field="deviceCustomString1" operator="contains" value="shadowcopy delete"/>
+        </And>
+        <And>
+          <Condition field="destinationProcessName" operator="contains" value="bcdedit"/>
+          <Condition field="deviceCustomString1" operator="contains" value="recoveryenabled no"/>
+        </And>
+      </Or>
+    </MatchConditions>
+    <Actions>
+      <Action type="createCorrelationEvent">
+        <Severity>10</Severity>
+        <Name>RANSOMWARE - Shadow Copy Deletion on ${sourceAddress}</Name>
+        <MITREAttack>T1486,T1490</MITREAttack>
+      </Action>
+      <Action type="sendNotification">
+        <NotificationGroup>SOC-Critical</NotificationGroup>
+        <NotificationGroup>IR-Team</NotificationGroup>
+      </Action>
+      <Action type="createCase">
+        <CaseTemplate>Ransomware Incident Response</CaseTemplate>
+        <Priority>Critical</Priority>
+      </Action>
+    </Actions>
+  </Rule>
+
+</Rules>

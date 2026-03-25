@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ArcSight FlexConnector Configuration: Custom Syslog Parser
+  Description: FlexConnector framework configuration for parsing custom
+               syslog sources into ArcSight CEF format.
+  Author: Blue Team
+  Usage: Place in $ARCSIGHT_HOME/current/user/agent/flexagent/
+-->
+<FlexConnector>
+
+  <Metadata>
+    <Name>Custom Security Log FlexConnector</Name>
+    <Version>1.0.0</Version>
+    <Description>Parses custom syslog security events into CEF format for ArcSight ESM</Description>
+    <Vendor>Custom</Vendor>
+    <Product>Security Appliance</Product>
+  </Metadata>
+
+  <!-- ================================================================= -->
+  <!-- Transport Configuration -->
+  <!-- ================================================================= -->
+  <Transport type="syslog">
+    <Parameter name="port" value="514"/>
+    <Parameter name="protocol" value="udp"/>
+    <Parameter name="encoding" value="UTF-8"/>
+    <Parameter name="facility" value="local0"/>
+  </Transport>
+
+  <!-- ================================================================= -->
+  <!-- Parser Configuration -->
+  <!-- ================================================================= -->
+  <Parser>
+
+    <!-- Regex-based token definitions -->
+    <TokenDefinitions>
+      <Token name="Timestamp" regex="\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}"/>
+      <Token name="Hostname" regex="[\w\-\.]+"/>
+      <Token name="EventType" regex="(AUTH_FAILURE|AUTH_SUCCESS|POLICY_DENY|POLICY_ALLOW|THREAT_DETECT|SYSTEM_ALERT)"/>
+      <Token name="SourceIP" regex="\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"/>
+      <Token name="DestIP" regex="\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"/>
+      <Token name="SourcePort" regex="\d{1,5}"/>
+      <Token name="DestPort" regex="\d{1,5}"/>
+      <Token name="Username" regex="[\w\.\-@]+"/>
+      <Token name="Action" regex="(allow|deny|block|alert|drop)"/>
+      <Token name="Protocol" regex="(TCP|UDP|ICMP|HTTP|HTTPS|DNS|SSH|RDP)"/>
+    </TokenDefinitions>
+
+    <!-- Message format definitions -->
+    <MessageDefinitions>
+
+      <!-- Authentication Events -->
+      <Message id="auth_failure">
+        <Pattern><![CDATA[{Timestamp} {Hostname} AUTH_FAILURE: user={Username} src={SourceIP} dst={DestIP} reason={*}]]></Pattern>
+        <Mapping>
+          <Field arcsight="deviceReceiptTime" token="Timestamp"/>
+          <Field arcsight="deviceHostName" token="Hostname"/>
+          <Field arcsight="sourceAddress" token="SourceIP"/>
+          <Field arcsight="destinationAddress" token="DestIP"/>
+          <Field arcsight="sourceUserName" token="Username"/>
+          <Field arcsight="categoryBehavior" value="/Authentication/Verify"/>
+          <Field arcsight="categoryOutcome" value="/Failure"/>
+          <Field arcsight="categorySignificance" value="/Informational"/>
+          <Field arcsight="name" value="Authentication Failure"/>
+          <Field arcsight="agentSeverity" value="3"/>
+        </Mapping>
+      </Message>
+
+      <!-- Successful Authentication -->
+      <Message id="auth_success">
+        <Pattern><![CDATA[{Timestamp} {Hostname} AUTH_SUCCESS: user={Username} src={SourceIP} dst={DestIP}]]></Pattern>
+        <Mapping>
+          <Field arcsight="deviceReceiptTime" token="Timestamp"/>
+          <Field arcsight="deviceHostName" token="Hostname"/>
+          <Field arcsight="sourceAddress" token="SourceIP"/>
+          <Field arcsight="destinationAddress" token="DestIP"/>
+          <Field arcsight="sourceUserName" token="Username"/>
+          <Field arcsight="categoryBehavior" value="/Authentication/Verify"/>
+          <Field arcsight="categoryOutcome" value="/Success"/>
+          <Field arcsight="name" value="Authentication Success"/>
+          <Field arcsight="agentSeverity" value="1"/>
+        </Mapping>
+      </Message>
+
+      <!-- Firewall Policy Events -->
+      <Message id="policy_deny">
+        <Pattern><![CDATA[{Timestamp} {Hostname} POLICY_DENY: src={SourceIP}:{SourcePort} dst={DestIP}:{DestPort} proto={Protocol} action={Action}]]></Pattern>
+        <Mapping>
+          <Field arcsight="deviceReceiptTime" token="Timestamp"/>
+          <Field arcsight="deviceHostName" token="Hostname"/>
+          <Field arcsight="sourceAddress" token="SourceIP"/>
+          <Field arcsight="sourcePort" token="SourcePort"/>
+          <Field arcsight="destinationAddress" token="DestIP"/>
+          <Field arcsight="destinationPort" token="DestPort"/>
+          <Field arcsight="transportProtocol" token="Protocol"/>
+          <Field arcsight="deviceAction" token="Action"/>
+          <Field arcsight="categoryBehavior" value="/Access/Firewall"/>
+          <Field arcsight="categoryOutcome" value="/Failure"/>
+          <Field arcsight="name" value="Firewall Policy Deny"/>
+          <Field arcsight="agentSeverity" value="3"/>
+        </Mapping>
+      </Message>
+
+      <!-- Threat Detection Events -->
+      <Message id="threat_detect">
+        <Pattern><![CDATA[{Timestamp} {Hostname} THREAT_DETECT: src={SourceIP} dst={DestIP} threat_name={*} severity={*}]]></Pattern>
+        <Mapping>
+          <Field arcsight="deviceReceiptTime" token="Timestamp"/>
+          <Field arcsight="deviceHostName" token="Hostname"/>
+          <Field arcsight="sourceAddress" token="SourceIP"/>
+          <Field arcsight="destinationAddress" token="DestIP"/>
+          <Field arcsight="categoryBehavior" value="/Access/Malware"/>
+          <Field arcsight="categorySignificance" value="/Hostile"/>
+          <Field arcsight="name" value="Threat Detected"/>
+          <Field arcsight="agentSeverity" value="8"/>
+        </Mapping>
+      </Message>
+
+    </MessageDefinitions>
+
+  </Parser>
+
+  <!-- ================================================================= -->
+  <!-- Categorization and Enrichment -->
+  <!-- ================================================================= -->
+  <Categorization>
+    <CategoryMap>
+      <Entry eventType="AUTH_FAILURE" behavior="/Authentication/Verify" outcome="/Failure" significance="/Informational"/>
+      <Entry eventType="AUTH_SUCCESS" behavior="/Authentication/Verify" outcome="/Success" significance="/Normal"/>
+      <Entry eventType="POLICY_DENY" behavior="/Access/Firewall" outcome="/Failure" significance="/Informational"/>
+      <Entry eventType="POLICY_ALLOW" behavior="/Access/Firewall" outcome="/Success" significance="/Normal"/>
+      <Entry eventType="THREAT_DETECT" behavior="/Access/Malware" outcome="/Attempt" significance="/Hostile"/>
+      <Entry eventType="SYSTEM_ALERT" behavior="/System/Anomaly" outcome="/Attempt" significance="/Warning"/>
+    </CategoryMap>
+  </Categorization>
+
+</FlexConnector>

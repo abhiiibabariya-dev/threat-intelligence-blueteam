@@ -1,0 +1,116 @@
+<dashboard version="1.1" theme="dark">
+  <label>Threat Hunting Dashboard</label>
+  <description>Proactive threat hunting - suspicious processes, network anomalies, DNS analysis, and user behavior</description>
+
+  <fieldset submitButton="true">
+    <input type="time" token="timeRange">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="text" token="target_host">
+      <label>Target Host (optional)</label>
+      <default>*</default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>Rare Process Executions</title>
+      <table>
+        <search>
+          <query>index=sysmon EventCode=1 Computer=$target_host$
+| stats count as ExecCount, dc(Computer) as HostCount, values(Computer) as Hosts, values(CommandLine) as Commands by Image
+| where ExecCount &lt; 5
+| sort ExecCount
+| head 20</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Suspicious Network Beaconing (Low Jitter Connections)</title>
+      <table>
+        <search>
+          <query>index=proxy sourcetype=proxy action=allowed
+| sort src_ip, dest, _time
+| streamstats current=f window=2 last(_time) as prev by src_ip, dest
+| eval interval=_time - prev | where interval &gt; 30 AND interval &lt; 3600
+| stats count as c, avg(interval) as avg_i, stdev(interval) as std_i by src_ip, dest
+| where c &gt; 15 | eval jitter=round(std_i/avg_i*100,1) | where jitter &lt; 25
+| sort jitter | head 20
+| rename src_ip as "Source", dest as "Destination", c as "Connections", avg_i as "Avg Interval(s)", jitter as "Jitter%"</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>DNS Anomalies - Long Subdomain Queries</title>
+      <table>
+        <search>
+          <query>index=dns sourcetype=dns
+| eval sub_len=len(mvindex(split(query,"."),0))
+| where sub_len &gt; 30
+| rex field=query "\.(?&lt;basedomain&gt;[^\.]+\.[^\.]+)$"
+| stats count, dc(query) as unique, avg(sub_len) as avg_len by src_ip, basedomain
+| where count &gt; 50 | sort -count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+    <panel>
+      <title>Processes Running from Temp/Downloads</title>
+      <table>
+        <search>
+          <query>index=sysmon EventCode=1
+| where match(Image, "(?i)(\\\\Temp\\\\|\\\\Downloads\\\\|\\\\AppData\\\\Local\\\\Temp)")
+| stats count, dc(Computer) as hosts, values(CommandLine) as cmds by Image
+| sort -count | head 15</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>User Behavior - Off-Hours Activity</title>
+      <table>
+        <search>
+          <query>index=wineventlog sourcetype=WinEventLog:Security EventCode=4624 LogonType IN (2,10)
+| eval hour=strftime(_time, "%H") | where hour &lt; 6 OR hour &gt; 22
+| stats count as Logons, dc(ComputerName) as Hosts, values(ComputerName) as HostList by TargetUserName
+| sort -Logons | head 15</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+    <panel>
+      <title>Suspicious Parent-Child Relationships</title>
+      <table>
+        <search>
+          <query>index=sysmon EventCode=1
+| where match(ParentImage, "(?i)(winword|excel|outlook|powerpnt)")
+  AND match(Image, "(?i)(cmd|powershell|wscript|cscript|mshta)")
+| table _time, Computer, User, ParentImage, Image, CommandLine
+| head 20</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>

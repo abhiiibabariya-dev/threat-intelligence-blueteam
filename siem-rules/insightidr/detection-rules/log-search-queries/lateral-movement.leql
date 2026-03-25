@@ -1,0 +1,33 @@
+// InsightIDR LEQL Queries - Lateral Movement
+// MITRE ATT&CK Tactic: TA0008
+
+// IDR-LM-001: PsExec Service (T1021.002)
+where(event_id = 7045 AND service_name ICONTAINS "psexe")
+groupby(host, source_address)
+calculate(count)
+
+// IDR-LM-002: WMI Remote Process (T1047)
+where(parent_process_name = "wmiprvse.exe" AND process_name IN ["cmd.exe", "powershell.exe", "pwsh.exe"])
+groupby(host, process_name, command_line)
+calculate(count)
+
+// IDR-LM-003: RDP Lateral Movement (T1021.001)
+where(event_id = 4624 AND logon_type = 10)
+groupby(source_address, account)
+calculate(unique:host)
+having(unique > 2)
+
+// IDR-LM-004: Admin Share Access (T1021.002)
+where(event_id = 5140 AND share_name ICONTAINS-ANY ["ADMIN$", "C$"])
+groupby(source_address, account, share_name)
+calculate(count)
+
+// IDR-LM-005: WinRM Remote Execution (T1021.006)
+where(parent_process_name = "wsmprovhost.exe")
+groupby(host, process_name, command_line)
+calculate(count)
+
+// IDR-LM-006: Pass-the-Hash (T1550.002)
+where(event_id = 4624 AND logon_type = 9 AND authentication_package = "Negotiate")
+groupby(account, source_address, host)
+calculate(count)

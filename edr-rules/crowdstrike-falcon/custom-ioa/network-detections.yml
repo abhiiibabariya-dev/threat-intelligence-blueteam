@@ -1,0 +1,441 @@
+---
+# CrowdStrike Falcon Custom IOA Rules - Network-Based Detections
+# Version: 1.0
+# Last Updated: 2026-03-24
+# MITRE ATT&CK Version: 14.1
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Custom IOA rules for detecting network-based threats including C2
+    beaconing, DNS exfiltration, lateral movement, and encrypted channel abuse.
+  platform: CrowdStrike Falcon
+  min_sensor_version: "6.40"
+
+rules:
+
+  # ============================================================================
+  # Rule 1: C2 Beaconing Patterns
+  # ============================================================================
+  - rule_name: "Command and Control Beaconing Pattern Detection"
+    rule_id: "CS-NET-001"
+    description: >
+      Detects periodic network callbacks indicative of C2 beaconing by
+      analyzing connection frequency, regularity, jitter patterns, and
+      data transfer characteristics to external infrastructure.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Command and Control
+      technique: T1071
+      technique_name: "Application Layer Protocol"
+      additional_mappings:
+        - T1071.001  # Web Protocols
+        - T1071.004  # DNS
+        - T1573.001  # Symmetric Cryptography
+        - T1132.001  # Standard Encoding
+    platform:
+      - Windows
+      - macOS
+      - Linux
+    detection_logic:
+      network_behavior:
+        - name: "HTTP/HTTPS Beaconing"
+          protocol:
+            - HTTP
+            - HTTPS
+          beacon_analysis:
+            min_connections: 20
+            time_window_minutes: 60
+            regularity_threshold: 0.85
+            jitter_percentage_max: 40
+            consistent_payload_size: true
+            small_response_ratio: 0.9
+          destination_filters:
+            exclude_known_good:
+              - "*.microsoft.com"
+              - "*.windows.com"
+              - "*.windowsupdate.com"
+              - "*.office365.com"
+              - "*.office.com"
+              - "*.amazonaws.com"
+              - "*.google.com"
+              - "*.crowdstrike.com"
+            suspicious_indicators:
+              - newly_registered_domain: true
+              - dga_score_above: 0.7
+              - low_alexa_rank: true
+              - self_signed_certificate: true
+
+        - name: "Long-Duration Connections"
+          connection_duration_minutes_above: 480
+          idle_data_transfer: true
+          process_not:
+            - "Teams.exe"
+            - "slack.exe"
+            - "OneDrive.exe"
+            - "Dropbox.exe"
+
+    response_actions:
+      - action: detect
+        description: >
+          Generate alert with beacon analysis details including interval,
+          jitter, destination IP/domain, and associated process.
+      - action: collect_artifacts
+        description: >
+          Capture network traffic from the host, DNS resolution history,
+          and full process tree for the beaconing process.
+      - action: threat_intelligence
+        description: >
+          Query threat intelligence platforms for the destination
+          IP/domain reputation and any known C2 framework associations.
+    false_positive_guidance: >
+      Software update mechanisms, telemetry agents, and health-check services
+      produce regular callbacks. Tune exclusions based on validated software
+      inventory.
+
+  # ============================================================================
+  # Rule 2: DNS-Based Exfiltration
+  # ============================================================================
+  - rule_name: "DNS Tunneling and Data Exfiltration Detection"
+    rule_id: "CS-NET-002"
+    description: >
+      Detects data exfiltration via DNS queries by identifying anomalous
+      query patterns including high entropy subdomains, excessive query
+      volume, large TXT record responses, and known DNS tunneling tools.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Exfiltration
+      technique: T1048.001
+      technique_name: "Exfiltration Over Alternative Protocol: Exfiltration Over Symmetric Encrypted Non-C2 Protocol"
+      additional_mappings:
+        - T1071.004  # DNS
+        - T1568.002  # Domain Generation Algorithms
+    platform:
+      - Windows
+      - macOS
+      - Linux
+    detection_logic:
+      dns_indicators:
+        - name: "High Entropy Subdomain Queries"
+          query_analysis:
+            subdomain_entropy_threshold: 3.5
+            subdomain_length_above: 30
+            queries_per_minute_above: 20
+            unique_subdomains_per_domain_above: 50
+            time_window_minutes: 10
+
+        - name: "Excessive TXT Record Queries"
+          record_types:
+            - TXT
+            - NULL
+            - CNAME
+          volume_threshold:
+            queries_per_hour_above: 100
+            to_single_domain: true
+
+        - name: "Known DNS Tunneling Tool Patterns"
+          domain_patterns:
+            - subdomain_encoding:
+                - base64_pattern: true
+                - hex_pattern: true
+            - consistent_label_length: true
+          process_indicators:
+            - "iodine"
+            - "dnscat"
+            - "dns2tcp"
+            - "DNSExfiltrator"
+            - "Invoke-DNSExfiltration"
+
+        - name: "DNS Over HTTPS (DoH) Abuse"
+          destination_ips:
+            - "1.1.1.1"
+            - "8.8.8.8"
+            - "8.8.4.4"
+            - "9.9.9.9"
+          destination_ports:
+            - 443
+          process_not:
+            - "chrome.exe"
+            - "firefox.exe"
+            - "msedge.exe"
+          volume_anomaly: true
+
+    response_actions:
+      - action: detect
+        description: >
+          Alert with DNS query samples, entropy scores, volume metrics,
+          and the queried domain hierarchy.
+      - action: block_domain
+        description: Block resolution of the suspected tunneling domain
+      - action: collect_artifacts
+        description: >
+          Capture full DNS query logs from the host, identify the process
+          generating the queries, and collect packet captures if available.
+    false_positive_guidance: >
+      CDN providers, anti-spam services, and some SaaS applications generate
+      high volumes of DNS queries with unique subdomains. DKIM and SPF
+      validation also produces long TXT queries. Baseline normal DNS behavior
+      per host role.
+
+  # ============================================================================
+  # Rule 3: Lateral Movement via SMB
+  # ============================================================================
+  - rule_name: "SMB-Based Lateral Movement Detection"
+    rule_id: "CS-NET-003"
+    description: >
+      Detects lateral movement via SMB including PsExec-style service
+      installation, remote file copying to admin shares, and SMB-based
+      remote execution techniques.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Lateral Movement
+      technique: T1021.002
+      technique_name: "Remote Services: SMB/Windows Admin Shares"
+      additional_mappings:
+        - T1570  # Lateral Tool Transfer
+        - T1080  # Taint Shared Content
+        - T1569.002  # System Services: Service Execution
+    platform:
+      - Windows
+    detection_logic:
+      smb_indicators:
+        - name: "PsExec-Style Execution"
+          indicators:
+            - smb_write_to: "\\\\*\\ADMIN$"
+              file_extension: ".exe"
+            - service_installation:
+                service_name_random: true
+                service_binary_path_contains: "ADMIN$"
+            - named_pipe_creation:
+                patterns:
+                  - "\\psexesvc*"
+                  - "\\paexec*"
+                  - "\\remcom*"
+                  - "\\csexec*"
+
+        - name: "Remote File Copy to Admin Shares"
+          smb_operations:
+            target_shares:
+              - "ADMIN$"
+              - "C$"
+              - "IPC$"
+            file_types_suspicious:
+              - "*.exe"
+              - "*.dll"
+              - "*.bat"
+              - "*.ps1"
+              - "*.vbs"
+              - "*.hta"
+            source_not_admin_workstation: true
+
+        - name: "Impacket-Based SMB Execution"
+          indicators:
+            - service_name_pattern: "[a-zA-Z]{4,8}"
+            - service_binary_contains:
+                - "cmd.exe /Q /c"
+                - "\\\\127.0.0.1\\ADMIN$\\"
+            - rapid_service_create_start_delete: true
+
+        - name: "SMB Scanning and Enumeration"
+          network_behavior:
+            destination_port: 445
+            unique_destinations_above: 10
+            time_window_minutes: 5
+            connection_pattern: sequential_or_parallel
+
+    response_actions:
+      - action: detect
+        description: >
+          Generate alert with source host, destination hosts, credentials
+          used, files transferred, and services created.
+      - action: quarantine
+        description: >
+          Network-isolate both source and destination hosts if PsExec-style
+          execution is confirmed.
+      - action: alert_soc
+        priority: P1
+        description: >
+          Active lateral movement detected. Map the full scope of movement,
+          identify compromised credentials, and contain the spread.
+    false_positive_guidance: >
+      System administrators legitimately use PsExec and admin shares.
+      Software distribution tools access admin shares for deployment.
+      Correlate with user identity and business context.
+
+  # ============================================================================
+  # Rule 4: Suspicious TLS Certificates
+  # ============================================================================
+  - rule_name: "Suspicious TLS Certificate Usage for C2"
+    rule_id: "CS-NET-004"
+    description: >
+      Detects outbound TLS connections using self-signed certificates,
+      certificates with anomalous attributes, or certificates associated
+      with known C2 frameworks and malware families.
+    severity: medium
+    enabled: true
+    mitre_attack:
+      tactic: Command and Control
+      technique: T1573.002
+      technique_name: "Encrypted Channel: Asymmetric Cryptography"
+      additional_mappings:
+        - T1071.001  # Web Protocols
+        - T1001.003  # Protocol Impersonation
+    platform:
+      - Windows
+      - macOS
+      - Linux
+    detection_logic:
+      tls_indicators:
+        - name: "Self-Signed Certificate Detection"
+          certificate_properties:
+            self_signed: true
+            issuer_equals_subject: true
+          exclude_destinations:
+            - internal_ip_ranges: true
+            - known_dev_environments: true
+
+        - name: "Anomalous Certificate Attributes"
+          certificate_anomalies:
+            - validity_period_days_above: 3650
+            - validity_period_days_below: 7
+            - subject_cn_is_ip_address: true
+            - missing_san_extension: true
+            - weak_signature_algorithm:
+                - "md5WithRSAEncryption"
+                - "sha1WithRSAEncryption"
+            - key_size_below: 2048
+            - serial_number_pattern: "sequential"
+
+        - name: "Known C2 Framework Certificates"
+          ja3_hashes:
+            - "72a589da586844d7f0818ce684948eea"  # Cobalt Strike
+            - "a0e9f5d64349fb13191bc781f81f42e1"  # Cobalt Strike
+            - "6734f37431670b3ab4292b8f60f29984"  # Trickbot
+          ja3s_hashes:
+            - "b742b407517bac9536a77a7b0fee28e9"  # Cobalt Strike
+            - "ae4edc6faf64d08308082ad26be60767"  # Metasploit
+          certificate_fingerprints:
+            description: "Add known-bad certificate SHA256 fingerprints"
+            values: []
+
+        - name: "Certificate Impersonation"
+          certificate_subject_contains:
+            - "Microsoft"
+            - "Google"
+            - "Amazon"
+            - "Cloudflare"
+          issuer_not_trusted_ca: true
+
+    response_actions:
+      - action: detect
+        description: >
+          Alert with full certificate details, JA3/JA3S hashes,
+          destination IP/port, and associated process information.
+      - action: collect_artifacts
+        description: >
+          Extract and store the server certificate chain, capture TLS
+          handshake metadata, and correlate with threat intelligence.
+    false_positive_guidance: >
+      Internal development environments commonly use self-signed certificates.
+      IoT devices and network appliances may present anomalous certificates.
+      Maintain an exclusion list for known internal services.
+
+  # ============================================================================
+  # Rule 5: Tor and Proxy Usage Detection
+  # ============================================================================
+  - rule_name: "Tor Network and Anonymizing Proxy Detection"
+    rule_id: "CS-NET-005"
+    description: >
+      Detects usage of Tor network, known anonymizing proxies, and VPN
+      services commonly used by threat actors to obscure command-and-control
+      traffic and exfiltration channels.
+    severity: medium
+    enabled: true
+    mitre_attack:
+      tactic: Command and Control
+      technique: T1090
+      technique_name: "Proxy"
+      additional_mappings:
+        - T1090.003  # Multi-hop Proxy
+        - T1573  # Encrypted Channel
+    platform:
+      - Windows
+      - macOS
+      - Linux
+    detection_logic:
+      proxy_indicators:
+        - name: "Tor Client Detection"
+          process_indicators:
+            process_name_any:
+              - "tor.exe"
+              - "tor"
+              - "Browser\\firefox.exe"
+            parent_directory_contains:
+              - "Tor Browser"
+              - "TorBrowser"
+          network_indicators:
+            destination_ports:
+              - 9001
+              - 9030
+              - 9040
+              - 9050
+              - 9051
+              - 9150
+            tor_directory_authorities: true
+            tor_exit_node_list: true
+
+        - name: "Tor Network Traffic"
+          tls_indicators:
+            certificate_subject_contains: ".onion"
+            destination_in_tor_relay_list: true
+          connection_pattern:
+            multi_hop_detected: true
+            circuit_build_pattern: true
+
+        - name: "Anonymizing Proxy Services"
+          destination_categories:
+            - anonymizer
+            - proxy_avoidance
+          known_proxy_domains:
+            - "*.hide.me"
+            - "*.protonvpn.com"
+            - "*.mullvad.net"
+            - "*.nordvpn.com"
+            - "*.psiphon3.com"
+            - "*.torproject.org"
+          process_not_authorized_vpn: true
+
+        - name: "SOCKS Proxy Configuration"
+          indicators:
+            - registry_modification:
+                key: "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
+                value: "ProxyServer"
+                data_contains: "socks"
+            - ssh_tunnel:
+                command_line_contains:
+                  - "-D "
+                  - "-L "
+                  - "DynamicForward"
+
+    response_actions:
+      - action: detect
+        description: >
+          Generate alert with proxy type, destination details, associated
+          process, and user context.
+      - action: block
+        description: >
+          Block connections to known Tor relays and exit nodes using
+          continuously updated threat intelligence lists.
+      - action: alert_soc
+        priority: P2
+        description: >
+          Investigate the business justification for proxy/Tor usage.
+          May indicate policy violation, insider threat, or compromised
+          host being used as part of a C2 chain.
+    false_positive_guidance: >
+      Security researchers and privacy-focused users may legitimately use
+      Tor. VPN usage may be authorized for remote workers. Validate against
+      organizational policy and user role.

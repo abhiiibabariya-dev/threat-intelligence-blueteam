@@ -1,0 +1,183 @@
+# Exabeam Fusion - Lateral Movement Detection Rules
+# MITRE ATT&CK Tactic: TA0008
+
+---
+rules:
+  - rule_name: "EXA-LM-001: PsExec Remote Execution"
+    description: "PsExec service installation on remote host indicating lateral movement"
+    severity: high
+    risk_score: 85
+    mitre_attack: [T1021.002]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: event_type
+          operator: equals
+          value: service_install
+        - field: service_name
+          operator: matches
+          value: "PSEXESVC*"
+    entity: host
+    response:
+      - create_notable_event
+      - enrich_source_host
+      - check_admin_activity
+
+  - rule_name: "EXA-LM-002: WMI Remote Process Creation"
+    description: "WMI provider spawning suspicious child process on remote system"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1047]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: parent_process
+          operator: equals
+          value: wmiprvse.exe
+        - field: process_name
+          operator: in
+          values: [cmd.exe, powershell.exe, pwsh.exe, mshta.exe]
+    entity: host
+    response:
+      - create_notable_event
+      - trace_lateral_path
+
+  - rule_name: "EXA-LM-003: RDP Lateral Movement"
+    description: "RDP connections between internal hosts - potential lateral movement"
+    severity: medium
+    risk_score: 65
+    mitre_attack: [T1021.001]
+    trigger:
+      type: correlation
+      data_source: network
+      conditions:
+        - field: dest_port
+          operator: equals
+          value: 3389
+        - field: src_zone
+          operator: equals
+          value: internal
+        - field: dest_zone
+          operator: equals
+          value: internal
+      time_window: 1h
+      threshold: 1
+      group_by: [src_host]
+      distinct_count:
+        field: dest_host
+        minimum: 3
+    entity: src_host
+    response:
+      - create_notable_event
+      - add_risk_score: 30
+
+  - rule_name: "EXA-LM-004: Admin Share Access"
+    description: "Access to administrative shares (ADMIN$, C$, IPC$) from non-admin workstation"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1021.002]
+    trigger:
+      type: real_time
+      data_source: windows_security
+      conditions:
+        - field: event_id
+          operator: equals
+          value: 5140
+        - field: share_name
+          operator: matches_any
+          values: ["*ADMIN$*", "*C$*"]
+        - field: src_host
+          operator: not_in
+          value: "$admin_workstations"
+    entity: src_user
+    response:
+      - create_notable_event
+      - verify_admin_authorization
+
+  - rule_name: "EXA-LM-005: WinRM Remote Execution"
+    description: "Windows Remote Management spawning processes on remote systems"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1021.006]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: parent_process
+          operator: equals
+          value: wsmprovhost.exe
+        - field: process_name
+          operator: in
+          values: [cmd.exe, powershell.exe, pwsh.exe]
+    entity: host
+    response:
+      - create_notable_event
+
+  - rule_name: "EXA-LM-006: Pass-the-Hash Detection"
+    description: "NTLM authentication with NewCredentials logon type indicating PtH"
+    severity: critical
+    risk_score: 90
+    mitre_attack: [T1550.002]
+    trigger:
+      type: real_time
+      data_source: windows_security
+      conditions:
+        - field: event_id
+          operator: equals
+          value: 4624
+        - field: logon_type
+          operator: equals
+          value: 9
+        - field: auth_package
+          operator: equals
+          value: Negotiate
+    entity: src_user
+    response:
+      - create_critical_incident
+      - reset_user_credentials
+
+  - rule_name: "EXA-LM-007: SSH Lateral Movement Chain"
+    description: "SSH connections chaining through multiple internal hosts"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1021.004]
+    trigger:
+      type: sequence
+      data_source: authentication
+      conditions:
+        - step1:
+            field: protocol
+            value: ssh
+            outcome: success
+        - step2:
+            field: protocol
+            value: ssh
+            outcome: success
+            src_host: step1.dest_host
+      time_window: 30m
+    entity: src_user
+    response:
+      - create_notable_event
+      - build_lateral_movement_map
+
+  - rule_name: "EXA-LM-008: Anomalous Host-to-Host Communication (UEBA)"
+    description: "First-time communication between hosts that have no historical baseline"
+    severity: medium
+    risk_score: 60
+    mitre_attack: [T1021]
+    trigger:
+      type: anomaly
+      model: host_communication_baseline
+      conditions:
+        - field: dest_host
+          deviation: first_time_connection
+        - field: dest_port
+          operator: in
+          values: [445, 135, 3389, 5985, 5986, 22]
+    entity: src_host
+    smart_timeline: true
+    response:
+      - add_risk_score: 20
+      - enrich_connection_context

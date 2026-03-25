@@ -1,0 +1,96 @@
+<!-- Wazuh Detection Rules: Exfiltration -->
+<!-- MITRE ATT&CK Tactic: TA0010 - Exfiltration -->
+<!-- Rule IDs: 100200-100214 -->
+
+<group name="exfiltration,mitre_ta0010,">
+
+  <!-- T1048.003 - Exfiltration Over Unencrypted Protocol -->
+  <rule id="100200" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(ftp\s+-s:|tftp\s|curl.*-T\s|curl.*--upload|scp\s.*@)</field>
+    <description>Exfiltration: Data transfer via command-line tool - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1048.003</id>
+    </mitre>
+    <group>data_exfiltration,</group>
+  </rule>
+
+  <!-- T1567 - Exfiltration to Cloud Storage -->
+  <rule id="100201" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(rclone|megasync|gdrive|dropbox|onedrive|aws\s+s3\s+cp|azcopy|gsutil\s+cp)</field>
+    <description>Exfiltration: Cloud storage tool execution - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>cloud_exfiltration,</group>
+  </rule>
+
+  <!-- T1048.001 - DNS Exfiltration (Long DNS Queries) -->
+  <rule id="100202" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(nslookup\s+[a-z0-9]{30,}|Resolve-DnsName.*[a-z0-9]{30,})</field>
+    <description>Exfiltration: Possible DNS exfiltration - unusually long DNS query</description>
+    <mitre>
+      <id>T1048.001</id>
+    </mitre>
+    <group>dns_exfiltration,</group>
+  </rule>
+
+  <!-- T1041 - Exfiltration Over C2 Channel (certutil) -->
+  <rule id="100203" level="12">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)certutil.*-urlcache.*-split.*-f\s+http</field>
+    <description>Exfiltration: Certutil used for data transfer - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+    <group>certutil_transfer,lolbas,</group>
+  </rule>
+
+  <!-- T1567.001 - Exfiltration to Code Repository -->
+  <rule id="100204" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(git\s+push|svn\s+commit|git\s+remote\s+add)</field>
+    <description>Exfiltration: Code repository push detected - possible data exfil via VCS</description>
+    <mitre>
+      <id>T1567.001</id>
+    </mitre>
+    <group>vcs_exfiltration,</group>
+  </rule>
+
+  <!-- T1052.001 - Exfiltration over USB -->
+  <rule id="100205" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)[A-Z]:\\\\.*\.(zip|7z|rar|tar|gz|doc|xls|pdf|pst|ost)</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)explorer\.exe</field>
+    <description>Exfiltration: Sensitive file type written to removable drive</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>usb_exfiltration,</group>
+  </rule>
+
+  <!-- T1560.001 - Archive Collected Data -->
+  <rule id="100206" level="8">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(7z\s+a|rar\s+a|zip\s+-r|Compress-Archive|tar\s+(czf|cjf|cf))</field>
+    <description>Exfiltration: Data archiving detected (staging for exfil) - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1560.001</id>
+    </mitre>
+    <group>data_staging,archive,</group>
+  </rule>
+
+  <!-- T1048.002 - Exfiltration Over Asymmetric Encrypted Non-C2 Protocol -->
+  <rule id="100207" level="10">
+    <if_sid>61601</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(openssl\s+s_client|ncat\s+--ssl|socat\s+openssl)</field>
+    <description>Exfiltration: Encrypted channel tool usage for possible data exfil</description>
+    <mitre>
+      <id>T1048.002</id>
+    </mitre>
+    <group>encrypted_exfiltration,</group>
+  </rule>
+
+</group>

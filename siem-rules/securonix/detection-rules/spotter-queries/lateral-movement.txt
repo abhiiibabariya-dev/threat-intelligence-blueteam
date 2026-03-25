@@ -1,0 +1,36 @@
+# Securonix Spotter Queries - Lateral Movement
+# MITRE ATT&CK Tactic: TA0008
+
+# SQ-LM-001: PsExec Detection (T1021.002)
+index = activity AND categoryobject = "Service" AND categoryoutcome = "Installed"
+| where resourcecustomfield1 MATCHES "(?i).*psexe(svc|c).*"
+| fields datetime, accountname, devicename, sourceaddress, resourcecustomfield1
+
+# SQ-LM-002: WMI Remote Process (T1047)
+index = activity AND categoryobject = "Process" AND sourceprocessname = "wmiprvse.exe"
+| where objectname IN ("cmd.exe", "powershell.exe", "pwsh.exe", "mshta.exe")
+| fields datetime, accountname, devicename, objectname, resourcecustomfield2
+
+# SQ-LM-003: RDP Lateral Movement (T1021.001)
+index = activity AND baseeventid = "4624" AND resourcecustomfield1 = "10"
+| stats dc(devicename) as unique_targets by sourceaddress, accountname
+| where unique_targets > 2
+| sort -unique_targets
+| fields sourceaddress, accountname, unique_targets
+
+# SQ-LM-004: Admin Share Access (T1021.002)
+index = activity AND baseeventid = "5140"
+| where objectname MATCHES ".*(ADMIN\\$|C\\$|IPC\\$).*"
+| fields datetime, accountname, sourceaddress, devicename, objectname
+
+# SQ-LM-005: Pass-the-Hash (T1550.002)
+index = activity AND baseeventid = "4624" AND resourcecustomfield1 = "9"
+| where resourcecustomfield4 = "Negotiate"
+| fields datetime, accountname, sourceaddress, devicename
+
+# SQ-LM-006: Internal Network Scanning (T1046)
+index = activity AND categoryobject = "Network Connection"
+| where sourceaddress STARTS WITH "10." OR sourceaddress STARTS WITH "192.168."
+| stats dc(destinationport) as unique_ports, dc(destinationaddress) as unique_targets by sourceaddress
+| where unique_ports > 20 OR unique_targets > 50
+| fields sourceaddress, unique_ports, unique_targets

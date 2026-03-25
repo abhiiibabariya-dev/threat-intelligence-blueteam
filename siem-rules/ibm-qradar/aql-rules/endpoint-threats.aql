@@ -1,0 +1,146 @@
+-- =============================================================================
+-- IBM QRadar AQL Rules: Endpoint Threats
+-- =============================================================================
+-- Description:  Detect endpoint threats including suspicious process execution,
+--               binary anomalies, and service manipulation.
+-- MITRE ATT&CK: T1059 (Command and Scripting), T1543 (System Process)
+-- Severity:     Medium to Critical
+-- Log Sources:  Windows Security, Sysmon, EDR
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Rule 1: Suspicious Process Execution (LOLBins)
+-- MITRE: T1218 - System Binary Proxy Execution
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Host",
+    username AS "User",
+    "Image" AS "Process",
+    "CommandLine" AS "Command Line",
+    "ParentImage" AS "Parent Process",
+    DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm:ss') AS "Time"
+FROM events
+WHERE LOGSOURCETYPENAME(logsourcetypeid) = 'Microsoft Windows Security Event Log'
+    AND "EventID" = '4688'
+    AND (
+        "NewProcessName" LIKE '%\mshta.exe' OR
+        "NewProcessName" LIKE '%\certutil.exe' OR
+        "NewProcessName" LIKE '%\regsvr32.exe' OR
+        "NewProcessName" LIKE '%\rundll32.exe' OR
+        "NewProcessName" LIKE '%\msbuild.exe' OR
+        "NewProcessName" LIKE '%\cmstp.exe' OR
+        "NewProcessName" LIKE '%\installutil.exe'
+    )
+    AND (
+        "CommandLine" LIKE '%http%' OR
+        "CommandLine" LIKE '%javascript%' OR
+        "CommandLine" LIKE '%script%' OR
+        "CommandLine" LIKE '%decode%' OR
+        "CommandLine" LIKE '%urlcache%'
+    )
+ORDER BY starttime DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 2: Suspicious PowerShell Activity
+-- MITRE: T1059.001 - PowerShell
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Host",
+    username AS "User",
+    "CommandLine" AS "Command",
+    COUNT(*) AS "Occurrences",
+    DATEFORMAT(MIN(starttime), 'yyyy-MM-dd HH:mm:ss') AS "First Seen"
+FROM events
+WHERE "EventID" = '4688'
+    AND "NewProcessName" LIKE '%powershell%'
+    AND (
+        "CommandLine" ILIKE '%encodedcommand%' OR
+        "CommandLine" ILIKE '%-enc %' OR
+        "CommandLine" ILIKE '%downloadstring%' OR
+        "CommandLine" ILIKE '%invoke-expression%' OR
+        "CommandLine" ILIKE '%iex%' OR
+        "CommandLine" ILIKE '%bypass%' OR
+        "CommandLine" ILIKE '%hidden%' OR
+        "CommandLine" ILIKE '%frombase64%' OR
+        "CommandLine" ILIKE '%webclient%'
+    )
+GROUP BY sourceip, username, "CommandLine"
+ORDER BY "Occurrences" DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 3: Malicious Service Installation
+-- MITRE: T1543.003 - Create or Modify System Process: Windows Service
+-- Severity: High
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Host",
+    username AS "User",
+    "ServiceName" AS "Service Name",
+    "ServiceFileName" AS "Service Binary",
+    "ServiceStartType" AS "Start Type",
+    DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm:ss') AS "Time"
+FROM events
+WHERE "EventID" = '7045'
+    AND (
+        "ServiceFileName" LIKE '%\Temp\%' OR
+        "ServiceFileName" LIKE '%\AppData\%' OR
+        "ServiceFileName" LIKE '%powershell%' OR
+        "ServiceFileName" LIKE '%cmd.exe%' OR
+        "ServiceFileName" LIKE '%\ProgramData\%' OR
+        "ServiceFileName" LIKE '%.bat%' OR
+        "ServiceFileName" LIKE '%.ps1%'
+    )
+ORDER BY starttime DESC
+LAST 7 DAYS
+
+-- ---------------------------------------------------------------------------
+-- Rule 4: Credential Dumping Tool Detection
+-- MITRE: T1003 - OS Credential Dumping
+-- Severity: Critical
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Host",
+    username AS "User",
+    "Image" AS "Process",
+    "CommandLine" AS "Command",
+    DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm:ss') AS "Time"
+FROM events
+WHERE "EventID" = '4688'
+    AND (
+        "CommandLine" ILIKE '%mimikatz%' OR
+        "CommandLine" ILIKE '%sekurlsa%' OR
+        "CommandLine" ILIKE '%lsadump%' OR
+        "CommandLine" ILIKE '%procdump%lsass%' OR
+        "CommandLine" ILIKE '%comsvcs%MiniDump%' OR
+        "CommandLine" ILIKE '%ntdsutil%'
+    )
+ORDER BY starttime DESC
+LAST 24 HOURS
+
+-- ---------------------------------------------------------------------------
+-- Rule 5: Process Execution from Unusual Directories
+-- MITRE: T1036 - Masquerading
+-- Severity: Medium
+-- ---------------------------------------------------------------------------
+SELECT
+    sourceip AS "Host",
+    username AS "User",
+    "NewProcessName" AS "Process Path",
+    "CommandLine" AS "Command",
+    COUNT(*) AS "Executions"
+FROM events
+WHERE "EventID" = '4688'
+    AND (
+        "NewProcessName" LIKE '%\Temp\%.exe' OR
+        "NewProcessName" LIKE '%\Downloads\%.exe' OR
+        "NewProcessName" LIKE '%\AppData\Local\Temp\%.exe' OR
+        "NewProcessName" LIKE '%\Public\%.exe' OR
+        "NewProcessName" LIKE '%\Recycle%\%.exe'
+    )
+GROUP BY sourceip, username, "NewProcessName", "CommandLine"
+ORDER BY "Executions" DESC
+LAST 24 HOURS

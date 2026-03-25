@@ -1,0 +1,122 @@
+` ===================================================================
+` Splunk Detection Rules: Command and Control
+` ===================================================================
+` MITRE ATT&CK: T1071 (Application Layer Protocol), T1572 (Protocol Tunneling),
+`               T1573 (Encrypted Channel)
+` Severity:     Medium to High
+` Data Sources: Proxy, DNS, Network, Firewall
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Rule 1: C2 Beaconing Detection (Regular Interval Analysis)
+` MITRE: T1071 - Application Layer Protocol
+` ---------------------------------------------------------------------------
+index=proxy sourcetype=proxy
+| where action="allowed" AND bytes_out > 0
+| sort 0 src_ip, dest, _time
+| streamstats current=f window=2 last(_time) as prev_time by src_ip, dest
+| eval interval=_time - prev_time
+| where interval > 10 AND interval < 7200
+| stats count as BeaconCount,
+        avg(interval) as AvgInterval,
+        stdev(interval) as StdevInterval,
+        min(interval) as MinInterval,
+        max(interval) as MaxInterval,
+        earliest(_time) as FirstSeen,
+        latest(_time) as LastSeen
+    by src_ip, dest
+| where BeaconCount > 20
+| eval Jitter=round((StdevInterval/AvgInterval)*100, 1)
+| where Jitter < 20
+| eval BeaconScore=case(
+    Jitter < 5 AND BeaconCount > 50, 95,
+    Jitter < 10 AND BeaconCount > 30, 80,
+    Jitter < 15, 65,
+    1=1, 50
+)
+| where BeaconScore >= 65
+| eval AlertName="C2 Beaconing Detected"
+| eval Severity=case(BeaconScore >= 90, "Critical", BeaconScore >= 75, "High", 1=1, "Medium")
+| eval MITREAttack="T1071"
+| table _time, AlertName, src_ip, dest, BeaconCount, AvgInterval, Jitter, BeaconScore, Severity
+
+` ---------------------------------------------------------------------------
+` Rule 2: DNS C2 Communication
+` MITRE: T1071.004 - Application Layer Protocol: DNS
+` ---------------------------------------------------------------------------
+index=dns sourcetype=dns
+| eval query_len=len(query)
+| eval subdomain=mvindex(split(query, "."), 0)
+| eval sub_len=len(subdomain)
+| eval has_hex=if(match(subdomain, "^[0-9a-fA-F]+$"), 1, 0)
+| eval has_base64=if(match(subdomain, "^[A-Za-z0-9+/=]+$") AND sub_len > 20, 1, 0)
+| stats count as QueryCount,
+        dc(query) as UniqueQueries,
+        avg(sub_len) as AvgSubLen,
+        max(sub_len) as MaxSubLen,
+        sum(has_hex) as HexQueries,
+        sum(has_base64) as Base64Queries,
+        values(query_type) as QueryTypes
+    by src_ip, query
+| rex field=query "\.(?<basedomain>[^\.]+\.[^\.]+)$"
+| stats sum(QueryCount) as TotalQueries,
+        sum(UniqueQueries) as TotalUniqueQueries,
+        avg(AvgSubLen) as OverallAvgSubLen,
+        max(MaxSubLen) as OverallMaxSubLen
+    by src_ip, basedomain
+| where TotalQueries > 100 AND TotalUniqueQueries > 50 AND OverallAvgSubLen > 20
+| eval AlertName="DNS C2 Channel Suspected"
+| eval Severity="High"
+| eval MITREAttack="T1071.004"
+
+` ---------------------------------------------------------------------------
+` Rule 3: Known C2 Framework Detection
+` MITRE: T1071, T1573
+` ---------------------------------------------------------------------------
+index=proxy sourcetype=proxy
+| where (url="*/api/v1/beacon*" OR url="*/submit.php*" OR url="*/pixel.gif*"
+    OR url="*/__utm.gif*" OR url="*/updates.rss*" OR url="*/fwlink*")
+| eval C2Framework=case(
+    match(url, "beacon|stager"), "Cobalt Strike",
+    match(url, "submit\.php"), "Metasploit",
+    match(url, "agent|staging"), "Empire/Covenant",
+    match(url, "__utm\.gif"), "Cobalt Strike Malleable",
+    1=1, "Unknown C2"
+)
+| stats count by src_ip, dest, url, C2Framework, user_agent
+| eval AlertName="Known C2 Framework Communication"
+| eval Severity="Critical"
+| eval MITREAttack="T1071,T1573"
+
+` ---------------------------------------------------------------------------
+` Rule 4: TOR Network Usage
+` MITRE: T1090.003 - Proxy: Multi-hop Proxy
+` ---------------------------------------------------------------------------
+index=network sourcetype=firewall
+| where dest_port IN (9001, 9030, 9050, 9051, 9150)
+    OR [| inputlookup tor_exit_nodes.csv | fields ip | rename ip as dest_ip]
+| stats count as Connections,
+        sum(bytes_out) as TotalBytesOut,
+        dc(dest_ip) as UniqueNodes,
+        earliest(_time) as FirstSeen,
+        latest(_time) as LastSeen
+    by src_ip
+| eval AlertName="TOR Network Communication"
+| eval Severity="High"
+| eval MITREAttack="T1090.003"
+
+` ---------------------------------------------------------------------------
+` Rule 5: Encrypted Channel on Non-Standard Port
+` MITRE: T1573 - Encrypted Channel
+` ---------------------------------------------------------------------------
+index=network sourcetype=firewall
+| where dest_port NOT IN (443, 8443, 993, 995, 465, 636)
+| where app="ssl" OR app="tls"
+| stats count as Connections,
+        dc(dest_ip) as UniqueDestinations,
+        values(dest_port) as Ports
+    by src_ip
+| where Connections > 10
+| eval AlertName="Encrypted Traffic on Non-Standard Port"
+| eval Severity="Medium"
+| eval MITREAttack="T1573"

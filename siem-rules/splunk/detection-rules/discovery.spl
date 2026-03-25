@@ -1,0 +1,74 @@
+` ===================================================================
+` Splunk Detection Rules: Discovery
+` ===================================================================
+` MITRE ATT&CK: T1046 (Network Scanning), T1087 (Account Discovery),
+`               T1082 (System Information Discovery)
+` Severity:     Low to Medium
+` Data Sources: Sysmon, Windows Security, Network
+` ===================================================================
+
+` ---------------------------------------------------------------------------
+` Rule 1: Internal Network Scanning
+` MITRE: T1046 - Network Service Scanning
+` ---------------------------------------------------------------------------
+index=network sourcetype=firewall direction=internal
+| stats dc(dest_port) as UniquePortsScanned,
+        dc(dest_ip) as UniqueHostsScanned,
+        count as TotalConnections,
+        values(dest_port) as Ports
+    by src_ip, _time span=5m
+| where (UniquePortsScanned > 20) OR (UniqueHostsScanned > 15)
+| eval ScanType=case(
+    UniquePortsScanned > 20 AND UniqueHostsScanned < 3, "Vertical Port Scan",
+    UniqueHostsScanned > 15 AND UniquePortsScanned < 3, "Horizontal Sweep",
+    1=1, "Combined Scan"
+)
+| eval AlertName="Internal Network Scan Detected"
+| eval Severity=case(UniquePortsScanned > 100 OR UniqueHostsScanned > 50, "High", 1=1, "Medium")
+| eval MITREAttack="T1046"
+
+` ---------------------------------------------------------------------------
+` Rule 2: Active Directory Enumeration
+` MITRE: T1087.002 - Account Discovery: Domain Account
+` ---------------------------------------------------------------------------
+index=wineventlog sourcetype=WinEventLog:Security
+    (EventCode=4661 OR EventCode=4662)
+    ObjectType="SAM_*"
+| stats count as EnumCount,
+        dc(ObjectName) as UniqueObjects,
+        values(ObjectName) as ObjectList
+    by SubjectUserName, ComputerName
+| where EnumCount > 50
+| eval AlertName="Active Directory Enumeration Detected"
+| eval Severity="Medium"
+| eval MITREAttack="T1087.002"
+
+` ---------------------------------------------------------------------------
+` Rule 3: System Information Discovery Commands
+` MITRE: T1082 - System Information Discovery
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+| where CommandLine IN ("*systeminfo*", "*hostname*", "*whoami*",
+    "*ipconfig /all*", "*net config*", "*ver*", "*set*")
+| bin _time span=5m
+| stats dc(CommandLine) as UniqueCommands,
+        count as CommandCount,
+        values(CommandLine) as Commands
+    by Computer, User, _time
+| where UniqueCommands >= 4
+| eval AlertName="Automated System Discovery"
+| eval Severity="Medium"
+| eval MITREAttack="T1082"
+
+` ---------------------------------------------------------------------------
+` Rule 4: BloodHound / SharpHound Collection
+` MITRE: T1087.002, T1069.002 - Domain Account/Group Discovery
+` ---------------------------------------------------------------------------
+index=sysmon EventCode=1
+    (CommandLine="*SharpHound*" OR CommandLine="*BloodHound*"
+    OR CommandLine="*Invoke-BloodHound*" OR CommandLine="*-CollectionMethod*All*"
+    OR Image="*\\SharpHound.exe")
+| eval AlertName="BloodHound/SharpHound AD Enumeration"
+| eval Severity="Critical"
+| eval MITREAttack="T1087.002,T1069.002"
+| table _time, Computer, User, Image, CommandLine, AlertName, Severity

@@ -1,0 +1,45 @@
+// =============================================================================
+// Microsoft Defender for Endpoint - Lateral Movement Detection
+// MITRE ATT&CK: T1021, T1550, T1047
+// =============================================================================
+
+// Query 1: PsExec Lateral Movement
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where FileName =~ "PsExec.exe" or FileName =~ "PsExec64.exe"
+    or (InitiatingProcessFileName =~ "services.exe" and FileName =~ "PSEXESVC.exe")
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine
+
+// Query 2: WMI Remote Process Execution
+DeviceProcessEvents
+| where Timestamp > ago(1d)
+| where InitiatingProcessFileName =~ "wmiprvse.exe"
+| where FileName in~ ("cmd.exe", "powershell.exe", "cscript.exe", "wscript.exe", "mshta.exe")
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine
+
+// Query 3: SMB Lateral Movement Pattern
+DeviceNetworkEvents
+| where Timestamp > ago(1d)
+| where RemotePort == 445 and ActionType == "ConnectionSuccess"
+| summarize TargetCount = dcount(RemoteIP), Targets = make_set(RemoteIP, 10)
+    by DeviceName, InitiatingProcessFileName, bin(Timestamp, 1h)
+| where TargetCount >= 3
+
+// Query 4: Pass-the-Hash Detection
+DeviceLogonEvents
+| where Timestamp > ago(1d)
+| where LogonType == "Network"
+| where Protocol == "NTLM"
+| where not(AccountName endswith "$")
+| summarize LogonCount = count(), UniqueTargets = dcount(DeviceName)
+    by AccountName, RemoteIP, bin(Timestamp, 1h)
+| where UniqueTargets >= 3
+
+// Query 5: RDP Lateral Movement Chain
+DeviceLogonEvents
+| where Timestamp > ago(1d)
+| where LogonType == "RemoteInteractive"
+| summarize RDPSessions = count(), UniqueTargets = dcount(DeviceName),
+    TargetList = make_set(DeviceName, 10)
+    by AccountName, RemoteIP
+| where UniqueTargets >= 3

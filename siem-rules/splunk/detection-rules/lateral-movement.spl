@@ -1,0 +1,313 @@
+` ============================================================================
+` Splunk SPL Detection Rules - Lateral Movement (TA0008)
+` ============================================================================
+` These rules detect adversary techniques for moving through the network
+` after initial compromise, mapped to MITRE ATT&CK Lateral Movement tactic.
+`
+` Required Data Sources:
+`   - Windows Security Event Logs (WinEventLog:Security)
+`   - Sysmon (XmlWinEventLog:Microsoft-Windows-Sysmon/Operational)
+`   - Windows System Event Logs
+`   - Network traffic / firewall logs
+`
+` Usage: Deploy as saved searches or ES correlation searches in Splunk.
+` ============================================================================
+
+
+` ============================================================================
+` Rule 1: PsExec Remote Execution Detection
+` ============================================================================
+` Rule Name:    lateral-movement-psexec-usage
+` Description:  Detects the use of PsExec or PsExec-like tools for remote
+`               command execution. PsExec creates a service (PSEXESVC) on
+`               the remote host and uses named pipes for communication. This
+`               rule monitors for the service installation event, named pipe
+`               creation, and characteristic process execution patterns.
+` MITRE ATT&CK: T1570 - Lateral Tool Transfer
+`               T1021.002 - Remote Services: SMB/Windows Admin Shares
+` Tactic:       Lateral Movement (TA0008)
+` Severity:     High
+` Data Sources: Sysmon Event ID 1 (Process Create), Event ID 13 (Registry),
+`               Event ID 17/18 (Pipe Created/Connected),
+`               Windows System Event ID 7045 (Service Install)
+` False Positives: Legitimate IT administration using PsExec for remote
+`                  management, SCCM deployments
+` ============================================================================
+
+index=windows
+    (sourcetype="WinEventLog:System" EventCode=7045
+        (Service_Name="PSEXESVC" OR Service_Name="csexec*" OR Service_Name="paexec*"
+         OR ImagePath="*PSEXESVC*" OR ImagePath="*csexec*" OR ImagePath="*paexec*"))
+    OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+        (Image="*\\PsExec.exe" OR Image="*\\PsExec64.exe"
+         OR OriginalFileName="psexec.c" OR OriginalFileName="PsExec.exe"))
+    OR (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        (EventCode=17 OR EventCode=18)
+        PipeName="\\PSEXESVC*")
+| eval event_type=case(
+    EventCode=7045, "service_install",
+    EventCode=1, "process_create",
+    EventCode=17 OR EventCode=18, "named_pipe")
+| eval detail=case(
+    EventCode=7045, Service_Name." - ".ImagePath,
+    EventCode=1, Image." - ".CommandLine,
+    EventCode=17 OR EventCode=18, PipeName)
+| eval acting_user=coalesce(User, Service_Start_Type, "unknown")
+| stats count as event_count
+        values(event_type) as detection_methods
+        values(detail) as details
+        values(acting_user) as users
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| eval severity="HIGH"
+| table host, users, detection_methods, details, event_count,
+        first_seen, last_seen, severity
+| sort -event_count
+
+
+` ============================================================================
+` Rule 2: WMI Remote Execution Detection
+` ============================================================================
+` Rule Name:    lateral-movement-wmi-remote-execution
+` Description:  Detects Windows Management Instrumentation (WMI) being used
+`               for remote process execution. Adversaries use wmic.exe,
+`               PowerShell's Invoke-WmiMethod, or WMI providers to execute
+`               commands on remote systems. Monitors for WMI process creation
+`               events and suspicious WMIC command lines targeting remote
+`               hosts.
+` MITRE ATT&CK: T1047 - Windows Management Instrumentation
+` Tactic:       Lateral Movement (TA0008), Execution (TA0002)
+` Severity:     High
+` Data Sources: Sysmon Event ID 1 (Process Create), Windows Security
+`               Event ID 4688, WMI Operational logs
+` False Positives: SCCM, Intune, and other management tools using WMI for
+`                  inventory and configuration
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+    (Image="*\\wmic.exe" AND CommandLine="*/node:*")
+    OR (Image="*\\wmic.exe" AND CommandLine="*process call create*")
+    OR (ParentImage="*\\WmiPrvSE.exe"
+        AND NOT Image IN ("*\\WmiPrvSE.exe", "*\\WerFault.exe", "*\\svchost.exe"))
+    OR (Image="*\\powershell.exe" AND CommandLine="*Invoke-WmiMethod*"
+        AND CommandLine="*-ComputerName*")
+    OR (Image="*\\powershell.exe" AND CommandLine="*Invoke-CimMethod*"
+        AND CommandLine="*-ComputerName*")
+| eval exec_type=case(
+    match(CommandLine, "(?i)/node:"), "wmic_remote",
+    match(CommandLine, "(?i)process call create"), "wmic_process_create",
+    match(ParentImage, "(?i)wmiprvse"), "wmi_spawned_process",
+    match(CommandLine, "(?i)Invoke-WmiMethod"), "powershell_wmi",
+    match(CommandLine, "(?i)Invoke-CimMethod"), "powershell_cim",
+    1=1, "other_wmi")
+| eval target_host=case(
+    match(CommandLine, "(?i)/node:\"?([^\s\"]+)"), "extracted",
+    match(CommandLine, "(?i)-ComputerName\s+\"?([^\s\"]+)"), "extracted",
+    1=1, "local_or_unknown")
+| eval acting_user=User
+| stats count as execution_count
+        values(exec_type) as wmi_methods
+        values(CommandLine) as commands
+        values(ParentImage) as parent_processes
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user, Image
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, Image, wmi_methods, commands, parent_processes,
+        execution_count, first_seen, last_seen
+| sort -execution_count
+
+
+` ============================================================================
+` Rule 3: RDP Brute Force and Anomalous RDP Activity
+` ============================================================================
+` Rule Name:    lateral-movement-rdp-anomalous-activity
+` Description:  Detects anomalous RDP (Remote Desktop Protocol) usage
+`               including brute force attempts against RDP (multiple failed
+`               logons of type 10), successful RDP logons from unusual
+`               source IPs, and RDP connections to hosts that do not
+`               typically receive RDP sessions.
+` MITRE ATT&CK: T1021.001 - Remote Services: Remote Desktop Protocol
+` Tactic:       Lateral Movement (TA0008)
+` Severity:     High (brute force), Medium (anomalous usage)
+` Data Sources: Windows Security Event ID 4625 (Logon Type 10),
+`               Event ID 4624 (Logon Type 10), Network firewall logs
+` False Positives: Legitimate remote administration, help desk support
+`                  sessions, jump server activity
+` ============================================================================
+
+index=windows sourcetype="WinEventLog:Security"
+    (EventCode=4625 Logon_Type=10) OR (EventCode=4624 Logon_Type=10)
+| eval login_status=if(EventCode=4624, "success", "failure")
+| eval src_ip=Source_Network_Address
+| eval target_account=case(
+    EventCode=4624, Account_Name,
+    EventCode=4625, mvindex(Account_Name, 1),
+    1=1, "unknown")
+| where src_ip!="-" AND src_ip!="127.0.0.1" AND target_account!="*$"
+| bucket _time span=15m
+| stats count(eval(login_status="failure")) as failed_rdp
+        count(eval(login_status="success")) as success_rdp
+        dc(target_account) as unique_accounts
+        values(target_account) as accounts_targeted
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by src_ip, host, _time
+| eval alert_type=case(
+    failed_rdp >= 15 AND success_rdp=0, "rdp_brute_force",
+    failed_rdp >= 10 AND success_rdp > 0, "rdp_brute_force_with_success",
+    failed_rdp >= 5 AND unique_accounts >= 3, "rdp_password_spray",
+    success_rdp > 0, "rdp_successful_login",
+    1=1, "rdp_activity")
+| where failed_rdp >= 10 OR alert_type="rdp_brute_force_with_success"
+| eval severity=case(
+    alert_type="rdp_brute_force_with_success", "CRITICAL",
+    alert_type="rdp_brute_force", "HIGH",
+    alert_type="rdp_password_spray", "HIGH",
+    1=1, "MEDIUM")
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table src_ip, host, alert_type, failed_rdp, success_rdp, unique_accounts,
+        accounts_targeted, first_seen, last_seen, severity
+| sort -severity, -failed_rdp
+
+
+` ============================================================================
+` Rule 4: SMB Lateral Movement Detection
+` ============================================================================
+` Rule Name:    lateral-movement-smb-admin-shares
+` Description:  Detects lateral movement via SMB administrative shares
+`               (C$, ADMIN$, IPC$). Adversaries use these shares to copy
+`               tools, access files, and execute payloads on remote systems.
+`               Monitors for network logons (Type 3) combined with access
+`               to administrative shares from non-standard sources.
+` MITRE ATT&CK: T1021.002 - Remote Services: SMB/Windows Admin Shares
+` Tactic:       Lateral Movement (TA0008)
+` Severity:     Medium
+` Data Sources: Windows Security Event ID 5140/5145 (Share Access),
+`               Event ID 4624 (Logon Type 3), Sysmon Event ID 3 (Network)
+` False Positives: File server access, Group Policy processing, legitimate
+`                  admin tools, backup software
+` ============================================================================
+
+index=windows sourcetype="WinEventLog:Security" EventCode=5140
+    (Share_Name="\\\\*\\C$" OR Share_Name="\\\\*\\ADMIN$" OR Share_Name="\\\\*\\IPC$")
+| eval src_ip=Source_Address
+| eval share_accessed=Share_Name
+| eval requester=Account_Name
+| eval requester_domain=Account_Domain
+| where src_ip!="-" AND src_ip!="127.0.0.1" AND requester!="*$"
+| search NOT
+    [| inputlookup known_admin_workstations
+     | fields admin_ip
+     | rename admin_ip as src_ip]
+| bucket _time span=1h
+| stats count as share_access_count
+        dc(Share_Name) as unique_shares
+        dc(host) as unique_targets
+        values(share_accessed) as shares_accessed
+        values(host) as target_hosts
+        earliest(_time) as first_access
+        latest(_time) as last_access
+        by src_ip, requester, requester_domain, _time
+| where share_access_count >= 3 OR unique_targets >= 2
+| eval first_access=strftime(first_access, "%Y-%m-%d %H:%M:%S")
+| eval last_access=strftime(last_access, "%Y-%m-%d %H:%M:%S")
+| eval severity=if(unique_targets >= 3, "HIGH", "MEDIUM")
+| table src_ip, requester, requester_domain, shares_accessed, unique_targets,
+        target_hosts, share_access_count, first_access, last_access, severity
+| sort -unique_targets, -share_access_count
+
+
+` ============================================================================
+` Rule 5: WinRM Remote Execution Detection
+` ============================================================================
+` Rule Name:    lateral-movement-winrm-abuse
+` Description:  Detects Windows Remote Management (WinRM) being used for
+`               remote code execution. WinRM is the underlying transport for
+`               PowerShell Remoting (Invoke-Command, Enter-PSSession). While
+`               WinRM is a legitimate admin protocol, adversaries abuse it
+`               for fileless lateral movement. Detects unusual WinRM
+`               connections and PowerShell remoting activity.
+` MITRE ATT&CK: T1021.006 - Remote Services: Windows Remote Management
+` Tactic:       Lateral Movement (TA0008)
+` Severity:     Medium
+` Data Sources: Sysmon Event ID 1 (Process Create), Windows Security
+`               Event ID 4624 (Logon Type 3), WinRM Operational Logs,
+`               PowerShell ScriptBlock logs
+` False Positives: Legitimate PowerShell remoting by administrators, DSC
+`                  (Desired State Configuration), Ansible/Chef/Puppet
+` ============================================================================
+
+index=windows
+    (sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+        ((Image="*\\wsmprovhost.exe")
+         OR (Image="*\\powershell.exe"
+             AND (CommandLine="*Invoke-Command*-ComputerName*"
+                  OR CommandLine="*Enter-PSSession*"
+                  OR CommandLine="*New-PSSession*"
+                  OR CommandLine="*-Session*$*"))))
+    OR (sourcetype="WinEventLog:Microsoft-Windows-WinRM/Operational"
+        EventCode IN (6, 91, 168))
+| eval activity_type=case(
+    match(Image, "(?i)wsmprovhost"), "winrm_session_host",
+    match(CommandLine, "(?i)Invoke-Command"), "ps_invoke_command",
+    match(CommandLine, "(?i)Enter-PSSession"), "ps_interactive_session",
+    match(CommandLine, "(?i)New-PSSession"), "ps_new_session",
+    isnotnull(EventCode) AND sourcetype="WinEventLog:Microsoft-Windows-WinRM/Operational", "winrm_operational",
+    1=1, "other_winrm")
+| eval acting_user=coalesce(User, "unknown")
+| eval process_detail=coalesce(CommandLine, Message, "N/A")
+| stats count as event_count
+        values(activity_type) as activities
+        values(process_detail) as details
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host, acting_user
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| table host, acting_user, activities, details, event_count,
+        first_seen, last_seen
+| sort -event_count
+
+
+` ============================================================================
+` Rule 6: Remote Service Session Hijacking via RDP
+` ============================================================================
+` Rule Name:    lateral-movement-rdp-session-hijack
+` Description:  Detects RDP session hijacking where an attacker uses
+`               tscon.exe to connect to a disconnected RDP session without
+`               credentials. This allows an attacker with SYSTEM privileges
+`               to hijack another user's active or disconnected session.
+` MITRE ATT&CK: T1563.002 - Remote Service Session Hijacking: RDP Hijacking
+` Tactic:       Lateral Movement (TA0008)
+` Severity:     Critical
+` Data Sources: Sysmon Event ID 1 (Process Create), Windows Security
+`               Event ID 4688
+` False Positives: Rarely used legitimately; very low false positive rate
+` ============================================================================
+
+index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+    Image="*\\tscon.exe"
+| eval cmdline=CommandLine
+| eval parent=ParentImage
+| eval acting_user=User
+| eval session_id_target=if(match(cmdline, "(\d+)"), "session_targeted", "unknown")
+| where NOT match(parent, "(?i)(explorer\.exe|rdpclip\.exe)")
+| stats count as hijack_attempts
+        values(cmdline) as commands
+        values(parent) as parent_processes
+        values(acting_user) as users
+        earliest(_time) as first_seen
+        latest(_time) as last_seen
+        by host
+| eval first_seen=strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+| eval severity="CRITICAL"
+| eval alert="Potential RDP session hijacking via tscon.exe"
+| table host, users, commands, parent_processes, hijack_attempts,
+        first_seen, last_seen, severity, alert

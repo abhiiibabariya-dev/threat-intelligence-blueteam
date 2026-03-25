@@ -1,0 +1,62 @@
+# Trend Micro Vision One - Custom Detection Models
+---
+models:
+  - name: "VM1-001: Encoded PowerShell Execution"
+    severity: high
+    mitre: [T1059.001]
+    filter: "eventType:TELEMETRY_PROCESS AND processCmd:\"*powershell*-enc*\""
+    response: [alert]
+
+  - name: "VM1-002: Office Macro Spawning Shell"
+    severity: critical
+    mitre: [T1204.002]
+    filter: "eventType:TELEMETRY_PROCESS AND parentCmd:(\"*winword*\" OR \"*excel*\") AND processCmd:(\"*cmd.exe*\" OR \"*powershell*\" OR \"*wscript*\")"
+    response: [alert, isolate_endpoint]
+
+  - name: "VM1-003: LSASS Memory Access"
+    severity: critical
+    mitre: [T1003.001]
+    filter: "eventType:TELEMETRY_PROCESS AND objectCmd:\"*lsass*\" AND NOT processCmd:(\"*csrss*\" OR \"*svchost*\")"
+    response: [alert, isolate_endpoint]
+
+  - name: "VM1-004: PsExec Lateral Movement"
+    severity: high
+    mitre: [T1021.002]
+    filter: "eventType:TELEMETRY_PROCESS AND parentCmd:\"*psexesvc*\""
+    response: [alert]
+
+  - name: "VM1-005: Shadow Copy Deletion (Ransomware)"
+    severity: critical
+    mitre: [T1490]
+    filter: "eventType:TELEMETRY_PROCESS AND processCmd:(\"*vssadmin*delete*shadow*\" OR \"*wmic*shadowcopy*delete*\")"
+    response: [alert, isolate_endpoint, terminate_process]
+
+  - name: "VM1-006: LOLBAS Download"
+    severity: high
+    mitre: [T1105]
+    filter: "eventType:TELEMETRY_PROCESS AND processCmd:(\"*certutil*-urlcache*\" OR \"*bitsadmin*/transfer*\") AND processCmd:\"*http*\""
+    response: [alert]
+
+  - name: "VM1-007: Registry Run Key Persistence"
+    severity: medium
+    mitre: [T1547.001]
+    filter: "eventType:TELEMETRY_REGISTRY AND objectRegistryKeyHandle:\"*\\CurrentVersion\\Run*\""
+    response: [alert]
+
+  - name: "VM1-008: Tunneling Tool Execution"
+    severity: high
+    mitre: [T1572]
+    filter: "eventType:TELEMETRY_PROCESS AND processCmd:(\"*chisel*\" OR \"*ngrok*\" OR \"*cloudflared*\" OR \"*plink*\")"
+    response: [alert]
+
+  - name: "VM1-009: Suspicious DNS Query"
+    severity: medium
+    mitre: [T1071.004]
+    filter: "eventType:TELEMETRY_DNS AND objectDomain:(\"*.tk\" OR \"*.xyz\" OR \"*.top\" OR \"*.buzz\" OR \"*.onion\")"
+    response: [alert]
+
+  - name: "VM1-010: Windows Defender Disabled"
+    severity: critical
+    mitre: [T1562.001]
+    filter: "eventType:TELEMETRY_PROCESS AND processCmd:(\"*Set-MpPreference*DisableRealtimeMonitoring*\" OR \"*sc stop WinDefend*\")"
+    response: [alert, isolate_endpoint]

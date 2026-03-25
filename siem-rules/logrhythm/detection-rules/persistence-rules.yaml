@@ -1,0 +1,62 @@
+# LogRhythm - Persistence Detection Rules
+---
+rules:
+  - rule_name: "LR-PER-001: Registry Run Key Persistence"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1547.001]
+    filter: {event_id: 13, registry_path_contains: "\\CurrentVersion\\Run"}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-PER-002: Suspicious Service Binary"
+    rule_type: threshold
+    severity: critical
+    risk_rating: 9
+    mitre: [T1543.003]
+    filter:
+      event_id: 7045
+      service_path_regex: "(cmd|powershell|mshta|wscript|\\\\temp\\\\|\\\\appdata\\\\)"
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm, smartresponse: "Stop Service"]
+
+  - rule_name: "LR-PER-003: Scheduled Task via CLI"
+    rule_type: threshold
+    severity: high
+    risk_rating: 7
+    mitre: [T1053.005]
+    filter: {command_contains_all: ["schtasks", "/create"], command_contains_any: ["/sc minute", "/ru system"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-PER-004: New Local Admin Account"
+    rule_type: behavioral
+    severity: critical
+    risk_rating: 9
+    mitre: [T1136.001]
+    behavioral_sequence:
+      - step: 1
+        filter: {event_id: 4720}
+      - step: 2
+        filter: {event_id: 4732, group_name: "Administrators"}
+        time_after_previous_seconds: 300
+    actions: [create_alarm, smartresponse: "Disable Account"]
+
+  - rule_name: "LR-PER-005: WMI Persistence"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1546.003]
+    filter: {command_contains_any: ["__EventFilter", "__EventConsumer", "ActiveScriptEventConsumer"]}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]
+
+  - rule_name: "LR-PER-006: SSH Key Backdoor"
+    rule_type: threshold
+    severity: high
+    risk_rating: 8
+    mitre: [T1098.004]
+    filter: {object_name_contains: ".ssh/authorized_keys", classification: "File Modification"}
+    threshold: {count: 1, time_window_seconds: 60}
+    actions: [create_alarm]

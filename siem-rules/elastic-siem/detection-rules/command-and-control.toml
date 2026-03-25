@@ -1,0 +1,90 @@
+# Elastic SIEM Detection Rules: Command and Control
+# MITRE ATT&CK: T1071, T1573, T1572, T1090
+
+[rule]
+rule_id = "e1a06001-0001-4000-8000-000000000001"
+risk_score = 70
+severity = "high"
+name = "Known C2 Framework User-Agent Detected"
+description = "Detects HTTP traffic with user-agent strings associated with known C2 frameworks."
+type = "query"
+index = ["packetbeat-*", "filebeat-*"]
+language = "kuery"
+query = '''http.request.headers.user-agent: ("Mozilla/5.0 (compatible; MSIE 6.0;)" or "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)" or "Internet Explorer" or "" ) and not destination.ip: (10.0.0.0/8 or 172.16.0.0/12 or 192.168.0.0/16)'''
+tags = ["C2", "T1071"]
+
+[[rule.threat]]
+framework = "MITRE ATT&CK"
+[[rule.threat.technique]]
+id = "T1071"
+name = "Application Layer Protocol"
+reference = "https://attack.mitre.org/techniques/T1071/"
+[rule.threat.tactic]
+id = "TA0011"
+name = "Command and Control"
+reference = "https://attack.mitre.org/tactics/TA0011/"
+
+[rule_2]
+rule_id = "e1a06001-0002-4000-8000-000000000002"
+risk_score = 55
+severity = "medium"
+name = "TLS/SSL Traffic on Non-Standard Port"
+description = "Detects encrypted traffic on non-standard ports potentially indicating C2 encrypted channels."
+type = "query"
+index = ["packetbeat-*", "logs-*"]
+language = "kuery"
+query = '''tls.established: true and not destination.port: (443 or 8443 or 993 or 995 or 465 or 636 or 5986) and not destination.ip: (10.0.0.0/8 or 172.16.0.0/12 or 192.168.0.0/16)'''
+tags = ["C2", "T1573"]
+
+[[rule_2.threat]]
+framework = "MITRE ATT&CK"
+[[rule_2.threat.technique]]
+id = "T1573"
+name = "Encrypted Channel"
+reference = "https://attack.mitre.org/techniques/T1573/"
+[rule_2.threat.tactic]
+id = "TA0011"
+name = "Command and Control"
+reference = "https://attack.mitre.org/tactics/TA0011/"
+
+[rule_3]
+rule_id = "e1a06001-0003-4000-8000-000000000003"
+risk_score = 65
+severity = "medium"
+name = "TOR Network Connection Attempt"
+description = "Detects outbound connections to TOR network relay ports."
+type = "query"
+index = ["packetbeat-*", "logs-*", "filebeat-*"]
+language = "kuery"
+query = '''destination.port: (9001 or 9030 or 9050 or 9051 or 9150) and not destination.ip: (10.0.0.0/8 or 172.16.0.0/12 or 192.168.0.0/16)'''
+tags = ["C2", "T1090.003"]
+
+[[rule_3.threat]]
+framework = "MITRE ATT&CK"
+[[rule_3.threat.technique]]
+id = "T1090"
+name = "Proxy"
+reference = "https://attack.mitre.org/techniques/T1090/"
+[[rule_3.threat.technique.subtechnique]]
+id = "T1090.003"
+name = "Multi-hop Proxy"
+reference = "https://attack.mitre.org/techniques/T1090/003/"
+[rule_3.threat.tactic]
+id = "TA0011"
+name = "Command and Control"
+reference = "https://attack.mitre.org/tactics/TA0011/"
+
+[rule_4]
+rule_id = "e1a06001-0004-4000-8000-000000000004"
+risk_score = 75
+severity = "high"
+name = "Cobalt Strike Default Named Pipe"
+description = "Detects creation of named pipes commonly used by Cobalt Strike beacon."
+type = "eql"
+index = ["winlogbeat-*", "logs-endpoint.events.*"]
+language = "eql"
+query = '''
+file where event.type == "creation" and
+  file.name : ("\\\\*\\pipe\\msagent_*", "\\\\*\\pipe\\MSSE-*", "\\\\*\\pipe\\postex_*", "\\\\*\\pipe\\status_*", "\\\\*\\pipe\\mojo.*")
+'''
+tags = ["C2", "Cobalt Strike", "T1071"]

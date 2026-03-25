@@ -1,0 +1,119 @@
+# Exabeam Fusion - Exfiltration Detection Rules
+# MITRE ATT&CK Tactic: TA0010
+---
+rules:
+  - rule_name: "EXA-EX-001: DNS Data Exfiltration"
+    description: "Unusually long DNS queries suggesting DNS tunneling/exfiltration"
+    severity: high
+    risk_score: 85
+    mitre_attack: [T1048.001]
+    trigger:
+      type: correlation
+      data_source: dns
+      conditions:
+        - field: query_length
+          operator: greater_than
+          value: 50
+        - field: query_type
+          operator: in
+          values: [TXT, NULL, CNAME]
+      time_window: 1h
+      threshold: 20
+      group_by: [src_host]
+    entity: src_host
+    response: [create_notable_event, block_dns_domain, investigate_host]
+
+  - rule_name: "EXA-EX-002: Cloud Storage Exfiltration"
+    description: "Large uploads to cloud storage services (rclone, mega, gdrive)"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1567.002]
+    trigger:
+      type: real_time
+      data_source: endpoint
+      conditions:
+        - field: process_name
+          operator: in
+          values: [rclone.exe, megasync.exe, gdrive.exe, onedrive.exe]
+        - field: bytes_sent
+          operator: greater_than
+          value: 104857600  # 100MB
+    entity: src_user
+    response: [create_notable_event, block_upload, alert_dlp]
+
+  - rule_name: "EXA-EX-003: Anomalous Data Upload Volume (UEBA)"
+    description: "User uploading significantly more data than their baseline"
+    severity: high
+    risk_score: 80
+    mitre_attack: [T1041]
+    trigger:
+      type: anomaly
+      model: user_data_upload_baseline
+      conditions:
+        - field: bytes_uploaded
+          deviation: 4_sigma
+      time_window: 24h
+    entity: src_user
+    peer_group: department
+    response: [create_notable_event, generate_data_flow_report]
+
+  - rule_name: "EXA-EX-004: USB Mass Storage Data Copy"
+    description: "Large data transfer to USB removable storage"
+    severity: high
+    risk_score: 75
+    mitre_attack: [T1052.001]
+    trigger:
+      type: correlation
+      data_source: endpoint
+      conditions:
+        - field: device_type
+          operator: equals
+          value: removable_storage
+        - field: bytes_written
+          operator: greater_than
+          value: 52428800  # 50MB
+    entity: src_user
+    response: [create_notable_event, notify_manager]
+
+  - rule_name: "EXA-EX-005: Email Bulk Attachment Exfiltration"
+    description: "User sending multiple emails with attachments to external recipients"
+    severity: medium
+    risk_score: 70
+    mitre_attack: [T1048.003]
+    trigger:
+      type: correlation
+      data_source: email
+      conditions:
+        - field: direction
+          value: outbound
+        - field: recipient_domain
+          operator: not_in
+          value: "$corporate_domains"
+        - field: has_attachment
+          value: true
+      time_window: 1h
+      threshold: 10
+      group_by: [sender]
+    entity: sender
+    response: [create_notable_event, quarantine_emails]
+
+  - rule_name: "EXA-EX-006: Archive Creation Before Transfer"
+    description: "Data archived (zip/7z/rar) followed by network transfer"
+    severity: medium
+    risk_score: 65
+    mitre_attack: [T1560.001, T1041]
+    trigger:
+      type: sequence
+      conditions:
+        - step1:
+            field: command_line
+            operator: matches_any
+            values: ["*7z a*", "*rar a*", "*zip -r*", "*Compress-Archive*"]
+        - step2:
+            field: event_type
+            value: network_connection
+            dest_zone: external
+            time_after_step1: 30m
+      group_by: [host]
+    entity: src_user
+    response: [create_notable_event, capture_network_traffic]
