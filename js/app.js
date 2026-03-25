@@ -162,6 +162,7 @@ const pageData = {
     usecases: { title: "DETECTION USE CASE LIBRARY", type: "BLUE TEAM", desc: "100+ detection use cases mapped to MITRE ATT&CK", features: ["12 MITRE ATT&CK tactics covered", "Multi-SIEM query examples (SPL, KQL, AQL)", "False positive guidance", "Response action recommendations", "Severity scoring"], path: "../blue-team-resources/detection-engineering/" },
     ir: { title: "INCIDENT RESPONSE PLAYBOOKS", type: "BLUE TEAM", desc: "8 comprehensive IR playbooks", features: ["Phishing Response", "Ransomware Response", "Data Breach Response", "Insider Threat Response", "DDoS Response", "Supply Chain Compromise", "Cloud Security Incident", "Business Email Compromise"], path: "../blue-team-resources/incident-response/" },
     hunting: { title: "THREAT HUNTING PLAYBOOKS", type: "BLUE TEAM", desc: "Hypothesis-driven threat hunting", features: ["20+ hunting hypotheses", "Ransomware pre-encryption", "APT persistence", "Insider data theft", "Living-off-the-land", "C2 communication patterns", "Query examples (SPL + KQL)"], path: "../threat-intelligence/threat-hunting/" },
+    rulebuilder: { title: "RULE BUILDER", type: "TOOL", desc: "Drag-and-drop visual SIEM rule & use case builder", features: ["Visual drag-and-drop rule composition", "7 SIEM platform output formats", "MITRE ATT&CK tactic mapping", "Use case metadata & export", "Splunk SPL, Sentinel KQL, QRadar AQL, Elastic EQL, Wazuh XML, Chronicle YARA-L, Sigma"], path: "interactive" },
 };
 
 function loadPage(pageId) {
@@ -366,4 +367,862 @@ function animateStats() {
         el.style.width = '0%';
         setTimeout(() => { el.style.width = width; }, 300);
     });
+}
+
+// ═══════════════════════════════════════════════════════
+// RULE BUILDER - Drag & Drop Visual Detection Rule Builder
+// ═══════════════════════════════════════════════════════
+
+const rbComponents = {
+    datasource: {
+        label: 'Data Sources',
+        items: ['Windows Event Log', 'Syslog', 'Firewall', 'DNS', 'Proxy', 'Cloud Trail', 'EDR Telemetry', 'Network Flow']
+    },
+    tactic: {
+        label: 'MITRE Tactics',
+        items: ['Initial Access', 'Execution', 'Persistence', 'Privilege Escalation', 'Defense Evasion', 'Credential Access', 'Discovery', 'Lateral Movement', 'Collection', 'Exfiltration', 'C2', 'Impact']
+    },
+    condition: {
+        label: 'Conditions / Logic',
+        items: ['AND', 'OR', 'NOT', 'COUNT >', 'THRESHOLD', 'TIME WINDOW', 'SEQUENCE', 'AGGREGATION']
+    },
+    field: {
+        label: 'Fields',
+        items: ['Source IP', 'Dest IP', 'Username', 'Process Name', 'Command Line', 'File Hash', 'URL', 'Domain', 'Port', 'Registry Key', 'Parent Process', 'Service Name']
+    },
+    action: {
+        label: 'Actions',
+        items: ['Alert', 'Block', 'Quarantine', 'Isolate Host', 'Disable Account', 'Email Notify', 'Ticket Create', 'Enrich IOC']
+    },
+    severity: {
+        label: 'Severity',
+        items: ['Critical', 'High', 'Medium', 'Low', 'Informational']
+    }
+};
+
+const rbLanes = [
+    { id: 'datasource', label: 'Data Sources', accepts: ['datasource'] },
+    { id: 'tactic', label: 'MITRE Tactics', accepts: ['tactic'] },
+    { id: 'condition', label: 'Conditions & Fields', accepts: ['condition', 'field'] },
+    { id: 'action', label: 'Actions & Severity', accepts: ['action', 'severity'] }
+];
+
+// MITRE tactic to ID mapping
+const mitreTacticMap = {
+    'Initial Access': 'TA0001', 'Execution': 'TA0002', 'Persistence': 'TA0003',
+    'Privilege Escalation': 'TA0004', 'Defense Evasion': 'TA0005', 'Credential Access': 'TA0006',
+    'Discovery': 'TA0007', 'Lateral Movement': 'TA0008', 'Collection': 'TA0009',
+    'Exfiltration': 'TA0010', 'C2': 'TA0011', 'Impact': 'TA0040'
+};
+
+// Field name mapping for queries
+const fieldMap = {
+    'Source IP': { splunk: 'src_ip', kql: 'SourceIP', aql: 'sourceip', eql: 'source.ip', wazuh: 'srcip', yaral: 'principal.ip', sigma: 'src_ip' },
+    'Dest IP': { splunk: 'dest_ip', kql: 'DestinationIP', aql: 'destinationip', eql: 'destination.ip', wazuh: 'dstip', yaral: 'target.ip', sigma: 'dst_ip' },
+    'Username': { splunk: 'user', kql: 'AccountName', aql: 'username', eql: 'user.name', wazuh: 'dstuser', yaral: 'principal.user.userid', sigma: 'User' },
+    'Process Name': { splunk: 'process_name', kql: 'ProcessName', aql: '"Process Name"', eql: 'process.name', wazuh: 'data.win.eventdata.image', yaral: 'principal.process.file.full_path', sigma: 'Image' },
+    'Command Line': { splunk: 'process', kql: 'CommandLine', aql: '"Command Line"', eql: 'process.command_line', wazuh: 'data.win.eventdata.commandLine', yaral: 'principal.process.command_line', sigma: 'CommandLine' },
+    'File Hash': { splunk: 'file_hash', kql: 'FileHash', aql: '"File Hash"', eql: 'file.hash.sha256', wazuh: 'syscheck.sha256_after', yaral: 'target.file.sha256', sigma: 'Hashes' },
+    'URL': { splunk: 'url', kql: 'Url', aql: 'url', eql: 'url.original', wazuh: 'data.url', yaral: 'target.url', sigma: 'TargetUrl' },
+    'Domain': { splunk: 'query', kql: 'DomainName', aql: '"DNS Domain"', eql: 'dns.question.name', wazuh: 'data.win.eventdata.queryName', yaral: 'network.dns.questions.name', sigma: 'QueryName' },
+    'Port': { splunk: 'dest_port', kql: 'DestinationPort', aql: 'destinationport', eql: 'destination.port', wazuh: 'dstport', yaral: 'target.port', sigma: 'DestinationPort' },
+    'Registry Key': { splunk: 'registry_path', kql: 'RegistryKey', aql: '"Registry Key"', eql: 'registry.path', wazuh: 'data.win.eventdata.targetObject', yaral: 'target.registry.registry_key', sigma: 'TargetObject' },
+    'Parent Process': { splunk: 'parent_process_name', kql: 'ParentProcessName', aql: '"Parent Process"', eql: 'process.parent.name', wazuh: 'data.win.eventdata.parentImage', yaral: 'principal.process.parent_process.file.full_path', sigma: 'ParentImage' },
+    'Service Name': { splunk: 'service_name', kql: 'ServiceName', aql: '"Service Name"', eql: 'service.name', wazuh: 'data.win.eventdata.serviceName', yaral: 'target.resource.name', sigma: 'ServiceName' }
+};
+
+// Data source index mapping
+const dsMap = {
+    'Windows Event Log': { splunk: 'index=wineventlog', kql: 'SecurityEvent', aql: "SELECT * FROM events WHERE devicetype = 12", eql: 'any where true', wazuh: '<if_group>windows</if_group>', yaral: 'events', sigma: 'windows' },
+    'Syslog': { splunk: 'index=syslog', kql: 'Syslog', aql: "SELECT * FROM events WHERE devicetype = 11", eql: 'any where event.module == "system"', wazuh: '<if_group>syslog</if_group>', yaral: 'events', sigma: 'linux' },
+    'Firewall': { splunk: 'index=firewall', kql: 'CommonSecurityLog', aql: "SELECT * FROM events WHERE category = 'Firewall'", eql: 'any where event.category == "network"', wazuh: '<if_group>firewall</if_group>', yaral: 'events', sigma: 'firewall' },
+    'DNS': { splunk: 'index=dns', kql: 'DnsEvents', aql: "SELECT * FROM events WHERE category = 'DNS'", eql: 'dns where true', wazuh: '<if_group>ossec-dns</if_group>', yaral: 'events', sigma: 'dns_query' },
+    'Proxy': { splunk: 'index=proxy', kql: 'WebProxy', aql: "SELECT * FROM events WHERE category = 'Web'", eql: 'any where event.category == "web"', wazuh: '<if_group>web-log</if_group>', yaral: 'events', sigma: 'proxy' },
+    'Cloud Trail': { splunk: 'index=aws sourcetype=aws:cloudtrail', kql: 'AWSCloudTrail', aql: "SELECT * FROM events WHERE devicetype = 347", eql: 'any where event.provider == "cloudtrail"', wazuh: '<if_group>amazon</if_group>', yaral: 'events', sigma: 'aws' },
+    'EDR Telemetry': { splunk: 'index=edr', kql: 'DeviceEvents', aql: "SELECT * FROM events WHERE category = 'Endpoint'", eql: 'process where true', wazuh: '<if_group>sysmon</if_group>', yaral: 'events', sigma: 'process_creation' },
+    'Network Flow': { splunk: 'index=netflow', kql: 'AzureNetworkAnalytics_CL', aql: "SELECT * FROM flows", eql: 'network where true', wazuh: '<if_group>netflow</if_group>', yaral: 'events', sigma: 'network_connection' }
+};
+
+let rbCanvasState = {
+    datasource: [],
+    tactic: [],
+    condition: [],
+    action: []
+};
+
+function loadRuleBuilder() {
+    document.getElementById('dashboard').classList.add('hidden');
+    const content = document.getElementById('page-content');
+    content.classList.remove('hidden');
+
+    // Reset canvas state
+    rbCanvasState = { datasource: [], tactic: [], condition: [], action: [] };
+
+    // Build palette HTML
+    let paletteHtml = '';
+    for (const [cat, data] of Object.entries(rbComponents)) {
+        const itemsHtml = data.items.map(item =>
+            `<span class="rb-component" draggable="true" data-category="${cat}" data-value="${item}" ontouchstart="rbTouchAdd(this)">${item}</span>`
+        ).join('');
+        paletteHtml += `
+            <div class="rb-cat-header" onclick="rbToggleCat(this)">
+                ${data.label}
+                <span class="rb-cat-arrow open">&#9654;</span>
+            </div>
+            <div class="rb-cat-items open">${itemsHtml}</div>
+        `;
+    }
+
+    // Build lanes HTML
+    let lanesHtml = '';
+    rbLanes.forEach((lane, i) => {
+        lanesHtml += `
+            <div class="rb-lane" id="rb-lane-${lane.id}" data-lane="${lane.id}" data-accepts="${lane.accepts.join(',')}">
+                <div class="rb-lane-label">${lane.label}</div>
+                <div class="rb-lane-items" id="rb-lane-items-${lane.id}"></div>
+            </div>
+        `;
+        if (i < rbLanes.length - 1) {
+            lanesHtml += '<div class="rb-connector">&#9661;</div>';
+        }
+    });
+
+    content.innerHTML = `
+        <div class="rb-container">
+            <div class="rb-header">
+                <h1>&#x29C9; RULE &amp; USE CASE BUILDER</h1>
+                <button class="rb-back-btn" onclick="goHome()">&#9666; DASHBOARD</button>
+            </div>
+
+            <div class="rb-palette">
+                ${paletteHtml}
+            </div>
+
+            <div class="rb-canvas-wrapper">
+                <div class="rb-canvas-toolbar">
+                    <span class="rb-toolbar-label">CANVAS:</span>
+                    <button onclick="rbClearCanvas()">CLEAR ALL</button>
+                    <button onclick="rbAutoPopulate()">DEMO RULE</button>
+                </div>
+                <div class="rb-canvas" id="rb-canvas">
+                    <div class="rb-flow" id="rb-flow">
+                        ${lanesHtml}
+                    </div>
+                </div>
+            </div>
+
+            <div class="rb-output">
+                <div class="rb-output-section">
+                    <label>Platform Output</label>
+                    <select id="rb-platform" onchange="rbGenerateRule()">
+                        <option value="splunk">Splunk SPL</option>
+                        <option value="kql">Sentinel KQL</option>
+                        <option value="aql">QRadar AQL</option>
+                        <option value="eql">Elastic EQL</option>
+                        <option value="wazuh">Wazuh XML</option>
+                        <option value="yaral">Chronicle YARA-L</option>
+                        <option value="sigma">Sigma (Generic)</option>
+                    </select>
+                </div>
+
+                <div class="rb-output-section">
+                    <div class="rb-meta-grid">
+                        <div class="rb-meta-field">
+                            <label>Rule Name</label>
+                            <input type="text" id="rb-rule-name" placeholder="e.g. Suspicious Process Execution" oninput="rbGenerateRule()">
+                        </div>
+                        <div class="rb-meta-field">
+                            <label>Description</label>
+                            <textarea id="rb-rule-desc" rows="2" placeholder="Detection use case description..." oninput="rbGenerateRule()"></textarea>
+                        </div>
+                        <div class="rb-meta-field">
+                            <label>MITRE ATT&CK ID</label>
+                            <input type="text" id="rb-mitre-id" placeholder="Auto-populated from tactics" readonly>
+                        </div>
+                        <div class="rb-meta-field">
+                            <label>False Positive Guidance</label>
+                            <input type="text" id="rb-fp-guidance" placeholder="e.g. Admin scripts may trigger this" oninput="rbGenerateRule()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rb-code-area">
+                    <div class="rb-code-header">
+                        <span>Generated Rule</span>
+                        <div class="rb-code-actions">
+                            <button onclick="rbCopyRule()">COPY</button>
+                        </div>
+                    </div>
+                    <div class="rb-code-output" id="rb-code-output">// Drop components to generate a detection rule...</div>
+                </div>
+
+                <div class="rb-export-bar">
+                    <button onclick="rbCopyRule()">Copy to Clipboard</button>
+                    <button onclick="rbExport('yaml')">Export YAML</button>
+                    <button onclick="rbExport('json')">Export JSON</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Initialize drag-and-drop
+    rbInitDragDrop();
+
+    // Update active nav
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+}
+
+function rbToggleCat(el) {
+    const items = el.nextElementSibling;
+    const arrow = el.querySelector('.rb-cat-arrow');
+    items.classList.toggle('open');
+    arrow.classList.toggle('open');
+}
+
+function rbInitDragDrop() {
+    // Make palette components draggable
+    document.querySelectorAll('.rb-component').forEach(comp => {
+        comp.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                category: comp.dataset.category,
+                value: comp.dataset.value
+            }));
+            e.dataTransfer.effectAllowed = 'copy';
+            comp.style.opacity = '0.5';
+        });
+        comp.addEventListener('dragend', (e) => {
+            comp.style.opacity = '1';
+        });
+    });
+
+    // Set up drop zones (lanes)
+    document.querySelectorAll('.rb-lane').forEach(lane => {
+        lane.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            lane.classList.add('drag-over-lane');
+        });
+        lane.addEventListener('dragleave', (e) => {
+            lane.classList.remove('drag-over-lane');
+        });
+        lane.addEventListener('drop', (e) => {
+            e.preventDefault();
+            lane.classList.remove('drag-over-lane');
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                const accepts = lane.dataset.accepts.split(',');
+                if (accepts.includes(data.category)) {
+                    rbAddToLane(lane.dataset.lane, data.category, data.value);
+                }
+            } catch (err) {}
+        });
+    });
+}
+
+// Touch fallback: tap to add component to appropriate lane
+function rbTouchAdd(el) {
+    // Only use this as fallback on touch devices where drag doesn't work well
+    if ('ontouchstart' in window) {
+        const cat = el.dataset.category;
+        const val = el.dataset.value;
+        // Find the appropriate lane
+        for (const lane of rbLanes) {
+            if (lane.accepts.includes(cat)) {
+                rbAddToLane(lane.id, cat, val);
+                break;
+            }
+        }
+    }
+}
+
+function rbAddToLane(laneId, category, value) {
+    // Check if already in this lane
+    const items = rbCanvasState[laneId] || [];
+    if (items.some(i => i.value === value && i.category === category)) return;
+    items.push({ category, value });
+    rbCanvasState[laneId] = items;
+    rbRenderLane(laneId);
+    rbUpdateMitreId();
+    rbGenerateRule();
+}
+
+function rbRemoveFromLane(laneId, index) {
+    rbCanvasState[laneId].splice(index, 1);
+    rbRenderLane(laneId);
+    rbUpdateMitreId();
+    rbGenerateRule();
+}
+
+function rbRenderLane(laneId) {
+    const container = document.getElementById('rb-lane-items-' + laneId);
+    if (!container) return;
+    const items = rbCanvasState[laneId] || [];
+    container.innerHTML = items.map((item, i) =>
+        `<span class="rb-dropped rb-component" data-category="${item.category}">${item.value}<span class="rb-remove" onclick="rbRemoveFromLane('${laneId}', ${i})">&#10005;</span></span>`
+    ).join('');
+}
+
+function rbUpdateMitreId() {
+    const tactics = rbCanvasState.tactic || [];
+    const ids = tactics.map(t => mitreTacticMap[t.value]).filter(Boolean);
+    const mitreInput = document.getElementById('rb-mitre-id');
+    if (mitreInput) mitreInput.value = ids.join(', ');
+}
+
+function rbClearCanvas() {
+    rbCanvasState = { datasource: [], tactic: [], condition: [], action: [] };
+    rbLanes.forEach(l => rbRenderLane(l.id));
+    rbUpdateMitreId();
+    rbGenerateRule();
+}
+
+function rbAutoPopulate() {
+    rbClearCanvas();
+    // Demo: Suspicious PowerShell Execution
+    rbCanvasState = {
+        datasource: [{ category: 'datasource', value: 'Windows Event Log' }, { category: 'datasource', value: 'EDR Telemetry' }],
+        tactic: [{ category: 'tactic', value: 'Execution' }, { category: 'tactic', value: 'Defense Evasion' }],
+        condition: [
+            { category: 'field', value: 'Process Name' },
+            { category: 'field', value: 'Command Line' },
+            { category: 'field', value: 'Parent Process' },
+            { category: 'condition', value: 'AND' },
+            { category: 'condition', value: 'NOT' }
+        ],
+        action: [
+            { category: 'action', value: 'Alert' },
+            { category: 'action', value: 'Enrich IOC' },
+            { category: 'severity', value: 'High' }
+        ]
+    };
+    rbLanes.forEach(l => rbRenderLane(l.id));
+    const nameInput = document.getElementById('rb-rule-name');
+    const descInput = document.getElementById('rb-rule-desc');
+    const fpInput = document.getElementById('rb-fp-guidance');
+    if (nameInput) nameInput.value = 'Suspicious PowerShell Execution';
+    if (descInput) descInput.value = 'Detects encoded or obfuscated PowerShell commands commonly used by attackers for initial payload execution and defense evasion.';
+    if (fpInput) fpInput.value = 'Legitimate admin scripts using encoded commands, SCCM deployments';
+    rbUpdateMitreId();
+    rbGenerateRule();
+}
+
+// ── Rule Generation Engine ──
+
+function rbGenerateRule() {
+    const platform = document.getElementById('rb-platform')?.value || 'splunk';
+    const ruleName = document.getElementById('rb-rule-name')?.value || 'Untitled Rule';
+    const ruleDesc = document.getElementById('rb-rule-desc')?.value || '';
+    const mitreId = document.getElementById('rb-mitre-id')?.value || '';
+    const fpGuidance = document.getElementById('rb-fp-guidance')?.value || '';
+
+    const ds = rbCanvasState.datasource || [];
+    const tactics = rbCanvasState.tactic || [];
+    const condFields = rbCanvasState.condition || [];
+    const actSev = rbCanvasState.action || [];
+
+    const fields = condFields.filter(c => c.category === 'field');
+    const conditions = condFields.filter(c => c.category === 'condition');
+    const actions = actSev.filter(c => c.category === 'action');
+    const sevItems = actSev.filter(c => c.category === 'severity');
+    const severity = sevItems.length > 0 ? sevItems[0].value : 'Medium';
+
+    if (ds.length === 0 && fields.length === 0 && conditions.length === 0) {
+        document.getElementById('rb-code-output').textContent = '// Drop components onto the canvas to generate a detection rule...\n// Flow: Data Source -> Conditions/Fields -> Actions';
+        return;
+    }
+
+    let code = '';
+    switch (platform) {
+        case 'splunk': code = rbGenSplunk(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'kql': code = rbGenKQL(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'aql': code = rbGenAQL(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'eql': code = rbGenEQL(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'wazuh': code = rbGenWazuh(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'yaral': code = rbGenYARAL(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+        case 'sigma': code = rbGenSigma(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
+    }
+
+    const output = document.getElementById('rb-code-output');
+    if (output) output.textContent = code;
+}
+
+function rbSlug(name) {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function rbGenSplunk(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const dsStr = ds.length > 0 ? dsMap[ds[0].value]?.splunk || 'index=main' : 'index=main';
+    let search = dsStr;
+
+    if (fields.length > 0) {
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        const hasOr = conditions.some(c => c.value === 'OR');
+        const joiner = hasOr ? ' OR ' : ' ';
+        const fieldClauses = fields.map(f => {
+            const fn = fieldMap[f.value]?.splunk || f.value.toLowerCase().replace(/ /g, '_');
+            return `${fn}=*`;
+        });
+        if (hasNot && fieldClauses.length > 1) {
+            search += '\n| search ' + fieldClauses.slice(0, -1).join(joiner) + ' NOT ' + fieldClauses[fieldClauses.length - 1];
+        } else {
+            search += '\n| search ' + fieldClauses.join(joiner);
+        }
+    }
+
+    const hasCount = conditions.some(c => c.value === 'COUNT >');
+    const hasThreshold = conditions.some(c => c.value === 'THRESHOLD');
+    const hasTimeWindow = conditions.some(c => c.value === 'TIME WINDOW');
+    const hasAgg = conditions.some(c => c.value === 'AGGREGATION');
+
+    if (hasCount || hasThreshold || hasAgg) {
+        const groupBy = fields.length > 0 ? fieldMap[fields[0].value]?.splunk || 'src_ip' : 'src_ip';
+        search += `\n| stats count by ${groupBy}`;
+        search += '\n| where count > 5';
+    }
+
+    if (hasTimeWindow) {
+        search = `${dsStr} earliest=-15m latest=now\n` + search.split('\n').slice(1).join('\n');
+    }
+
+    const hasSequence = conditions.some(c => c.value === 'SEQUENCE');
+    if (hasSequence) {
+        search += '\n| transaction user maxspan=5m';
+    }
+
+    const actionStrs = actions.map(a => a.value.toLowerCase()).join(', ');
+
+    let result = `\`\`\` Splunk SPL Detection Rule \`\`\`
+\`\`\` Rule: ${name} \`\`\`
+\`\`\` Description: ${desc} \`\`\`
+\`\`\` MITRE ATT&CK: ${mitreId} \`\`\`
+\`\`\` Severity: ${severity} \`\`\`
+\`\`\` False Positives: ${fp} \`\`\`
+\`\`\` Response Actions: ${actionStrs || 'alert'} \`\`\`
+
+${search}
+| eval severity="${severity.toLowerCase()}"
+| eval mitre_attack="${mitreId}"`;
+
+    if (actions.some(a => a.value === 'Alert')) {
+        result += '\n| sendalert notable';
+    }
+
+    return result;
+}
+
+function rbGenKQL(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const dsStr = ds.length > 0 ? dsMap[ds[0].value]?.kql || 'SecurityEvent' : 'SecurityEvent';
+    let query = `// ${name}\n// ${desc}\n// MITRE: ${mitreId} | Severity: ${severity}\n// False Positives: ${fp}\n\n${dsStr}`;
+
+    const hasTimeWindow = conditions.some(c => c.value === 'TIME WINDOW');
+    if (hasTimeWindow) {
+        query += '\n| where TimeGenerated > ago(15m)';
+    }
+
+    if (fields.length > 0) {
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        const hasOr = conditions.some(c => c.value === 'OR');
+        const joiner = hasOr ? ' or ' : ' and ';
+        const clauses = fields.map(f => {
+            const fn = fieldMap[f.value]?.kql || f.value.replace(/ /g, '');
+            return `isnotempty(${fn})`;
+        });
+        if (hasNot && clauses.length > 1) {
+            const last = clauses.pop();
+            query += '\n| where ' + clauses.join(joiner) + ' and not(' + last + ')';
+        } else {
+            query += '\n| where ' + clauses.join(joiner);
+        }
+    }
+
+    const hasCount = conditions.some(c => c.value === 'COUNT >');
+    const hasThreshold = conditions.some(c => c.value === 'THRESHOLD');
+    const hasAgg = conditions.some(c => c.value === 'AGGREGATION');
+
+    if (hasCount || hasThreshold || hasAgg) {
+        const groupBy = fields.length > 0 ? fieldMap[fields[0].value]?.kql || 'SourceIP' : 'SourceIP';
+        query += `\n| summarize Count = count() by ${groupBy}`;
+        query += '\n| where Count > 5';
+    }
+
+    const hasSequence = conditions.some(c => c.value === 'SEQUENCE');
+    if (hasSequence && fields.length > 0) {
+        const groupBy = fieldMap[fields[0].value]?.kql || 'AccountName';
+        query += `\n| order by TimeGenerated asc\n| serialize\n| extend SessionId = row_number(1, prev(${groupBy}) != ${groupBy})`;
+    }
+
+    query += `\n| extend AlertSeverity = "${severity}"`;
+    query += `\n| extend MitreAttack = "${mitreId}"`;
+
+    return query;
+}
+
+function rbGenAQL(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const dsStr = ds.length > 0 ? dsMap[ds[0].value]?.aql || "SELECT * FROM events" : "SELECT * FROM events";
+    let query = `-- ${name}\n-- ${desc}\n-- MITRE: ${mitreId} | Severity: ${severity}\n-- False Positives: ${fp}\n\n`;
+
+    const fieldNames = fields.map(f => fieldMap[f.value]?.aql || `"${f.value}"`);
+    const selectFields = fieldNames.length > 0 ? fieldNames.join(', ') : '*';
+    const baseFrom = dsStr.includes('SELECT') ? dsStr.replace('SELECT * FROM', `SELECT ${selectFields},\n    LOGSOURCENAME(logsourceid) as log_source FROM`) : `SELECT ${selectFields} FROM events`;
+
+    query += baseFrom;
+
+    if (fields.length > 0) {
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        const hasOr = conditions.some(c => c.value === 'OR');
+        const joiner = hasOr ? ' OR ' : ' AND ';
+        const clauses = fields.map(f => {
+            const fn = fieldMap[f.value]?.aql || `"${f.value}"`;
+            return `${fn} IS NOT NULL`;
+        });
+
+        const whereExists = baseFrom.includes('WHERE');
+        const prefix = whereExists ? '\n    AND ' : '\n WHERE ';
+
+        if (hasNot && clauses.length > 1) {
+            const last = clauses.pop();
+            query += prefix + clauses.join(joiner) + ' AND NOT ' + last;
+        } else {
+            query += prefix + clauses.join(joiner);
+        }
+    }
+
+    const hasCount = conditions.some(c => c.value === 'COUNT >');
+    const hasThreshold = conditions.some(c => c.value === 'THRESHOLD');
+    if (hasCount || hasThreshold) {
+        const groupBy = fields.length > 0 ? fieldMap[fields[0].value]?.aql || 'sourceip' : 'sourceip';
+        query += `\n GROUP BY ${groupBy}\n HAVING COUNT(*) > 5`;
+    }
+
+    const hasTimeWindow = conditions.some(c => c.value === 'TIME WINDOW');
+    if (hasTimeWindow) {
+        query += "\n    AND DATERANGE('last 15 minutes')";
+    }
+
+    query += `\n ORDER BY starttime DESC\n LAST 100`;
+
+    return query;
+}
+
+function rbGenEQL(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const dsBase = ds.length > 0 ? dsMap[ds[0].value]?.eql || 'any where true' : 'any where true';
+    const parts = dsBase.split(' where ');
+    const eventType = parts[0];
+    let whereClauses = parts[1] && parts[1] !== 'true' ? [parts[1]] : [];
+
+    let query = `/* ${name} */\n/* ${desc} */\n/* MITRE: ${mitreId} | Severity: ${severity} */\n/* False Positives: ${fp} */\n\n`;
+
+    if (fields.length > 0) {
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        const hasOr = conditions.some(c => c.value === 'OR');
+        const joiner = hasOr ? ' or ' : ' and ';
+        const clauses = fields.map(f => {
+            const fn = fieldMap[f.value]?.eql || f.value.toLowerCase().replace(/ /g, '.');
+            return `${fn} != null`;
+        });
+        if (hasNot && clauses.length > 1) {
+            const last = clauses.pop();
+            whereClauses.push(clauses.join(joiner) + ' and not ' + last);
+        } else {
+            whereClauses.push(clauses.join(joiner));
+        }
+    }
+
+    const hasSequence = conditions.some(c => c.value === 'SEQUENCE');
+    if (hasSequence && fields.length >= 2) {
+        const f1 = fieldMap[fields[0].value]?.eql || 'process.name';
+        const f2 = fieldMap[fields[1].value]?.eql || 'process.command_line';
+        query += `sequence by user.name with maxspan=5m\n  [${eventType} where ${f1} != null]\n  [${eventType} where ${f2} != null]`;
+    } else {
+        const allWhere = whereClauses.length > 0 ? whereClauses.join(' and ') : 'true';
+        query += `${eventType} where ${allWhere}`;
+    }
+
+    return query;
+}
+
+function rbGenWazuh(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const sevLevel = { 'Critical': '15', 'High': '12', 'Medium': '8', 'Low': '4', 'Informational': '2' };
+    const level = sevLevel[severity] || '8';
+    const ruleId = 100000 + Math.floor(Math.random() * 9000);
+
+    const mitreIds = mitreId.split(',').map(s => s.trim()).filter(Boolean);
+    const mitreTags = mitreIds.map(id => `      <mitre>\n        <id>${id}</id>\n      </mitre>`).join('\n');
+
+    let fieldMatch = '';
+    if (fields.length > 0) {
+        fields.forEach(f => {
+            const fn = fieldMap[f.value]?.wazuh || f.value.toLowerCase().replace(/ /g, '_');
+            fieldMatch += `    <field name="${fn}">\\.+</field>\n`;
+        });
+    }
+
+    const dsGroup = ds.length > 0 ? dsMap[ds[0].value]?.wazuh || '<if_group>syslog</if_group>' : '<if_group>syslog</if_group>';
+
+    let activeResponse = '';
+    if (actions.some(a => a.value === 'Block' || a.value === 'Isolate Host')) {
+        activeResponse = `\n  <!-- Active Response -->\n  <active-response>\n    <command>firewall-drop</command>\n    <location>local</location>\n    <rules_id>${ruleId}</rules_id>\n    <timeout>600</timeout>\n  </active-response>`;
+    }
+
+    const hasCount = conditions.some(c => c.value === 'COUNT >' || c.value === 'THRESHOLD');
+    let freqBlock = '';
+    if (hasCount) {
+        freqBlock = `    <frequency>5</frequency>\n    <timeframe>300</timeframe>\n`;
+    }
+
+    return `<!-- ${name} -->
+<!-- ${desc} -->
+<!-- MITRE: ${mitreId} | Severity: ${severity} -->
+<!-- False Positives: ${fp} -->
+
+<group name="${rbSlug(name)},">
+  <rule id="${ruleId}" level="${level}">
+    ${dsGroup}
+${freqBlock}${fieldMatch}    <description>${name}: ${desc}</description>
+    <options>no_full_log</options>
+    <group>${rbSlug(name)},${mitreIds.join(',')},</group>
+${mitreTags}
+  </rule>
+</group>${activeResponse}`;
+}
+
+function rbGenYARAL(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const slug = rbSlug(name);
+    const sevMap = { 'Critical': 'CRITICAL', 'High': 'HIGH', 'Medium': 'MEDIUM', 'Low': 'LOW', 'Informational': 'INFORMATIONAL' };
+    const sev = sevMap[severity] || 'MEDIUM';
+
+    let eventFilter = '';
+    if (fields.length > 0) {
+        const clauses = fields.map(f => {
+            const fn = fieldMap[f.value]?.yaral || 'principal.hostname';
+            return `      $e.${fn} != ""`;
+        });
+        const hasOr = conditions.some(c => c.value === 'OR');
+        const joiner = hasOr ? ' or\n' : ' and\n';
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        if (hasNot && clauses.length > 1) {
+            const last = clauses.pop();
+            eventFilter = clauses.join(joiner) + ' and\n      not ' + last.trim();
+        } else {
+            eventFilter = clauses.join(joiner);
+        }
+    }
+
+    let matchSection = '';
+    const hasCount = conditions.some(c => c.value === 'COUNT >' || c.value === 'THRESHOLD');
+    if (hasCount) {
+        const groupBy = fields.length > 0 ? `$e.${fieldMap[fields[0].value]?.yaral || 'principal.ip'}` : '$e.principal.ip';
+        matchSection = `\n  match:\n    ${groupBy} over 15m\n\n  condition:\n    #e > 5`;
+    } else {
+        matchSection = '\n  condition:\n    $e';
+    }
+
+    const hasTimeWindow = conditions.some(c => c.value === 'TIME WINDOW');
+    const windowClause = hasTimeWindow ? ' over 15m' : '';
+
+    return `// ${name}
+// ${desc}
+// MITRE: ${mitreId} | Severity: ${severity}
+// False Positives: ${fp}
+
+rule ${slug} {
+  meta:
+    author = "BlueShell Rule Builder"
+    description = "${desc}"
+    severity = "${sev}"
+    mitre_attack = "${mitreId}"
+
+  events:
+    $e.metadata.event_type = "GENERIC_EVENT"
+${eventFilter ? eventFilter : '    $e.principal.hostname != ""'}
+${matchSection}
+
+  outcome:
+    $risk_score = max(if(#e > 10, 80, 50))
+    $severity = "${sev}"
+
+  options:
+    allow_zero_values = false
+}`;
+}
+
+function rbGenSigma(name, desc, ds, fields, conditions, actions, severity, mitreId, fp) {
+    const logsource = ds.length > 0 ? dsMap[ds[0].value]?.sigma || 'process_creation' : 'process_creation';
+    const sevMap = { 'Critical': 'critical', 'High': 'high', 'Medium': 'medium', 'Low': 'low', 'Informational': 'informational' };
+    const sev = sevMap[severity] || 'medium';
+
+    const mitreIds = mitreId.split(',').map(s => s.trim()).filter(Boolean);
+    const mitreTags = mitreIds.map(id => `    - attack.${id.toLowerCase()}`).join('\n');
+    const tacticTags = (rbCanvasState.tactic || []).map(t => `    - attack.${t.value.toLowerCase().replace(/ /g, '_')}`).join('\n');
+
+    let detectionBlock = '  selection:\n';
+    let hasFilter = false;
+
+    if (fields.length > 0) {
+        const hasNot = conditions.some(c => c.value === 'NOT');
+        fields.forEach((f, i) => {
+            const fn = fieldMap[f.value]?.sigma || f.value;
+            if (hasNot && i === fields.length - 1) {
+                detectionBlock += `  filter:\n    ${fn}|contains: ''\n`;
+                hasFilter = true;
+            } else {
+                detectionBlock += `    ${fn}|contains: '*'\n`;
+            }
+        });
+    } else {
+        detectionBlock += "    EventID: '*'\n";
+    }
+
+    detectionBlock += hasFilter ? '  condition: selection and not filter' : '  condition: selection';
+
+    const hasCount = conditions.some(c => c.value === 'COUNT >' || c.value === 'THRESHOLD');
+    if (hasCount) {
+        detectionBlock += ' | count() by ' + (fields.length > 0 ? fieldMap[fields[0].value]?.sigma || 'src_ip' : 'src_ip') + ' > 5';
+    }
+
+    const hasTimeWindow = conditions.some(c => c.value === 'TIME WINDOW');
+    if (hasTimeWindow) {
+        detectionBlock += '\n  timeframe: 15m';
+    }
+
+    // Determine logsource category
+    let logsourceBlock = '';
+    const catMap = {
+        'process_creation': 'category: process_creation\n    product: windows',
+        'windows': 'product: windows\n    service: security',
+        'linux': 'product: linux\n    service: syslog',
+        'firewall': 'category: firewall',
+        'dns_query': 'category: dns_query',
+        'proxy': 'category: proxy',
+        'aws': 'product: aws\n    service: cloudtrail',
+        'network_connection': 'category: network_connection\n    product: windows'
+    };
+    logsourceBlock = catMap[logsource] || `category: ${logsource}`;
+
+    return `title: ${name}
+id: ${crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); })}
+status: experimental
+description: |
+  ${desc}
+references:
+  - https://attack.mitre.org/
+author: BlueShell Rule Builder
+date: ${new Date().toISOString().split('T')[0]}
+tags:
+${tacticTags}
+${mitreTags}
+logsource:
+    ${logsourceBlock}
+detection:
+${detectionBlock}
+falsepositives:
+    - ${fp || 'Unknown'}
+level: ${sev}`;
+}
+
+// ── Copy & Export ──
+
+function rbCopyRule() {
+    const code = document.getElementById('rb-code-output')?.textContent || '';
+    if (!code || code.startsWith('//')) return;
+    navigator.clipboard.writeText(code).then(() => {
+        rbShowToast('Rule copied to clipboard');
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        rbShowToast('Rule copied to clipboard');
+    });
+}
+
+function rbExport(format) {
+    const ruleName = document.getElementById('rb-rule-name')?.value || 'Untitled Rule';
+    const ruleDesc = document.getElementById('rb-rule-desc')?.value || '';
+    const mitreId = document.getElementById('rb-mitre-id')?.value || '';
+    const fpGuidance = document.getElementById('rb-fp-guidance')?.value || '';
+    const platform = document.getElementById('rb-platform')?.value || 'splunk';
+    const code = document.getElementById('rb-code-output')?.textContent || '';
+    const actSev = rbCanvasState.action || [];
+    const sevItems = actSev.filter(c => c.category === 'severity');
+    const severity = sevItems.length > 0 ? sevItems[0].value : 'Medium';
+
+    const exportData = {
+        name: ruleName,
+        description: ruleDesc,
+        mitre_attack_ids: mitreId.split(',').map(s => s.trim()).filter(Boolean),
+        mitre_tactics: (rbCanvasState.tactic || []).map(t => t.value),
+        severity: severity,
+        false_positives: fpGuidance,
+        platform: platform,
+        data_sources: (rbCanvasState.datasource || []).map(d => d.value),
+        fields: (rbCanvasState.condition || []).filter(c => c.category === 'field').map(c => c.value),
+        conditions: (rbCanvasState.condition || []).filter(c => c.category === 'condition').map(c => c.value),
+        actions: (rbCanvasState.action || []).filter(c => c.category === 'action').map(c => c.value),
+        rule_code: code,
+        exported_at: new Date().toISOString(),
+        tool: 'BlueShell Rule Builder'
+    };
+
+    let content, filename, mimeType;
+
+    if (format === 'yaml') {
+        content = rbToYaml(exportData);
+        filename = rbSlug(ruleName) + '.yaml';
+        mimeType = 'text/yaml';
+    } else {
+        content = JSON.stringify(exportData, null, 2);
+        filename = rbSlug(ruleName) + '.json';
+        mimeType = 'application/json';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    rbShowToast(`Exported as ${format.toUpperCase()}: ${filename}`);
+}
+
+function rbToYaml(obj, indent) {
+    indent = indent || 0;
+    const pad = '  '.repeat(indent);
+    let yaml = '';
+    for (const [key, val] of Object.entries(obj)) {
+        if (Array.isArray(val)) {
+            yaml += `${pad}${key}:\n`;
+            val.forEach(v => {
+                if (typeof v === 'object') {
+                    yaml += `${pad}  -\n` + rbToYaml(v, indent + 2);
+                } else {
+                    yaml += `${pad}  - ${JSON.stringify(v)}\n`;
+                }
+            });
+        } else if (typeof val === 'object' && val !== null) {
+            yaml += `${pad}${key}:\n` + rbToYaml(val, indent + 1);
+        } else if (typeof val === 'string' && val.includes('\n')) {
+            yaml += `${pad}${key}: |\n`;
+            val.split('\n').forEach(line => { yaml += `${pad}  ${line}\n`; });
+        } else {
+            yaml += `${pad}${key}: ${JSON.stringify(val)}\n`;
+        }
+    }
+    return yaml;
+}
+
+function rbShowToast(msg) {
+    const existing = document.querySelector('.rb-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'rb-toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
 }
