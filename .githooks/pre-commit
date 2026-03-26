@@ -1,0 +1,33 @@
+#!/bin/bash
+# Pre-commit hook: block common secrets from being committed
+
+BLOCKED_PATTERNS=(
+  'PRIVATE.KEY'
+  'api_key\s*[:=]'
+  'api_secret\s*[:=]'
+  'password\s*[:=]'
+  'AWS_SECRET_ACCESS_KEY'
+  'BEGIN RSA PRIVATE KEY'
+  'BEGIN OPENSSH PRIVATE KEY'
+  'token\s*[:=]\s*["\x27][A-Za-z0-9]'
+)
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+FOUND=0
+
+for file in $STAGED_FILES; do
+  for pattern in "${BLOCKED_PATTERNS[@]}"; do
+    if git show ":$file" 2>/dev/null | grep -qiE "$pattern"; then
+      echo "BLOCKED: '$file' matches secret pattern: $pattern"
+      FOUND=1
+    fi
+  done
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  echo ""
+  echo "Commit aborted. Remove secrets or use 'git commit --no-verify' to override."
+  exit 1
+fi
+
+exit 0
