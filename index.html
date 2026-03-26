@@ -219,7 +219,12 @@
                     <option value="elastic">Elastic Security JSON</option>
                     <option value="yara">YARA</option>
                     <option value="defender">Microsoft Defender KQL</option>
-                    <option value="crowdstrike">CrowdStrike Falcon</option>
+                    <option value="crowdstrike">CrowdStrike Falcon Query</option>
+                    <option value="cs-ioa">CrowdStrike IOA Rule</option>
+                    <option value="cs-ioc">CrowdStrike IOC Policy</option>
+                    <option value="cs-prevention">CrowdStrike Prevention Policy</option>
+                    <option value="cs-firewall">CrowdStrike Firewall Rule</option>
+                    <option value="cs-realtime">CrowdStrike Real Time Response</option>
                     <option value="sentinelone">SentinelOne Deep Visibility</option>
                     <option value="carbonblack">VMware Carbon Black</option>
                     <option value="cortex">Palo Alto Cortex XDR</option>
@@ -303,6 +308,16 @@
             <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Kerberoasting Attack','splunk','high','windows','credential-access')">Kerberoast</button>
             <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Phishing Email with Macro','sigma','high','email','initial-access')">Phishing Macro</button>
             <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Cryptominer Process','yara','medium','endpoint','impact')">Cryptominer</button>
+        </div>
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin:.75rem 0">CrowdStrike Specific:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('Mimikatz Credential Dump','cs-ioa','critical','windows','credential-access')">IOA: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('Ransomware File Encryption','cs-ioa','critical','windows','impact')">IOA: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('PowerShell Download Cradle','cs-ioa','high','windows','execution')">IOA: PS Download</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('Cobalt Strike Beacon','cs-ioc','critical','endpoint','command-and-control')">IOC: Cobalt Strike</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('Ransomware File Encryption','cs-prevention','critical','windows','impact')">Prevention Policy</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('DNS Tunneling Exfiltration','cs-firewall','critical','network','exfiltration')">Firewall Rule</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="preset('Mimikatz Credential Dump','cs-realtime','critical','windows','credential-access')">RTR Script</button>
         </div>
     </div>
 </div>
@@ -2907,6 +2922,21 @@ function generateRule() {
     } else if (format === 'thehive') {
         rule = buildTheHive(name, severity, match, now);
         document.getElementById('dlNdjson').style.display='inline-block';
+    } else if (format === 'cs-ioa') {
+        rule = buildCSIOA(name, severity, match, now);
+        document.getElementById('dlNdjson').style.display='inline-block';
+    } else if (format === 'cs-ioc') {
+        rule = buildCSIOC(name, severity, match, now);
+        document.getElementById('dlNdjson').style.display='inline-block';
+    } else if (format === 'cs-prevention') {
+        rule = buildCSPrevention(name, severity, match, now);
+        document.getElementById('dlNdjson').style.display='inline-block';
+    } else if (format === 'cs-firewall') {
+        rule = buildCSFirewall(name, severity, match, now);
+        document.getElementById('dlNdjson').style.display='inline-block';
+    } else if (format === 'cs-realtime') {
+        rule = buildCSRTR(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
     }
 
     lastGeneratedRule = rule;
@@ -3365,6 +3395,530 @@ function buildTheHive(name, severity, m, date) {
         ]
     };
     return JSON.stringify(alert, null, 2);
+}
+
+// ==================== CROWDSTRIKE IOA RULES ====================
+function buildCSIOA(name, severity, m, date) {
+    if (!m) return `// No template for "${name}" - try Mimikatz, PowerShell, Ransomware, Webshell, etc.`;
+    const sevMap = {critical:'critical',high:'high',medium:'medium',low:'informational'};
+    const platformMap = {windows:'windows',linux:'linux',endpoint:'windows',cloud:'windows',network:'windows',web:'linux',email:'windows'};
+    const dispMap = {critical:'red',high:'orange',medium:'yellow',low:'blue'};
+
+    // Build IOA rule patterns based on threat type
+    let ruleGroups = [];
+    let dispositionId = severity === 'critical' ? 80 : severity === 'high' ? 60 : 40;
+
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) {
+        ruleGroups = [
+            { name:"Process - Known Credential Tool", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\mimikatz.exe","*\\\\mimi.exe","*\\\\procdump.exe","*\\\\procdump64.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*sekurlsa*","*logonpasswords*","*lsadump*","*kerberos::list*","*privilege::debug*"],operator:"match_any"}
+              ]},
+            { name:"Process Access - LSASS Memory Read", type:"process_access",
+              field_values:[
+                {name:"TargetImageFileName",type:"string",values:["*\\\\lsass.exe"],operator:"match_any"},
+                {name:"SourceImageFileName",type:"string",values:["*\\\\csrss.exe","*\\\\svchost.exe","*\\\\wininit.exe","*\\\\MsMpEng.exe"],operator:"not_match_any"},
+                {name:"DesiredAccess",type:"string",values:["0x1010","0x1410","0x1438","0x143a","0x1fffff"],operator:"match_any"}
+              ]}
+        ];
+    } else if (m.key.includes('powershell')) {
+        ruleGroups = [
+            { name:"Process - PowerShell Download Cradle", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\powershell.exe","*\\\\pwsh.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*DownloadString*","*DownloadFile*","*IEX*","*Invoke-Expression*","*WebClient*","*Invoke-WebRequest*","*Start-BitsTransfer*"],operator:"match_any"}
+              ]},
+            { name:"Process - Encoded PowerShell with Bypass", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\powershell.exe","*\\\\pwsh.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*-EncodedCommand*","*-enc *","*-ec *"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*bypass*","*hidden*","*NonInteractive*"],operator:"match_any"}
+              ]}
+        ];
+    } else if (m.key.includes('ransom')) {
+        ruleGroups = [
+            { name:"Process - Shadow Copy Deletion", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\vssadmin.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*delete*shadows*"],operator:"match_any"}
+              ]},
+            { name:"Process - WMIC Shadow Delete", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\wmic.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*shadowcopy*delete*"],operator:"match_any"}
+              ]},
+            { name:"Process - Recovery Disabled", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\bcdedit.exe"],operator:"match_any"},
+                {name:"CommandLine",type:"string",values:["*recoveryenabled*no*"],operator:"match_any"}
+              ]}
+        ];
+    } else if (m.key.includes('webshell')) {
+        ruleGroups = [
+            { name:"Process - Web Server Spawning Shell", type:"process_creation",
+              field_values:[
+                {name:"ParentImageFileName",type:"string",values:["*\\\\w3wp.exe","*\\\\httpd.exe","*\\\\nginx.exe","*\\\\tomcat*","*\\\\php-cgi.exe"],operator:"match_any"},
+                {name:"ImageFileName",type:"string",values:["*\\\\cmd.exe","*\\\\powershell.exe","*\\\\bash","*\\\\sh","*\\\\python*"],operator:"match_any"}
+              ]}
+        ];
+    } else if (m.key.includes('psexec')) {
+        ruleGroups = [
+            { name:"Process - PsExec Remote Execution", type:"process_creation",
+              field_values:[
+                {name:"ImageFileName",type:"string",values:["*\\\\psexec.exe","*\\\\psexec64.exe","*\\\\paexec.exe","*\\\\remcom.exe"],operator:"match_any"}
+              ]},
+            { name:"Service - PSEXESVC Installation", type:"service_creation",
+              field_values:[
+                {name:"ServiceName",type:"string",values:["PSEXESVC*","PAEXEC*","RemCom*"],operator:"match_any"}
+              ]}
+        ];
+    } else {
+        // Generic IOA from sigma detection
+        const kws = m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,6):['keyword'];
+        ruleGroups = [
+            { name:`Process - ${name}`, type:"process_creation",
+              field_values:[
+                {name:"CommandLine",type:"string",values:kws.map(k=>`*${k}*`),operator:"match_any"}
+              ]}
+        ];
+    }
+
+    const ioaRule = {
+        rule_name: name,
+        rule_description: m.desc,
+        disposition_id: dispositionId,
+        disposition: dispositionId >= 80 ? "Block, Block" : dispositionId >= 60 ? "Detect, Detect" : "Monitor",
+        severity: sevMap[severity],
+        platform: "windows",
+        enabled: true,
+        mitre_attack: {
+            tactic_id: m.tac.replace(/-/g,'_').toUpperCase(),
+            technique_id: m.t,
+            technique_name: m.desc.split(':')[0] || name
+        },
+        created_date: date,
+        rule_groups: ruleGroups.map((rg, i) => ({
+            rule_group_id: i + 1,
+            name: rg.name,
+            detection_type: rg.type,
+            field_values: rg.field_values,
+            action: dispositionId >= 80 ? "prevent" : "detect"
+        })),
+        _falcon_api_endpoint: "POST /ioarules/entities/rules/v1",
+        _import_instructions: [
+            "1. Go to Falcon Console > Custom IOA Rule Groups",
+            "2. Create new Rule Group or select existing",
+            "3. Add Rule > Simple or Advanced",
+            "4. Configure field values from rule_groups above",
+            `5. Set disposition to: ${dispositionId >= 80 ? 'Block, Block' : 'Detect, Detect'}`,
+            "6. Enable the rule and assign to Prevention Policy",
+            "-- OR use the Falcon API: POST /ioarules/entities/rules/v1 with this JSON body"
+        ]
+    };
+    return JSON.stringify(ioaRule, null, 2);
+}
+
+// ==================== CROWDSTRIKE IOC ====================
+function buildCSIOC(name, severity, m, date) {
+    if (!m) return `// No template for "${name}"`;
+    const actionMap = {critical:'prevent',high:'detect',medium:'detect',low:'allow'};
+    const sevMap = {critical:'critical',high:'high',medium:'medium',low:'low'};
+
+    // Build IOC entries based on threat type
+    let iocs = [];
+    if (m.key.includes('cobalt') || m.key.includes('c2') || m.key.includes('beacon')) {
+        iocs = [
+            {type:"sha256",value:"__HASH_HERE__",description:"Cobalt Strike beacon payload hash",action:"prevent",platforms:["windows","linux"],tags:["CobaltStrike","C2","beacon"]},
+            {type:"domain",value:"__C2_DOMAIN__",description:"Cobalt Strike C2 domain",action:"prevent",platforms:["windows","linux"],tags:["CobaltStrike","C2"]},
+            {type:"ipv4",value:"__C2_IP__",description:"Cobalt Strike Team Server IP",action:"detect",platforms:["windows","linux"],tags:["CobaltStrike","C2","TeamServer"]},
+        ];
+    } else if (m.key.includes('mimikatz') || m.key.includes('credential')) {
+        iocs = [
+            {type:"sha256",value:"__MIMIKATZ_HASH__",description:"Mimikatz binary hash",action:"prevent",platforms:["windows"],tags:["Mimikatz","CredentialDumping","T1003"]},
+            {type:"sha256",value:"__PROCDUMP_HASH__",description:"ProcDump (abused for LSASS dumping)",action:"detect",platforms:["windows"],tags:["ProcDump","LSASS","T1003"]},
+        ];
+    } else if (m.key.includes('ransom')) {
+        iocs = [
+            {type:"sha256",value:"__RANSOMWARE_HASH__",description:"Ransomware payload hash",action:"prevent",platforms:["windows"],tags:["Ransomware","T1486"]},
+            {type:"domain",value:"__PAYMENT_DOMAIN__",description:"Ransomware payment/C2 domain",action:"prevent",platforms:["windows","linux"],tags:["Ransomware","C2"]},
+            {type:"ipv4",value:"__EXFIL_IP__",description:"Data exfiltration destination IP",action:"prevent",platforms:["windows","linux"],tags:["Ransomware","Exfiltration"]},
+        ];
+    } else {
+        iocs = [
+            {type:"sha256",value:"__FILE_HASH__",description:`${name} - malicious file hash`,action:actionMap[severity],platforms:["windows","linux","mac"],tags:[m.t, m.tac]},
+            {type:"domain",value:"__MALICIOUS_DOMAIN__",description:`${name} - associated malicious domain`,action:actionMap[severity],platforms:["windows","linux","mac"],tags:[m.t, m.tac]},
+            {type:"ipv4",value:"__MALICIOUS_IP__",description:`${name} - associated malicious IP`,action:"detect",platforms:["windows","linux","mac"],tags:[m.t, m.tac]},
+        ];
+    }
+
+    const policy = {
+        _name: `IOC Policy: ${name}`,
+        _description: m.desc,
+        _mitre_attack: m.t,
+        _severity: severity,
+        _created: date,
+        _falcon_api_endpoint: "POST /iocs/entities/indicators/v1",
+        _import_instructions: [
+            "1. Falcon Console > IOC Management > Add Indicator",
+            "2. Select indicator type (SHA256, Domain, IPv4, etc.)",
+            "3. Paste the indicator value",
+            "4. Set Action (Prevent/Detect/Allow)",
+            "5. Set Severity and add tags",
+            "6. Set expiration if needed",
+            "7. Apply to host groups",
+            "-- OR use API: POST /iocs/entities/indicators/v1 with indicators array below",
+            "",
+            "REPLACE __HASH_HERE__, __C2_DOMAIN__, __C2_IP__ etc. with actual indicator values"
+        ],
+        indicators: iocs.map(ioc => ({
+            type: ioc.type,
+            value: ioc.value,
+            description: ioc.description,
+            action: ioc.action,
+            severity: sevMap[severity],
+            platforms: ioc.platforms,
+            tags: ioc.tags,
+            applied_globally: true,
+            host_groups: [],
+            expiration: new Date(Date.now() + 90*24*60*60*1000).toISOString(),
+            metadata: {
+                company: "Blue Team Toolkit",
+                mitre_attack: m.t,
+                created_by: "auto-generated"
+            }
+        }))
+    };
+    return JSON.stringify(policy, null, 2);
+}
+
+// ==================== CROWDSTRIKE PREVENTION POLICY ====================
+function buildCSPrevention(name, severity, m, date) {
+    if (!m) return `// No template for "${name}"`;
+
+    let settings = {};
+    if (m.key.includes('ransom')) {
+        settings = {
+            NextGenAV: {Enabled:true,CloudAntiMalware:{Detection:"AGGRESSIVE",Prevention:"AGGRESSIVE"},OnSensorMLSlider:{Detection:"AGGRESSIVE",Prevention:"AGGRESSIVE"},AdwarePUP:{Detection:"MODERATE",Prevention:"MODERATE"}},
+            Ransomware: {RansomwareEnhancedVisibility:true,FilesystemProtection:true,BackupDeletion:{Enabled:true,Action:"BLOCK"},VolumeEncryption:{Enabled:true,Action:"BLOCK"},MBRProtection:true,CryptoWallProtection:true},
+            BehavioralProtection: {SuspiciousProcessBlocking:true,SuspiciousScriptBlocking:true,SuspiciousCommandLineBlocking:true,CredentialDumpingBlocking:true},
+            ExploitMitigation: {HeapSprayPreallocation:true,StackPivot:true,SEHOverwrite:true,NullPage:true}
+        };
+    } else if (m.key.includes('mimikatz') || m.key.includes('credential')) {
+        settings = {
+            CredentialProtection: {CredentialDumpingBlocking:true,LsassReadProtection:true,HashDumpPrevention:true},
+            BehavioralProtection: {SuspiciousProcessBlocking:true,SuspiciousCommandLineBlocking:true,ProcessInjectionBlocking:true,CredentialDumpingBlocking:true},
+            NextGenAV: {Enabled:true,CloudAntiMalware:{Detection:"AGGRESSIVE",Prevention:"AGGRESSIVE"},OnSensorMLSlider:{Detection:"AGGRESSIVE",Prevention:"AGGRESSIVE"}},
+            ResponsePolicy: {AutoIsolateOnSeverity:"CRITICAL",NotifyOnDetection:true}
+        };
+    } else if (m.key.includes('powershell')) {
+        settings = {
+            ScriptBasedExecutionMonitoring: {Enabled:true,PreventSuspiciousScripts:true,AMSIIntegration:true,ScriptContentLogging:true},
+            BehavioralProtection: {SuspiciousScriptBlocking:true,SuspiciousCommandLineBlocking:true,EncodedCommandBlocking:true},
+            NextGenAV: {Enabled:true,CloudAntiMalware:{Detection:"AGGRESSIVE",Prevention:"MODERATE"},OnSensorMLSlider:{Detection:"AGGRESSIVE",Prevention:"MODERATE"}},
+            InterpreterProtection: {PowerShellRestrictions:"CONSTRAINED_LANGUAGE",WScriptBlocking:true,MshtaBlocking:true}
+        };
+    } else {
+        settings = {
+            NextGenAV: {Enabled:true,CloudAntiMalware:{Detection:"AGGRESSIVE",Prevention:severity==='critical'?"AGGRESSIVE":"MODERATE"},OnSensorMLSlider:{Detection:"AGGRESSIVE",Prevention:"MODERATE"},AdwarePUP:{Detection:"MODERATE",Prevention:"CAUTIOUS"}},
+            BehavioralProtection: {SuspiciousProcessBlocking:true,SuspiciousScriptBlocking:true,SuspiciousCommandLineBlocking:true},
+            SensorVisibility: {NetworkVisibility:true,USBVisibility:true,ProcessTreeVisibility:true}
+        };
+    }
+
+    const policy = {
+        _name: `Prevention Policy: ${name}`,
+        _description: `CrowdStrike Falcon prevention policy for ${m.desc}`,
+        _mitre_attack: m.t,
+        _severity: severity,
+        _created: date,
+        _falcon_api_endpoint: "POST /policy/entities/prevention/v1 (or configure via Console)",
+        _import_instructions: [
+            "1. Falcon Console > Configuration > Prevention Policies",
+            "2. Clone an existing policy or create new",
+            `3. Name it: '${name} - Prevention'`,
+            "4. Configure each section below in the policy settings",
+            "5. Assign to appropriate Host Groups",
+            "6. Enable the policy",
+            "",
+            "Settings reference (configure in Falcon Console):"
+        ],
+        platform: "Windows",
+        policy_settings: settings,
+        host_groups: ["All Hosts"],
+        enabled: true
+    };
+    return JSON.stringify(policy, null, 2);
+}
+
+// ==================== CROWDSTRIKE FIREWALL RULE ====================
+function buildCSFirewall(name, severity, m, date) {
+    if (!m) return `// No template for "${name}"`;
+
+    let rules = [];
+    if (m.key.includes('dns') || m.key.includes('tunnel') || m.key.includes('exfil')) {
+        rules = [
+            {name:"Block DNS to Non-Approved Resolvers",description:"Prevent DNS tunneling by restricting DNS to approved resolvers",direction:"OUT",protocol:"UDP",local_port:"*",remote_port:"53",remote_address:{exclude:["8.8.8.8","8.8.4.4","1.1.1.1","1.0.0.1","__INTERNAL_DNS__"]},action:"DENY",enabled:true},
+            {name:"Block DNS over HTTPS (DoH)",description:"Prevent DNS-over-HTTPS which can bypass DNS monitoring",direction:"OUT",protocol:"TCP",local_port:"*",remote_port:"443",remote_address:{include:["dns.google","cloudflare-dns.com","mozilla.cloudflare-dns.com","doh.opendns.com"]},action:"DENY",enabled:true},
+            {name:"Alert on Large DNS Responses",description:"Detect TXT record exfiltration via large DNS payloads",direction:"IN",protocol:"UDP",local_port:"*",remote_port:"*",remote_address:{any:true},action:"MONITOR",enabled:true,log:true}
+        ];
+    } else if (m.key.includes('c2') || m.key.includes('cobalt') || m.key.includes('beacon')) {
+        rules = [
+            {name:"Block Known C2 Ports",description:"Block outbound connections to common C2 ports",direction:"OUT",protocol:"TCP",local_port:"*",remote_port:"4444,5555,6666,7777,8888,9999,1234,50050",remote_address:{any:true},action:"DENY",enabled:true},
+            {name:"Block Uncommon HTTPS Ports",description:"Block HTTPS on non-standard ports (C2 evasion)",direction:"OUT",protocol:"TCP",local_port:"*",remote_port:"8443,4443,2083,2087,2096",remote_address:{any:true},action:"DENY",enabled:true},
+            {name:"Monitor High-Frequency Beaconing",description:"Alert on periodic outbound connections",direction:"OUT",protocol:"TCP",local_port:"*",remote_port:"80,443",remote_address:{any:true},action:"MONITOR",enabled:true,log:true}
+        ];
+    } else if (m.key.includes('rdp') || m.key.includes('lateral')) {
+        rules = [
+            {name:"Restrict RDP to Jump Servers Only",description:"Block RDP except from authorized jump servers",direction:"IN",protocol:"TCP",local_port:"3389",remote_port:"*",remote_address:{include:["__JUMPSERVER_IP__"],exclude_all_others:true},action:"DENY",enabled:true},
+            {name:"Block SMB from Internet",description:"Prevent external SMB/lateral movement",direction:"IN",protocol:"TCP",local_port:"445",remote_port:"*",remote_address:{exclude:["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]},action:"DENY",enabled:true},
+            {name:"Block WinRM from External",description:"Prevent external WinRM access",direction:"IN",protocol:"TCP",local_port:"5985,5986",remote_port:"*",remote_address:{exclude:["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]},action:"DENY",enabled:true}
+        ];
+    } else {
+        rules = [
+            {name:`Block: ${name}`,description:m.desc,direction:"OUT",protocol:"TCP",local_port:"*",remote_port:"*",remote_address:{include:["__MALICIOUS_IP__"]},action:"DENY",enabled:true}
+        ];
+    }
+
+    const fwPolicy = {
+        _name: `Firewall Rule Group: ${name}`,
+        _description: `CrowdStrike Falcon Firewall rules for ${m.desc}`,
+        _mitre_attack: m.t,
+        _created: date,
+        _falcon_api_endpoint: "POST /fwmgr/entities/rule-groups/v1",
+        _import_instructions: [
+            "1. Falcon Console > Network Protection > Firewall Management",
+            "2. Create new Rule Group or add to existing",
+            `3. Name: '${name}'`,
+            "4. Add each rule below with the specified parameters",
+            "5. Set rule order (deny rules first, then monitor)",
+            "6. Assign Rule Group to Firewall Policy",
+            "7. Apply Policy to Host Groups",
+            "",
+            "REPLACE __JUMPSERVER_IP__, __INTERNAL_DNS__, __MALICIOUS_IP__ with actual values"
+        ],
+        platform: "Windows",
+        rule_group: {
+            name: name,
+            description: m.desc,
+            enabled: true,
+            rules: rules
+        }
+    };
+    return JSON.stringify(fwPolicy, null, 2);
+}
+
+// ==================== CROWDSTRIKE REAL TIME RESPONSE ====================
+function buildCSRTR(name, severity, m) {
+    if (!m) return `# No template for "${name}"`;
+
+    let script = '';
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) {
+        script = `# ============================================================
+# CrowdStrike Real Time Response (RTR) Script
+# Purpose: ${name} - Investigation & Remediation
+# MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+# ============================================================
+# Run these commands in Falcon RTR session on the compromised host
+
+# --- PHASE 1: INVESTIGATE ---
+
+# Check for Mimikatz processes
+runscript -CloudFile="Investigate-CredDump" -CommandLine=""
+ps | findstr /i "mimikatz mimi procdump"
+
+# Check for LSASS access (recent process handles)
+runscript -Raw=\`\`\`
+Get-Process lsass | Select-Object Id, HandleCount, WorkingSet64
+Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" -FilterXPath "*[System[EventID=10] and EventData[Data[@Name='TargetImage'] and (Data='C:\\Windows\\System32\\lsass.exe')]]" -MaxEvents 20 | Select-Object TimeCreated, @{N='Source';E={$_.Properties[4].Value}}, @{N='GrantedAccess';E={$_.Properties[6].Value}}
+\`\`\`
+
+# Check for credential dump files
+filelist C:\\Users\\*\\AppData\\Local\\Temp\\*.dmp
+filelist C:\\Windows\\Temp\\*.dmp
+filelist C:\\Temp\\*lsass*
+
+# Check recent PowerShell history
+runscript -Raw=\`\`\`
+Get-Content (Get-PSReadlineOption).HistorySavePath -ErrorAction SilentlyContinue | Select-String -Pattern "mimikatz|sekurlsa|logonpasswords|procdump|lsass" -SimpleMatch
+\`\`\`
+
+# --- PHASE 2: CONTAIN ---
+
+# Kill mimikatz if running
+kill --name mimikatz.exe
+kill --name mimi.exe
+kill --name procdump.exe
+
+# Delete malicious files found
+rm "C:\\Users\\*\\AppData\\Local\\Temp\\mimikatz.exe" --force
+rm "C:\\Windows\\Temp\\*.dmp" --force
+
+# Force credential rotation (disable cached creds)
+runscript -Raw=\`\`\`
+# Clear cached credentials
+cmdkey /list | ForEach-Object { if ($_ -match "Target: (.+)") { cmdkey /delete:$matches[1] } }
+# Force LSASS to clear WDigest plaintext creds
+reg add HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest /v UseLogonCredential /t REG_DWORD /d 0 /f
+\`\`\`
+
+# --- PHASE 3: COLLECT FORENSICS ---
+
+# Dump process list for timeline
+runscript -Raw=\`\`\`
+Get-Process | Select-Object Id, ProcessName, Path, StartTime, @{N='CmdLine';E={(Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)").CommandLine}} | Export-Csv C:\\Windows\\Temp\\process_snapshot.csv -NoTypeInformation
+\`\`\`
+get "C:\\Windows\\Temp\\process_snapshot.csv"
+
+# Collect relevant event logs
+runscript -Raw=\`\`\`
+wevtutil epl Security C:\\Windows\\Temp\\security_export.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 86400000]]]"
+\`\`\`
+get "C:\\Windows\\Temp\\security_export.evtx"`;
+    } else if (m.key.includes('ransom')) {
+        script = `# ============================================================
+# CrowdStrike Real Time Response (RTR) Script
+# Purpose: ${name} - Emergency Ransomware Response
+# MITRE: ${m.t} | Severity: CRITICAL
+# ============================================================
+# IMMEDIATE ACTIONS - Run in Falcon RTR session
+
+# --- PHASE 1: STOP THE BLEEDING ---
+
+# Network contain the host (if not already isolated via Falcon)
+# This is done via Falcon Console: Host > Contain
+# API: POST /devices/entities/devices-actions/v2 {"action_name":"contain"}
+
+# Kill known ransomware processes
+runscript -Raw=\`\`\`
+# Stop processes deleting shadow copies
+Get-Process vssadmin,wmic,bcdedit,wbadmin,cipher -ErrorAction SilentlyContinue | Stop-Process -Force
+# Stop suspicious encryption processes
+Get-Process | Where-Object {$_.CPU -gt 80 -and $_.StartTime -gt (Get-Date).AddHours(-2)} | Stop-Process -Force
+\`\`\`
+
+# --- PHASE 2: ASSESS DAMAGE ---
+
+# Check shadow copy status
+runscript -Raw=\`\`\`
+vssadmin list shadows
+vssadmin list volumes
+wmic shadowcopy list brief
+\`\`\`
+
+# Check for ransom notes
+filelist C:\\Users\\*\\Desktop\\*README*
+filelist C:\\Users\\*\\Desktop\\*DECRYPT*
+filelist C:\\Users\\*\\Desktop\\*RECOVER*
+filelist C:\\Users\\*\\Documents\\*README*
+
+# Count encrypted files
+runscript -Raw=\`\`\`
+$extensions = @(".encrypted",".locked",".crypted",".enc",".locky",".wcry",".wnry")
+foreach ($ext in $extensions) {
+    $count = (Get-ChildItem C:\\ -Recurse -Filter "*$ext" -ErrorAction SilentlyContinue | Measure-Object).Count
+    if ($count -gt 0) { Write-Output "FOUND: $count files with extension $ext" }
+}
+\`\`\`
+
+# --- PHASE 3: PRESERVE EVIDENCE ---
+
+# Snapshot running processes
+runscript -Raw=\`\`\`
+Get-Process | Select-Object Id, ProcessName, Path, StartTime, CPU, WorkingSet64 | Export-Csv C:\\Windows\\Temp\\ransomware_processes.csv -NoTypeInformation
+Get-NetTCPConnection | Where-Object State -eq 'Established' | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess | Export-Csv C:\\Windows\\Temp\\ransomware_connections.csv -NoTypeInformation
+\`\`\`
+get "C:\\Windows\\Temp\\ransomware_processes.csv"
+get "C:\\Windows\\Temp\\ransomware_connections.csv"
+
+# Collect a ransom note sample
+get "C:\\Users\\*\\Desktop\\*README*"
+
+# --- PHASE 4: RECOVERY CHECK ---
+runscript -Raw=\`\`\`
+# Check if backups are accessible
+Get-WBSummary -ErrorAction SilentlyContinue
+# Check recovery partition
+bcdedit /enum | Select-String "recovery"
+\`\`\``;
+    } else if (m.key.includes('powershell')) {
+        script = `# ============================================================
+# CrowdStrike Real Time Response (RTR) Script
+# Purpose: ${name} - PowerShell Investigation
+# MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+# ============================================================
+
+# --- INVESTIGATE ---
+
+# Check PowerShell execution history
+runscript -Raw=\`\`\`
+Get-Content "$env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt" -ErrorAction SilentlyContinue | Select-Object -Last 50
+\`\`\`
+
+# Check PowerShell event logs for suspicious commands
+runscript -Raw=\`\`\`
+Get-WinEvent -LogName "Microsoft-Windows-PowerShell/Operational" -MaxEvents 50 | Where-Object {$_.Message -match "EncodedCommand|DownloadString|IEX|Invoke-Expression|bypass"} | Select-Object TimeCreated, Message | Format-List
+\`\`\`
+
+# Check for downloaded payloads in temp
+filelist C:\\Users\\*\\AppData\\Local\\Temp\\*.exe
+filelist C:\\Users\\*\\AppData\\Local\\Temp\\*.ps1
+filelist C:\\Users\\*\\AppData\\Local\\Temp\\*.dll
+filelist C:\\Users\\*\\AppData\\Local\\Temp\\*.bat
+
+# Check scheduled tasks for persistence
+runscript -Raw=\`\`\`
+Get-ScheduledTask | Where-Object {$_.Actions.Execute -match "powershell|cmd|wscript|mshta"} | Select-Object TaskName, @{N='Command';E={$_.Actions.Execute + " " + $_.Actions.Arguments}}, State
+\`\`\`
+
+# --- REMEDIATE ---
+
+# Kill suspicious PowerShell processes
+kill --name powershell.exe
+kill --name pwsh.exe
+
+# Remove suspicious scheduled tasks
+runscript -Raw=\`\`\`
+Get-ScheduledTask | Where-Object {$_.Actions.Execute -match "powershell.*encodedcommand|powershell.*downloadstring"} | Unregister-ScheduledTask -Confirm:\\$false
+\`\`\`
+
+# Clean temp directory
+rm "C:\\Users\\*\\AppData\\Local\\Temp\\*.ps1" --force
+rm "C:\\Users\\*\\AppData\\Local\\Temp\\*.bat" --force`;
+    } else {
+        script = `# ============================================================
+# CrowdStrike Real Time Response (RTR) Script
+# Purpose: ${name}
+# MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+# Description: ${m.desc}
+# ============================================================
+
+# --- INVESTIGATE ---
+
+# Check running processes
+ps
+
+# Check network connections
+runscript -Raw=\`\`\`
+Get-NetTCPConnection | Where-Object State -eq 'Established' | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess, @{N='Process';E={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | Format-Table
+\`\`\`
+
+# Check recent file modifications
+runscript -Raw=\`\`\`
+Get-ChildItem C:\\Users -Recurse -File -ErrorAction SilentlyContinue | Where-Object {$_.LastWriteTime -gt (Get-Date).AddHours(-4)} | Select-Object FullName, LastWriteTime, Length | Sort-Object LastWriteTime -Descending | Select-Object -First 50
+\`\`\`
+
+# Check autoruns / persistence
+runscript -Raw=\`\`\`
+Get-ItemProperty "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -ErrorAction SilentlyContinue
+Get-ItemProperty "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -ErrorAction SilentlyContinue
+Get-ScheduledTask | Where-Object State -eq 'Ready' | Select-Object TaskName, @{N='Action';E={$_.Actions.Execute}}
+\`\`\`
+
+# --- REMEDIATE ---
+# (Add specific remediation commands based on investigation findings)`;
+    }
+    return script;
 }
 </script>
 
