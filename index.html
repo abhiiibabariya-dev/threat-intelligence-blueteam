@@ -106,6 +106,13 @@
             </div>
 
             <div class="nav-section">
+                <div class="nav-header" onclick="renderKnowledgeBase()" style="background:rgba(0,255,65,0.08)">
+                    <span class="nav-icon">⚛</span> SOC KNOWLEDGE BASE
+                    <span class="arrow" style="color:var(--accent)">◉</span>
+                </div>
+            </div>
+
+            <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('tools')">
                     <span class="nav-icon">◈</span> TOOLS & INTEL
                     <span class="arrow" id="arrow-tools">▶</span>
@@ -217,6 +224,12 @@
                         <div class="card-desc">100+ detection use cases mapped to MITRE ATT&CK</div>
                         <div class="card-tag">BLUE TEAM</div>
                     </div>
+                    <div class="hack-card" onclick="renderKnowledgeBase()" style="border-color:var(--accent)">
+                        <div class="card-icon">⚛</div>
+                        <div class="card-title">SOC Knowledge Base</div>
+                        <div class="card-desc">Search any rule → full query, playbook, policy, payload & use cases</div>
+                        <div class="card-tag" style="background:var(--accent);color:#000">NEW</div>
+                    </div>
                     <div class="hack-card" onclick="loadRuleBuilder()">
                         <div class="card-icon">⧉</div>
                         <div class="card-title">Rule Builder</div>
@@ -317,6 +330,7 @@
         </div>
     </div>
 
+    <script src="js/rule-database.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
