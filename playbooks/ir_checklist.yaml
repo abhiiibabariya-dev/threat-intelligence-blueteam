@@ -1,0 +1,137 @@
+# Incident Response Playbooks
+# Mapped to NIST SP 800-61 and MITRE ATT&CK
+
+playbooks:
+  - name: Compromised Account
+    id: IR-001
+    severity: high
+    mitre_tactics: [Initial Access, Persistence, Credential Access]
+    phases:
+      identification:
+        - Check authentication logs for unusual login times/locations
+        - Review failed login attempts preceding the compromise
+        - Identify all sessions for the compromised account
+        - Check for MFA bypass or new MFA device enrollment
+        - Review email forwarding rules and OAuth app grants
+      containment:
+        - Disable the compromised account immediately
+        - Revoke all active sessions and tokens
+        - Reset password and MFA
+        - Block source IPs at firewall/WAF
+        - Disable any suspicious OAuth applications
+      eradication:
+        - Remove unauthorized forwarding rules
+        - Remove unauthorized SSH keys or API tokens
+        - Audit and remove any persistence mechanisms
+        - Check for lateral movement from this account
+        - Scan for data exfiltration activity
+      recovery:
+        - Re-enable account with new credentials
+        - Enforce MFA re-enrollment
+        - Monitor account for 30 days post-incident
+        - Review and tighten access permissions
+      lessons_learned:
+        - Document timeline and root cause
+        - Update detection rules based on findings
+        - Review password policy effectiveness
+        - Assess need for additional monitoring
+
+  - name: Malware Infection
+    id: IR-002
+    severity: critical
+    mitre_tactics: [Execution, Persistence, Defense Evasion, C2]
+    phases:
+      identification:
+        - Identify the malware family and variant (YARA scan)
+        - Determine infection vector (email, web, USB, lateral)
+        - Identify all affected systems (network IOC scan)
+        - Collect volatile data (memory, network connections, processes)
+        - Hash all suspicious files and check against threat intel
+      containment:
+        - Isolate affected systems from network (do NOT power off)
+        - Block C2 domains/IPs at DNS and firewall
+        - Quarantine malicious files
+        - Disable affected service accounts
+        - Snapshot affected systems for forensics
+      eradication:
+        - Remove all malware artifacts and persistence
+        - Patch the exploited vulnerability
+        - Reset credentials on affected systems
+        - Scan all systems with updated signatures
+        - Verify no additional backdoors remain
+      recovery:
+        - Rebuild from known-good images if needed
+        - Restore data from clean backups
+        - Gradually reconnect to network with monitoring
+        - Verify system integrity before returning to production
+      lessons_learned:
+        - Submit samples to threat intel sharing platforms
+        - Update YARA/Sigma rules with new indicators
+        - Review endpoint protection gaps
+        - Update user awareness training
+
+  - name: Data Exfiltration
+    id: IR-003
+    severity: critical
+    mitre_tactics: [Collection, Exfiltration, Command and Control]
+    phases:
+      identification:
+        - Review DLP alerts and network flow data
+        - Identify volume and type of data transferred
+        - Determine exfiltration method (HTTP, DNS, email, cloud)
+        - Identify source systems and accounts involved
+        - Check for staging directories or compressed archives
+      containment:
+        - Block exfiltration destination IPs/domains
+        - Restrict outbound traffic from affected systems
+        - Disable involved accounts
+        - Engage legal and compliance teams
+        - Preserve all evidence and logs
+      eradication:
+        - Remove exfiltration tools and channels
+        - Close the access vector used
+        - Revoke compromised credentials
+        - Audit data access permissions
+      recovery:
+        - Assess data exposure impact
+        - Notify affected parties per regulations
+        - Implement additional DLP controls
+        - Enhance network segmentation
+      lessons_learned:
+        - Classify and inventory sensitive data locations
+        - Review outbound traffic policies
+        - Enhance monitoring for large data transfers
+        - Update data handling procedures
+
+  - name: Ransomware
+    id: IR-004
+    severity: critical
+    mitre_tactics: [Execution, Impact, Lateral Movement]
+    phases:
+      identification:
+        - Identify ransomware family from ransom note or file extensions
+        - Determine scope of encryption (systems, shares, backups)
+        - Identify patient zero and initial access vector
+        - Check for data exfiltration before encryption (double extortion)
+        - Assess backup availability and integrity
+      containment:
+        - Isolate ALL affected and at-risk systems immediately
+        - Disable network shares and mapped drives
+        - Block lateral movement paths
+        - Preserve encrypted samples for potential decryption
+        - Do NOT pay ransom without executive and legal approval
+      eradication:
+        - Remove ransomware binaries and persistence
+        - Patch exploited vulnerabilities
+        - Reset all domain credentials (assume full compromise)
+        - Scan for dormant payloads or secondary access
+      recovery:
+        - Restore from offline/immutable backups
+        - Rebuild systems that cannot be restored
+        - Validate data integrity after restoration
+        - Gradually bring systems online with enhanced monitoring
+      lessons_learned:
+        - Test backup restoration procedures
+        - Implement network segmentation
+        - Review privileged access management
+        - Conduct tabletop exercise for next incident

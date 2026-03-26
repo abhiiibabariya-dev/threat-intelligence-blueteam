@@ -1,0 +1,87 @@
+title: Multiple Failed Logins Followed by Success
+id: b5a3c7d1-4e2f-4a8b-9c1d-3e5f7a9b2c4d
+status: stable
+level: high
+description: Detects potential brute force - multiple failed logins from same source followed by a successful login
+author: Blue Team Toolkit
+date: 2024/01/01
+references:
+  - https://attack.mitre.org/techniques/T1110/
+tags:
+  - attack.credential_access
+  - attack.t1110.001
+logsource:
+  category: authentication
+  product: linux
+detection:
+  failed:
+    EventType: login_failed
+  success:
+    EventType: login_success
+  condition: failed | count(SourceIP) by TargetUser > 5
+timeframe: 10m
+falsepositives:
+  - Users who mistype passwords multiple times
+  - Service accounts with expired credentials
+---
+title: Login from Tor Exit Node
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+level: high
+description: Detects authentication from known Tor exit node IPs
+author: Blue Team Toolkit
+date: 2024/01/01
+references:
+  - https://attack.mitre.org/techniques/T1090/003/
+tags:
+  - attack.command_and_control
+  - attack.t1090.003
+logsource:
+  category: authentication
+detection:
+  selection:
+    EventType: login_success
+  filter_internal:
+    SourceIP|cidr:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+  tor_exit_nodes:
+    # Populate with Tor exit node IPs from a threat feed or lookup table
+    SourceIP|expand: '%tor_exit_nodes%'
+  condition: selection and not filter_internal and tor_exit_nodes
+falsepositives:
+  - Legitimate Tor users
+  - VPN exit nodes misidentified as Tor
+---
+title: Suspicious Scheduled Task Creation
+id: c3d4e5f6-a1b2-7890-cdef-567890abcdef
+status: stable
+level: medium
+description: Detects creation of scheduled tasks commonly used for persistence
+author: Blue Team Toolkit
+date: 2024/01/01
+references:
+  - https://attack.mitre.org/techniques/T1053/005/
+tags:
+  - attack.persistence
+  - attack.t1053.005
+logsource:
+  product: windows
+  service: security
+  category: process_creation
+detection:
+  selection:
+    CommandLine|contains:
+      - schtasks /create
+      - Register-ScheduledTask
+  suspicious_paths:
+    CommandLine|contains:
+      - \AppData\
+      - \Temp\
+      - \ProgramData\
+      - C:\Users\Public
+  condition: selection and suspicious_paths
+falsepositives:
+  - Legitimate software installers
+  - System administration scripts
