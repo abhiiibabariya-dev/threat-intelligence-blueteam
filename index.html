@@ -6,972 +6,898 @@
     <title>Blue Team Threat Intelligence Toolkit</title>
     <style>
         :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-card: #1a2332;
-            --bg-card-hover: #1f2b3d;
+            --bg: #0a0e17;
+            --bg2: #111827;
+            --card: #1a2332;
+            --card-hover: #1f2b3d;
             --accent: #00d4ff;
-            --accent-glow: rgba(0, 212, 255, 0.15);
-            --accent-secondary: #7c3aed;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-            --text-primary: #e2e8f0;
-            --text-secondary: #94a3b8;
-            --text-dim: #64748b;
+            --glow: rgba(0,212,255,0.15);
+            --purple: #7c3aed;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --green: #10b981;
+            --text: #e2e8f0;
+            --text2: #94a3b8;
+            --dim: #64748b;
             --border: #1e293b;
-            --gradient-1: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
-            --gradient-2: linear-gradient(135deg, #0a0e17 0%, #1a2332 100%);
         }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+        .grid-bg{position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:50px 50px;z-index:0;animation:gm 20s linear infinite}
+        @keyframes gm{0%{transform:translate(0,0)}100%{transform:translate(50px,50px)}}
+        .wrap{position:relative;z-index:1}
+        header{background:rgba(17,24,39,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:1rem 2rem;position:sticky;top:0;z-index:100}
+        .hdr{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
+        .logo{display:flex;align-items:center;gap:.75rem}
+        .logo-ic{width:42px;height:42px;background:linear-gradient(135deg,#00d4ff,#7c3aed);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem}
+        .logo h1{font-size:1.3rem;background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .logo p{font-size:.7rem;color:var(--dim)}
+        .badges{display:flex;gap:.5rem;flex-wrap:wrap}
+        .badge{padding:.3rem .75rem;border-radius:20px;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+        .b-blue{background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.3)}
+        .b-purple{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+        .b-green{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.3)}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Nav Tabs */
+        .nav-tabs{max-width:1400px;margin:0 auto;padding:1rem 2rem 0;display:flex;gap:.5rem;flex-wrap:wrap}
+        .nav-tab{padding:.6rem 1.2rem;border-radius:8px 8px 0 0;background:var(--card);border:1px solid var(--border);border-bottom:none;color:var(--text2);cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
+        .nav-tab:hover,.nav-tab.active{background:var(--bg2);color:var(--accent);border-color:var(--accent)}
+        .nav-tab.active{box-shadow:0 0 15px var(--glow)}
+        .tab-content{display:none}
+        .tab-content.active{display:block}
 
-        body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+        .sec{max-width:1400px;margin:0 auto;padding:1.5rem 2rem}
+        .sec-hdr{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+        .sec-hdr h3{font-size:1.3rem}
+        .sec-ic{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
 
-        /* Animated Background */
-        .bg-grid {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-image:
-                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-            background-size: 50px 50px;
-            z-index: 0;
-            animation: gridMove 20s linear infinite;
-        }
+        /* Stats */
+        .stats{max-width:1400px;margin:0 auto;padding:1rem 2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem}
+        .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem;text-align:center;transition:all .3s}
+        .stat:hover{border-color:var(--accent);box-shadow:0 0 20px var(--glow);transform:translateY(-2px)}
+        .stat-n{font-size:2rem;font-weight:800;color:var(--accent)}
+        .stat-l{font-size:.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-top:.2rem}
 
-        @keyframes gridMove {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(50px, 50px); }
-        }
+        /* Cards */
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.2rem}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;transition:all .3s;position:relative;overflow:hidden}
+        .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(135deg,#00d4ff,#7c3aed);opacity:0;transition:opacity .3s}
+        .card:hover{border-color:rgba(0,212,255,.3);box-shadow:0 4px 30px rgba(0,0,0,.3);transform:translateY(-3px)}
+        .card:hover::before{opacity:1}
+        .card-t{font-size:1.05rem;font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem}
+        .card-d{color:var(--text2);font-size:.83rem;line-height:1.5;margin-bottom:.8rem}
+        .tags{display:flex;flex-wrap:wrap;gap:.4rem}
+        .tag{padding:.2rem .5rem;border-radius:4px;font-size:.63rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2)}
+        .tag-r{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2)}
+        .tag-y{background:rgba(245,158,11,.1);color:var(--yellow);border-color:rgba(245,158,11,.2)}
+        .tag-g{background:rgba(16,185,129,.1);color:var(--green);border-color:rgba(16,185,129,.2)}
+        .tag-p{background:rgba(124,58,237,.1);color:#a78bfa;border-color:rgba(124,58,237,.2)}
 
-        .content { position: relative; z-index: 1; }
+        /* Rule Generator */
+        .gen-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2rem}
+        .gen-box h3{margin-bottom:1rem;font-size:1.2rem}
+        .gen-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end}
+        .gen-field{flex:1;min-width:200px}
+        .gen-field label{display:block;font-size:.75rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:.4rem}
+        .gen-field input,.gen-field select,.gen-field textarea{width:100%;padding:.7rem 1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem;font-family:inherit;outline:none;transition:border .3s}
+        .gen-field input:focus,.gen-field select:focus,.gen-field textarea:focus{border-color:var(--accent);box-shadow:0 0 10px var(--glow)}
+        .gen-field textarea{min-height:80px;resize:vertical}
+        .btn{padding:.7rem 1.5rem;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:.85rem;transition:all .3s;text-transform:uppercase;letter-spacing:.5px}
+        .btn-primary{background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff}
+        .btn-primary:hover{box-shadow:0 0 25px var(--glow);transform:translateY(-1px)}
+        .btn-secondary{background:var(--bg2);color:var(--accent);border:1px solid var(--accent)}
+        .btn-secondary:hover{background:rgba(0,212,255,.1)}
+        .output-box{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-top:1rem;font-family:'Fira Code','JetBrains Mono',monospace;font-size:.8rem;line-height:1.6;white-space:pre-wrap;overflow-x:auto;display:none;position:relative;max-height:500px;overflow-y:auto}
+        .output-box.show{display:block}
+        .copy-btn{position:absolute;top:.75rem;right:.75rem;padding:.4rem .8rem;border-radius:6px;background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3);cursor:pointer;font-size:.7rem;font-weight:600;transition:all .3s}
+        .copy-btn:hover{background:rgba(0,212,255,.3)}
 
-        /* Header */
-        header {
-            background: rgba(17, 24, 39, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+        /* SIEM Section */
+        .siem-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+        .siem-tab{padding:.5rem 1rem;border-radius:6px;background:var(--bg);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
+        .siem-tab:hover,.siem-tab.active{color:var(--accent);border-color:var(--accent);background:rgba(0,212,255,.05)}
+        .siem-content{display:none}
+        .siem-content.active{display:block}
+        .spl-block{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin:.75rem 0;font-family:'Fira Code',monospace;font-size:.78rem;line-height:1.6;overflow-x:auto;position:relative}
+        .spl-title{font-weight:700;color:var(--accent);margin-bottom:.5rem;font-size:.9rem}
+        .spl-meta{color:var(--dim);font-size:.7rem;margin-bottom:.5rem}
+        .spl-code{color:#c9d1d9;white-space:pre-wrap}
+        .spl-code .kw{color:#ff7b72}
+        .spl-code .fn{color:#d2a8ff}
+        .spl-code .str{color:#a5d6ff}
+        .spl-code .cm{color:#6a9955}
 
-        .header-inner {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
+        /* Playbook */
+        .pb{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1rem;transition:all .3s}
+        .pb:hover{border-color:rgba(124,58,237,.3);box-shadow:0 4px 20px rgba(124,58,237,.1)}
+        .pb-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+        .pb-id{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;font-weight:700;font-family:monospace}
+        .sev-c{background:rgba(239,68,68,.2);color:var(--red)}
+        .sev-h{background:rgba(245,158,11,.2);color:var(--yellow)}
+        .pb-phases{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.75rem}
+        .phase{font-size:.63rem;padding:.2rem .5rem;border-radius:4px;background:rgba(100,116,139,.15);color:var(--text2)}
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
+        /* MITRE */
+        .mitre{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem}
+        .mc{background:var(--card);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:.75rem;text-align:center;font-size:.68rem;background:rgba(16,185,129,.04);transition:all .3s}
+        .mc:hover{box-shadow:0 0 15px rgba(16,185,129,.2);transform:translateY(-2px)}
+        .mc b{display:block;font-size:.78rem;color:var(--text);margin-bottom:.2rem}
+        .mc span{color:var(--green);font-weight:600}
 
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--gradient-1);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-        }
+        /* Code */
+        .code{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:1.5rem;font-family:'Fira Code',monospace;font-size:.78rem;line-height:1.7;overflow-x:auto}
+        .code .c{color:#6a9955}
+        .code .cmd{color:var(--accent)}
+        .code .fl{color:#ce9178}
 
-        .logo h1 {
-            font-size: 1.3rem;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+        /* Arch */
+        .arch{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:2rem;font-family:monospace;font-size:.73rem;line-height:1.8;overflow-x:auto;color:var(--text2)}
+        .arch .h{color:var(--accent);font-weight:700}
+        .arch .w{color:var(--yellow)}
+        .arch .g{color:var(--green)}
 
-        .logo p {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-        }
+        footer{max-width:1400px;margin:3rem auto 0;padding:2rem;border-top:1px solid var(--border);text-align:center;color:var(--dim);font-size:.8rem}
+        footer a{color:var(--accent);text-decoration:none}
+        footer a:hover{text-decoration:underline}
 
-        .header-badges {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .badge {
-            padding: 0.3rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .badge-blue { background: rgba(0, 212, 255, 0.15); color: var(--accent); border: 1px solid rgba(0, 212, 255, 0.3); }
-        .badge-purple { background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); }
-        .badge-green { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-
-        /* Hero */
-        .hero {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 3rem 2rem;
-            text-align: center;
-        }
-
-        .hero h2 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 1rem;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero p {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            max-width: 700px;
-            margin: 0 auto 2rem;
-            line-height: 1.6;
-        }
-
-        /* Stats Bar */
-        .stats-bar {
-            max-width: 1400px;
-            margin: 0 auto 2rem;
-            padding: 0 2rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.25rem;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px var(--accent-glow);
-            transform: translateY(-2px);
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--accent);
-            display: block;
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 0.25rem;
-        }
-
-        /* Sections */
-        .section {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .section-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-        }
-
-        .section-header h3 {
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
-
-        /* Cards Grid */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.25rem;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--gradient-1);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: rgba(0, 212, 255, 0.3);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-            transform: translateY(-3px);
-        }
-
-        .card:hover::before { opacity: 1; }
-
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-desc {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            line-height: 1.5;
-            margin-bottom: 1rem;
-        }
-
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-        }
-
-        .tag {
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: rgba(0, 212, 255, 0.1);
-            color: var(--accent);
-            border: 1px solid rgba(0, 212, 255, 0.2);
-        }
-
-        .tag-red { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); }
-        .tag-yellow { background: rgba(245, 158, 11, 0.1); color: var(--warning); border-color: rgba(245, 158, 11, 0.2); }
-        .tag-green { background: rgba(16, 185, 129, 0.1); color: var(--success); border-color: rgba(16, 185, 129, 0.2); }
-        .tag-purple { background: rgba(124, 58, 237, 0.1); color: #a78bfa; border-color: rgba(124, 58, 237, 0.2); }
-
-        /* Playbooks */
-        .playbook-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .playbook-card:hover {
-            border-color: rgba(124, 58, 237, 0.3);
-            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.1);
-        }
-
-        .playbook-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .playbook-id {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 700;
-            font-family: monospace;
-        }
-
-        .severity-critical { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-        .severity-high { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-
-        .playbook-phases {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-top: 0.75rem;
-        }
-
-        .phase {
-            font-size: 0.65rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            background: rgba(100, 116, 139, 0.2);
-            color: var(--text-secondary);
-        }
-
-        /* Quick Start */
-        .quickstart {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 2rem;
-            margin: 2rem 0;
-        }
-
-        .code-block {
-            background: #0d1117;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.25rem;
-            margin: 0.75rem 0;
-            overflow-x: auto;
-            font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.6;
-        }
-
-        .code-block .comment { color: #6a9955; }
-        .code-block .command { color: var(--accent); }
-        .code-block .flag { color: #ce9178; }
-
-        /* MITRE Matrix */
-        .mitre-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .mitre-cell {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.75rem;
-            text-align: center;
-            font-size: 0.7rem;
-            transition: all 0.3s ease;
-        }
-
-        .mitre-cell.covered {
-            border-color: rgba(16, 185, 129, 0.4);
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        .mitre-cell.covered:hover {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
-        }
-
-        .mitre-cell .tactic-name {
-            font-weight: 700;
-            color: var(--text-primary);
-            display: block;
-            margin-bottom: 0.25rem;
-            font-size: 0.75rem;
-        }
-
-        .mitre-cell .tech-count {
-            color: var(--success);
-            font-weight: 600;
-        }
-
-        /* Architecture */
-        .arch-diagram {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 2rem;
-            margin: 1rem 0;
-            font-family: monospace;
-            font-size: 0.75rem;
-            line-height: 1.8;
-            overflow-x: auto;
-            color: var(--text-secondary);
-        }
-
-        .arch-diagram .highlight { color: var(--accent); font-weight: 700; }
-        .arch-diagram .warn { color: var(--warning); }
-        .arch-diagram .ok { color: var(--success); }
-
-        /* Footer */
-        footer {
-            max-width: 1400px;
-            margin: 3rem auto 0;
-            padding: 2rem;
-            border-top: 1px solid var(--border);
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 0.8rem;
-        }
-
-        footer a { color: var(--accent); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .hero h2 { font-size: 1.8rem; }
-            .cards-grid { grid-template-columns: 1fr; }
-            .header-inner { justify-content: center; text-align: center; }
-            .stats-bar { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        /* Pulse animation */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .pulse { animation: pulse 2s infinite; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+        @media(max-width:768px){.grid{grid-template-columns:1fr}.hdr{justify-content:center;text-align:center}.stats{grid-template-columns:repeat(2,1fr)}.gen-row{flex-direction:column}.hero h2{font-size:1.6rem}}
+        ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
     </style>
 </head>
 <body>
-    <div class="bg-grid"></div>
-    <div class="content">
-        <header>
-            <div class="header-inner">
-                <div class="logo">
-                    <div class="logo-icon">&#128737;</div>
-                    <div>
-                        <h1>Blue Team Toolkit</h1>
-                        <p>Threat Intelligence & Incident Response</p>
-                    </div>
-                </div>
-                <div class="header-badges">
-                    <span class="badge badge-blue">MITRE ATT&CK Mapped</span>
-                    <span class="badge badge-purple">NIST SP 800-61</span>
-                    <span class="badge badge-green">Open Source</span>
-                </div>
-            </div>
-        </header>
+<div class="grid-bg"></div>
+<div class="wrap">
 
-        <section class="hero">
-            <h2>Threat Intelligence & Defense Platform</h2>
-            <p>A comprehensive collection of tools, detection rules, threat hunting queries, and incident response playbooks for blue team operations. Built for defenders, by defenders.</p>
-        </section>
+<header>
+<div class="hdr">
+    <div class="logo">
+        <div class="logo-ic">&#128737;</div>
+        <div>
+            <h1>Blue Team Toolkit</h1>
+            <p>Threat Intelligence &amp; Incident Response</p>
+        </div>
+    </div>
+    <div class="badges">
+        <span class="badge b-blue">MITRE ATT&CK Mapped</span>
+        <span class="badge b-purple">NIST SP 800-61</span>
+        <span class="badge b-green">Open Source</span>
+    </div>
+</div>
+</header>
 
-        <div class="stats-bar">
-            <div class="stat-card">
-                <span class="stat-number" id="scriptCount">8</span>
-                <div class="stat-label">Python Tools</div>
+<!-- Hero -->
+<div class="sec" style="text-align:center;padding:2.5rem 2rem">
+    <h2 style="font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:1rem">Threat Intelligence & Defense Platform</h2>
+    <p style="color:var(--text2);font-size:1.05rem;max-width:700px;margin:0 auto;line-height:1.6">Detection rules, threat hunting, incident response playbooks, and an interactive rule generator. Built for defenders.</p>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+    <div class="stat"><span class="stat-n">8</span><div class="stat-l">Python Tools</div></div>
+    <div class="stat"><span class="stat-n">16</span><div class="stat-l">Sigma Rules</div></div>
+    <div class="stat"><span class="stat-n">13</span><div class="stat-l">YARA Rules</div></div>
+    <div class="stat"><span class="stat-n">9</span><div class="stat-l">IR Playbooks</div></div>
+    <div class="stat"><span class="stat-n">18</span><div class="stat-l">Hunting Queries</div></div>
+    <div class="stat"><span class="stat-n">7</span><div class="stat-l">Threat Feeds</div></div>
+</div>
+
+<!-- Nav Tabs -->
+<div class="nav-tabs">
+    <div class="nav-tab active" onclick="showTab('rule-gen')">&#9889; Rule Generator</div>
+    <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM / Splunk</div>
+    <div class="nav-tab" onclick="showTab('tools')">&#128736; Tools</div>
+    <div class="nav-tab" onclick="showTab('rules')">&#128680; Detection Rules</div>
+    <div class="nav-tab" onclick="showTab('hunting')">&#128270; Threat Hunting</div>
+    <div class="nav-tab" onclick="showTab('playbooks')">&#128214; Playbooks</div>
+    <div class="nav-tab" onclick="showTab('mitre')">&#127919; MITRE ATT&CK</div>
+    <div class="nav-tab" onclick="showTab('quickstart')">&#128187; Quick Start</div>
+</div>
+
+<!-- ==================== RULE GENERATOR ==================== -->
+<div id="tab-rule-gen" class="tab-content active">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#9889;</div>
+        <h3>Detection Rule Generator</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Type a rule name or describe what you want to detect. Select the format and severity, then generate a ready-to-deploy detection rule.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Rule Name / Description</label>
+                <input type="text" id="ruleName" placeholder="e.g. Detect Mimikatz, Brute Force SSH, Ransomware Encryption, PowerShell Download..." autocomplete="off">
             </div>
-            <div class="stat-card">
-                <span class="stat-number" id="sigmaCount">16</span>
-                <div class="stat-label">Sigma Rules</div>
+            <div class="gen-field" style="flex:0.5;min-width:140px">
+                <label>Format</label>
+                <select id="ruleFormat">
+                    <option value="sigma">Sigma (SIEM)</option>
+                    <option value="splunk">Splunk SPL</option>
+                    <option value="elastic">Elastic KQL</option>
+                    <option value="yara">YARA</option>
+                </select>
             </div>
-            <div class="stat-card">
-                <span class="stat-number" id="yaraCount">13</span>
-                <div class="stat-label">YARA Rules</div>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="playbookCount">9</span>
-                <div class="stat-label">IR Playbooks</div>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="huntCount">18</span>
-                <div class="stat-label">Hunting Queries</div>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number">7</span>
-                <div class="stat-label">Threat Feeds</div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="ruleSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
             </div>
         </div>
-
-        <!-- Tools Section -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(0, 212, 255, 0.15);">&#128736;</div>
-                <h3>Analysis & Intelligence Tools</h3>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:1;min-width:140px">
+                <label>Log Source</label>
+                <select id="ruleSource">
+                    <option value="windows">Windows Events</option>
+                    <option value="linux">Linux/Syslog</option>
+                    <option value="network">Network/Firewall</option>
+                    <option value="web">Web/Proxy</option>
+                    <option value="endpoint">Endpoint/EDR</option>
+                    <option value="cloud">Cloud (AWS/Azure/GCP)</option>
+                    <option value="email">Email</option>
+                </select>
             </div>
-            <div class="cards-grid">
-                <div class="card">
-                    <div class="card-title">&#128202; IOC Manager</div>
-                    <div class="card-desc">Aggregate and deduplicate indicators of compromise from 7+ threat feeds. Search, export, and maintain a local IOC database with automatic deduplication.</div>
-                    <div class="card-tags">
-                        <span class="tag">IOCs</span>
-                        <span class="tag">Threat Feeds</span>
-                        <span class="tag">Deduplication</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128269; Hash Checker</div>
-                    <div class="card-desc">Multi-source file hash reputation checking. Computes MD5/SHA1/SHA256 and queries VirusTotal, MalwareBazaar, and local IOC database.</div>
-                    <div class="card-tags">
-                        <span class="tag">VirusTotal</span>
-                        <span class="tag">MalwareBazaar</span>
-                        <span class="tag-green">Hash Analysis</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128232; Email Header Analyzer</div>
-                    <div class="card-desc">Parse and analyze email headers to detect phishing, spoofing, and suspicious routing. Checks SPF, DKIM, DMARC authentication with risk scoring.</div>
-                    <div class="card-tags">
-                        <span class="tag-red">Phishing</span>
-                        <span class="tag-red">Spoofing</span>
-                        <span class="tag">SPF/DKIM/DMARC</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#127760; IP Reputation Checker</div>
-                    <div class="card-desc">Check IPs against AbuseIPDB, VirusTotal, blocklist.de, and local IOCs. Includes geolocation, reverse DNS, and comprehensive risk scoring.</div>
-                    <div class="card-tags">
-                        <span class="tag">AbuseIPDB</span>
-                        <span class="tag">Geolocation</span>
-                        <span class="tag-yellow">Risk Score</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128027; CVE Vulnerability Checker</div>
-                    <div class="card-desc">Query NVD for CVEs by keyword or ID. Cross-references CISA Known Exploited Vulnerabilities catalog for active exploitation status.</div>
-                    <div class="card-tags">
-                        <span class="tag-red">CVE</span>
-                        <span class="tag-red">CISA KEV</span>
-                        <span class="tag">NVD API</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128200; Log Analyzer</div>
-                    <div class="card-desc">Pattern-based log analysis across syslog, auth, and web logs. 9 detection patterns with MITRE ATT&CK technique mapping and brute force summarization.</div>
-                    <div class="card-tags">
-                        <span class="tag">Syslog</span>
-                        <span class="tag">Auth Logs</span>
-                        <span class="tag-purple">MITRE Mapped</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128337; Forensic Timeline</div>
-                    <div class="card-desc">Generate chronological event timelines from multiple log sources. Auto-detects formats, classifies events, and exports to JSON/CSV for investigation.</div>
-                    <div class="card-tags">
-                        <span class="tag-yellow">Forensics</span>
-                        <span class="tag">Multi-source</span>
-                        <span class="tag">Timeline</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128506; Network Scanner</div>
-                    <div class="card-desc">Network baseline creation and anomaly detection. Identifies new connections, compares against IOC database, and alerts on suspicious activity.</div>
-                    <div class="card-tags">
-                        <span class="tag">Baseline</span>
-                        <span class="tag-yellow">Anomaly Detection</span>
-                        <span class="tag">IOC Matching</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#127919; ATT&CK Mapper</div>
-                    <div class="card-desc">Maps all detection rules and playbooks to MITRE ATT&CK techniques. Identifies coverage gaps and generates visual coverage reports.</div>
-                    <div class="card-tags">
-                        <span class="tag-purple">MITRE ATT&CK</span>
-                        <span class="tag">Coverage Analysis</span>
-                        <span class="tag-green">Gap Detection</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">&#128203; Threat Report Generator</div>
-                    <div class="card-desc">Generates comprehensive threat intelligence reports combining IOC data, detection coverage, feed status, and actionable recommendations.</div>
-                    <div class="card-tags">
-                        <span class="tag">Reports</span>
-                        <span class="tag">Markdown</span>
-                        <span class="tag-green">Automated</span>
-                    </div>
-                </div>
+            <div class="gen-field" style="flex:1;min-width:140px">
+                <label>MITRE Tactic</label>
+                <select id="ruleTactic">
+                    <option value="auto">Auto-Detect</option>
+                    <option value="initial-access">Initial Access</option>
+                    <option value="execution">Execution</option>
+                    <option value="persistence">Persistence</option>
+                    <option value="privilege-escalation">Privilege Escalation</option>
+                    <option value="defense-evasion">Defense Evasion</option>
+                    <option value="credential-access">Credential Access</option>
+                    <option value="discovery">Discovery</option>
+                    <option value="lateral-movement">Lateral Movement</option>
+                    <option value="collection">Collection</option>
+                    <option value="exfiltration">Exfiltration</option>
+                    <option value="command-and-control">Command & Control</option>
+                    <option value="impact">Impact</option>
+                </select>
             </div>
-        </section>
-
-        <!-- Detection Rules -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(239, 68, 68, 0.15);">&#128680;</div>
-                <h3>Detection Rules</h3>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateRule()">Generate Rule</button>
+                <button class="btn btn-secondary" onclick="clearOutput()">Clear</button>
             </div>
-            <div class="cards-grid">
-                <div class="card">
-                    <div class="card-title">Sigma Rules (16 Rules)</div>
-                    <div class="card-desc">SIEM-compatible detection rules for Splunk, Elastic, and QRadar covering multiple attack phases.</div>
-                    <div class="card-tags">
-                        <span class="tag-red">Data Exfiltration</span>
-                        <span class="tag-red">Brute Force</span>
-                        <span class="tag-red">Lateral Movement</span>
-                        <span class="tag-yellow">Privilege Escalation</span>
-                        <span class="tag-red">Defense Evasion</span>
-                        <span class="tag-yellow">Tor Detection</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">YARA Rules (13 Rules)</div>
-                    <div class="card-desc">File-based malware detection rules for scanning endpoints, network captures, and file shares.</div>
-                    <div class="card-tags">
-                        <span class="tag-red">Ransomware</span>
-                        <span class="tag-red">Webshells</span>
-                        <span class="tag-red">Mimikatz</span>
-                        <span class="tag-red">Cobalt Strike</span>
-                        <span class="tag-yellow">Cryptominers</span>
-                        <span class="tag-red">APT Loaders</span>
-                        <span class="tag-red">Rootkits</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- MITRE ATT&CK Coverage -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(16, 185, 129, 0.15);">&#127919;</div>
-                <h3>MITRE ATT&CK Coverage</h3>
-            </div>
-            <div class="mitre-grid">
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Initial Access</span>
-                    <span class="tech-count">4 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Execution</span>
-                    <span class="tech-count">3 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Persistence</span>
-                    <span class="tech-count">4 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Priv Escalation</span>
-                    <span class="tech-count">4 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Defense Evasion</span>
-                    <span class="tech-count">4 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Credential Access</span>
-                    <span class="tech-count">3 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Discovery</span>
-                    <span class="tech-count">2 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Lateral Movement</span>
-                    <span class="tech-count">4 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Collection</span>
-                    <span class="tech-count">2 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Exfiltration</span>
-                    <span class="tech-count">3 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">C2</span>
-                    <span class="tech-count">3 techniques</span>
-                </div>
-                <div class="mitre-cell covered">
-                    <span class="tactic-name">Impact</span>
-                    <span class="tech-count">2 techniques</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Threat Hunting -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(245, 158, 11, 0.15);">&#128270;</div>
-                <h3>Threat Hunting Queries (18 Queries)</h3>
-            </div>
-            <div class="cards-grid">
-                <div class="card">
-                    <div class="card-title">Initial Access & Execution</div>
-                    <div class="card-desc">Phishing link detection, external RDP monitoring, PowerShell download cradles, and suspicious script interpreter execution.</div>
-                    <div class="card-tags">
-                        <span class="tag">Splunk</span>
-                        <span class="tag">Elastic</span>
-                        <span class="tag-red">T1566</span>
-                        <span class="tag-red">T1059</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Persistence & Credential Access</div>
-                    <div class="card-desc">Scheduled task creation, registry run key modifications, service installation, LSASS access, and Kerberoasting detection.</div>
-                    <div class="card-tags">
-                        <span class="tag">Splunk</span>
-                        <span class="tag-red">T1053</span>
-                        <span class="tag-red">T1003</span>
-                        <span class="tag-red">T1558</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Lateral Movement & Evasion</div>
-                    <div class="card-desc">PsExec activity, WMI remote execution, timestomping, log clearing, and beaconing detection queries.</div>
-                    <div class="card-tags">
-                        <span class="tag">Splunk</span>
-                        <span class="tag-red">T1570</span>
-                        <span class="tag-red">T1070</span>
-                        <span class="tag-yellow">T1071</span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Exfiltration & Impact</div>
-                    <div class="card-desc">DNS tunneling, large file uploads, C2 beaconing, suspicious TLD connections, and mass file encryption detection.</div>
-                    <div class="card-tags">
-                        <span class="tag">Splunk</span>
-                        <span class="tag-red">T1048</span>
-                        <span class="tag-red">T1486</span>
-                        <span class="tag-yellow">T1041</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Incident Response Playbooks -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(124, 58, 237, 0.15);">&#128214;</div>
-                <h3>Incident Response Playbooks</h3>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Compromised Account</div>
-                    <span class="playbook-id severity-high">IR-001 | HIGH</span>
-                </div>
-                <div class="card-desc">Authentication log review, session revocation, MFA reset, and post-incident monitoring procedures.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Malware Infection</div>
-                    <span class="playbook-id severity-critical">IR-002 | CRITICAL</span>
-                </div>
-                <div class="card-desc">Malware family identification, network isolation, C2 blocking, and system rebuild procedures.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Data Exfiltration</div>
-                    <span class="playbook-id severity-critical">IR-003 | CRITICAL</span>
-                </div>
-                <div class="card-desc">DLP alert triage, exfiltration method identification, legal engagement, and data exposure assessment.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Ransomware</div>
-                    <span class="playbook-id severity-critical">IR-004 | CRITICAL</span>
-                </div>
-                <div class="card-desc">Ransomware family identification, encryption scope assessment, backup restoration, and recovery procedures.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Insider Threat</div>
-                    <span class="playbook-id severity-high">IR-005 | HIGH</span>
-                </div>
-                <div class="card-desc">User behavior analytics, HR/legal coordination, covert monitoring, and evidence preservation procedures.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">DDoS Attack</div>
-                    <span class="playbook-id severity-high">IR-006 | HIGH</span>
-                </div>
-                <div class="card-desc">Attack type classification, mitigation provider engagement, rate limiting, and infrastructure scaling.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Supply Chain Compromise</div>
-                    <span class="playbook-id severity-critical">IR-007 | CRITICAL</span>
-                </div>
-                <div class="card-desc">Third-party software compromise response, dependency auditing, SBOM tracking, and vendor risk management.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Cloud Account Compromise</div>
-                    <span class="playbook-id severity-critical">IR-008 | CRITICAL</span>
-                </div>
-                <div class="card-desc">Cloud IAM compromise response for AWS/Azure/GCP. Access key deactivation, resource audit, and CSPM deployment.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-
-            <div class="playbook-card">
-                <div class="playbook-header">
-                    <div class="card-title">Zero-Day Exploitation</div>
-                    <span class="playbook-id severity-critical">IR-009 | CRITICAL</span>
-                </div>
-                <div class="card-desc">Unknown vulnerability exploitation response. Virtual patching, exploit artifact collection, and vendor coordination.</div>
-                <div class="playbook-phases">
-                    <span class="phase">Identification</span>
-                    <span class="phase">Containment</span>
-                    <span class="phase">Eradication</span>
-                    <span class="phase">Recovery</span>
-                    <span class="phase">Lessons Learned</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Quick Start -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(0, 212, 255, 0.15);">&#9889;</div>
-                <h3>Quick Start</h3>
-            </div>
-            <div class="quickstart">
-                <div class="code-block">
-<span class="comment"># Clone and setup</span>
-<span class="command">git clone</span> https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam.git
-<span class="command">cd</span> threat-intelligence-blueteam
-<span class="command">pip install</span> <span class="flag">-r requirements.txt</span>
-
-<span class="comment"># Collect IOCs from threat feeds</span>
-<span class="command">python</span> ioc/ioc_manager.py collect
-
-<span class="comment"># Analyze suspicious email headers</span>
-<span class="command">python</span> scripts/email_analyzer.py <span class="flag">-f</span> suspicious_headers.txt
-
-<span class="comment"># Check IP reputation</span>
-<span class="command">python</span> scripts/ip_reputation.py 8.8.8.8 1.2.3.4
-
-<span class="comment"># Search for CVEs</span>
-<span class="command">python</span> scripts/cve_checker.py search <span class="flag">"apache log4j"</span>
-
-<span class="comment"># Generate forensic timeline from logs</span>
-<span class="command">python</span> scripts/timeline_generator.py /var/log/auth.log /var/log/syslog
-
-<span class="comment"># Map MITRE ATT&CK coverage</span>
-<span class="command">python</span> scripts/attack_mapper.py
-
-<span class="comment"># Generate threat report</span>
-<span class="command">python</span> scripts/threat_report.py
-
-<span class="comment"># Scan file hashes</span>
-<span class="command">python</span> scripts/hash_checker.py <span class="flag">--hash</span> &lt;sha256_hash&gt;
-
-<span class="comment"># Analyze logs for threats</span>
-<span class="command">python</span> scripts/log_analyzer.py <span class="flag">--input</span> /var/log/syslog
-                </div>
-            </div>
-        </section>
-
-        <!-- Architecture -->
-        <section class="section">
-            <div class="section-header">
-                <div class="section-icon" style="background: rgba(124, 58, 237, 0.15);">&#128736;</div>
-                <h3>Architecture</h3>
-            </div>
-            <div class="arch-diagram">
-<span class="highlight">THREAT FEEDS</span>                    <span class="highlight">ANALYSIS TOOLS</span>                  <span class="highlight">DETECTION</span>
- Feodo Tracker ─┐                  Email Analyzer ──┐             Sigma Rules (16) ──┐
- URLhaus ───────┤                  IP Reputation ───┤             YARA Rules (13) ───┤
- ET Compromised ┤  ┌───────────┐   CVE Checker ─────┤  ┌──────┐  Hunting Queries ───┤  ┌──────────┐
- SSL Blacklist ─┼─>│ <span class="ok">IOC</span>       │   Log Analyzer ───┼─>│ <span class="warn">RISK</span> │  Log Patterns (9) ──┼─>│ <span class="highlight">RESPONSE</span> │
- Tor Exit Nodes ┤  │ <span class="ok">DATABASE</span>  │   Timeline Gen ───┤  │ <span class="warn">ENGINE</span>│  ATT&CK Mapper ─────┤  │ 9 IR      │
- MalwareBazaar ─┤  └───────────┘   Network Scan ───┤  └──────┘                     │  │ Playbooks │
- ThreatFox ─────┘                  Hash Checker ────┘             Threat Reports ────┘  └──────────┘
-            </div>
-        </section>
-
-        <footer>
-            <p>
-                <strong>Blue Team Threat Intelligence Toolkit</strong> | MIT License<br>
-                Built for defenders | <a href="https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam">GitHub Repository</a><br>
-                <span style="color: var(--text-dim);">MITRE ATT&CK&reg; is a registered trademark of The MITRE Corporation</span>
-            </p>
-        </footer>
+        </div>
     </div>
+
+    <div id="ruleOutput" class="output-box">
+        <button class="copy-btn" onclick="copyRule()">Copy</button>
+        <code id="ruleCode"></code>
+    </div>
+
+    <!-- Preset Quick Buttons -->
+    <div style="margin-top:1.5rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate Presets:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Mimikatz Credential Dump','sigma','critical','windows','credential-access')">Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('SSH Brute Force Attack','sigma','high','linux','credential-access')">SSH Brute Force</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Ransomware File Encryption','yara','critical','endpoint','impact')">Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('PowerShell Download Cradle','splunk','high','windows','execution')">PS Download</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('DNS Tunneling Exfiltration','splunk','critical','network','exfiltration')">DNS Tunnel</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Cobalt Strike Beacon','yara','critical','endpoint','command-and-control')">Cobalt Strike</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Webshell Upload Detection','sigma','critical','web','persistence')">Webshell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Lateral Movement via PsExec','splunk','high','windows','lateral-movement')">PsExec</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('AWS Root Account Login','sigma','critical','cloud','initial-access')">AWS Root Login</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Kerberoasting Attack','splunk','high','windows','credential-access')">Kerberoast</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Phishing Email with Macro','sigma','high','email','initial-access')">Phishing Macro</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="preset('Cryptominer Process','yara','medium','endpoint','impact')">Cryptominer</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== SIEM / SPLUNK ==================== -->
+<div id="tab-siem" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128202;</div>
+        <h3>SIEM Queries & Dashboards</h3>
+    </div>
+
+    <div class="siem-tabs">
+        <div class="siem-tab active" onclick="showSiem('splunk')">Splunk SPL</div>
+        <div class="siem-tab" onclick="showSiem('elastic')">Elastic / KQL</div>
+        <div class="siem-tab" onclick="showSiem('sentinel')">Microsoft Sentinel</div>
+        <div class="siem-tab" onclick="showSiem('qradar')">IBM QRadar</div>
+    </div>
+
+    <!-- SPLUNK -->
+    <div id="siem-splunk" class="siem-content active">
+        <div class="spl-block">
+            <div class="spl-title">Brute Force Detection Dashboard</div>
+            <div class="spl-meta">MITRE: T1110 | Source: Authentication Logs | Severity: High</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect multiple failed logins followed by success</span>
+<span class="kw">index</span>=auth sourcetype=linux_secure
+| <span class="fn">rex</span> field=_raw "(?i)(failed|accepted)\s+password\s+for\s+(?:invalid\s+user\s+)?(?&lt;user&gt;\S+)\s+from\s+(?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)"
+| <span class="fn">eval</span> status=<span class="kw">if</span>(<span class="fn">match</span>(_raw,"(?i)failed"),"failure","success")
+| <span class="fn">stats</span> count(eval(status="failure")) <span class="kw">as</span> failures count(eval(status="success")) <span class="kw">as</span> successes values(src_ip) <span class="kw">as</span> source_ips <span class="kw">by</span> user
+| <span class="kw">where</span> failures > 5 AND successes > 0
+| <span class="fn">sort</span> -failures
+| <span class="fn">table</span> user failures successes source_ips</div>
+        </div>
+
+        <div class="spl-block">
+            <div class="spl-title">PowerShell Empire / Download Cradle Detection</div>
+            <div class="spl-meta">MITRE: T1059.001 | Source: Sysmon | Severity: Critical</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect PowerShell download and execute patterns</span>
+<span class="kw">index</span>=sysmon EventCode=1 Image="*\\powershell.exe" OR Image="*\\pwsh.exe"
+| <span class="kw">where</span> <span class="fn">match</span>(CommandLine, "(?i)(IEX|Invoke-Expression|DownloadString|DownloadFile|WebClient|Net\.WebClient|Start-BitsTransfer|Invoke-WebRequest|wget|curl|IO\.MemoryStream|FromBase64String)")
+| <span class="fn">eval</span> risk_score=<span class="kw">case</span>(
+    <span class="fn">match</span>(CommandLine,"(?i)EncodedCommand"), 90,
+    <span class="fn">match</span>(CommandLine,"(?i)bypass"), 85,
+    <span class="fn">match</span>(CommandLine,"(?i)hidden"), 80,
+    1=1, 70)
+| <span class="fn">stats</span> count values(CommandLine) <span class="kw">as</span> commands max(risk_score) <span class="kw">as</span> max_risk <span class="kw">by</span> Computer User ParentImage
+| <span class="fn">sort</span> -max_risk</div>
+        </div>
+
+        <div class="spl-block">
+            <div class="spl-title">DNS Tunneling / Data Exfiltration</div>
+            <div class="spl-meta">MITRE: T1048.003 | Source: DNS Logs | Severity: Critical</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect anomalous DNS queries indicating tunneling</span>
+<span class="kw">index</span>=dns sourcetype=dns
+| <span class="fn">eval</span> query_len=<span class="fn">len</span>(query)
+| <span class="fn">eval</span> subdomain_count=<span class="fn">mvcount</span>(<span class="fn">split</span>(query, "."))
+| <span class="kw">where</span> query_len > 50 AND subdomain_count > 4
+| <span class="fn">rex</span> field=query "\.(?&lt;base_domain&gt;[^.]+\.[^.]+)$"
+| <span class="fn">stats</span> count avg(query_len) <span class="kw">as</span> avg_len dc(query) <span class="kw">as</span> unique_queries sum(query_len) <span class="kw">as</span> total_bytes <span class="kw">by</span> src_ip base_domain
+| <span class="fn">eval</span> total_kb=<span class="fn">round</span>(total_bytes/1024,2)
+| <span class="kw">where</span> unique_queries > 50 AND avg_len > 40
+| <span class="fn">sort</span> -total_kb</div>
+        </div>
+
+        <div class="spl-block">
+            <div class="spl-title">Lateral Movement - PsExec & Remote Services</div>
+            <div class="spl-meta">MITRE: T1570, T1021.002 | Source: Windows Events | Severity: High</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect PsExec-style lateral movement</span>
+<span class="kw">index</span>=windows (EventCode=7045 ServiceName="PSEXESVC*") OR (EventCode=4624 LogonType=3)
+| <span class="fn">eval</span> detection_type=<span class="kw">case</span>(
+    EventCode=7045, "service_install",
+    EventCode=4624, "network_logon")
+| <span class="fn">stats</span> count values(detection_type) <span class="kw">as</span> detections values(ServiceName) <span class="kw">as</span> services <span class="kw">by</span> ComputerName SourceNetworkAddress Account_Name
+| <span class="kw">where</span> <span class="fn">mvcount</span>(detections) > 1 OR <span class="fn">match</span>(<span class="fn">mvindex</span>(services,0),"PSEXESVC")
+| <span class="fn">sort</span> -count</div>
+        </div>
+
+        <div class="spl-block">
+            <div class="spl-title">C2 Beaconing Detection (Statistical)</div>
+            <div class="spl-meta">MITRE: T1071.001 | Source: Proxy/Firewall | Severity: High</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect periodic C2 callbacks using time-series analysis</span>
+<span class="kw">index</span>=proxy OR <span class="kw">index</span>=firewall action=allowed
+| <span class="fn">bin</span> _time span=60s
+| <span class="fn">stats</span> count <span class="kw">by</span> _time src_ip dest_ip dest_port
+| <span class="fn">streamstats</span> window=120 current=f stdev(count) <span class="kw">as</span> jitter avg(count) <span class="kw">as</span> avg_count <span class="kw">by</span> src_ip dest_ip
+| <span class="kw">where</span> jitter &lt; 2 AND avg_count > 0
+| <span class="fn">stats</span> count dc(_time) <span class="kw">as</span> beacon_intervals avg(jitter) <span class="kw">as</span> avg_jitter <span class="kw">by</span> src_ip dest_ip dest_port
+| <span class="kw">where</span> beacon_intervals > 30
+| <span class="fn">eval</span> confidence=<span class="kw">if</span>(avg_jitter &lt; 0.5, "HIGH", <span class="kw">if</span>(avg_jitter &lt; 1.5, "MEDIUM", "LOW"))
+| <span class="fn">sort</span> -beacon_intervals</div>
+        </div>
+
+        <div class="spl-block">
+            <div class="spl-title">Ransomware Activity - Mass File Modification</div>
+            <div class="spl-meta">MITRE: T1486 | Source: Sysmon | Severity: Critical</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code"><span class="cm">| Detect mass file encryption indicating ransomware</span>
+<span class="kw">index</span>=sysmon (EventCode=11 OR EventCode=2)
+| <span class="fn">rex</span> field=TargetFilename "\.(?&lt;ext&gt;[^.\\]+)$"
+| <span class="fn">eval</span> suspicious_ext=<span class="kw">if</span>(<span class="fn">match</span>(ext,"(?i)(encrypted|locked|crypt|enc|locky|cerber|zepto|wnry|wcry)"),1,0)
+| <span class="fn">bin</span> _time span=5m
+| <span class="fn">stats</span> dc(TargetFilename) <span class="kw">as</span> files_modified sum(suspicious_ext) <span class="kw">as</span> suspicious_files values(ext) <span class="kw">as</span> extensions <span class="kw">by</span> _time Computer Image
+| <span class="kw">where</span> files_modified > 100 OR suspicious_files > 5
+| <span class="fn">sort</span> -files_modified</div>
+        </div>
+    </div>
+
+    <!-- ELASTIC -->
+    <div id="siem-elastic" class="siem-content">
+        <div class="spl-block">
+            <div class="spl-title">Brute Force Detection</div>
+            <div class="spl-meta">MITRE: T1110 | Elastic KQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">event.category: "authentication" AND event.outcome: "failure"
+| stats count by source.ip, user.name
+| where count > 10</div>
+        </div>
+        <div class="spl-block">
+            <div class="spl-title">PowerShell Suspicious Execution</div>
+            <div class="spl-meta">MITRE: T1059.001 | Elastic EQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">process where process.name == "powershell.exe" and
+  process.command_line : ("*EncodedCommand*", "*DownloadString*",
+    "*IEX*", "*Invoke-Expression*", "*WebClient*", "*bypass*")</div>
+        </div>
+        <div class="spl-block">
+            <div class="spl-title">Lateral Movement - Remote Service Creation</div>
+            <div class="spl-meta">MITRE: T1021.002 | Elastic KQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">event.code: "7045" AND winlog.event_data.ServiceName: ("PSEXESVC" OR "RemCom" OR "csexec")</div>
+        </div>
+    </div>
+
+    <!-- SENTINEL -->
+    <div id="siem-sentinel" class="siem-content">
+        <div class="spl-block">
+            <div class="spl-title">Brute Force Detection</div>
+            <div class="spl-meta">MITRE: T1110 | KQL (Microsoft Sentinel)</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">SigninLogs
+| where ResultType != 0
+| summarize FailedAttempts = count(), SuccessCount = countif(ResultType == 0)
+    by UserPrincipalName, IPAddress, bin(TimeGenerated, 1h)
+| where FailedAttempts > 10 and SuccessCount > 0
+| sort by FailedAttempts desc</div>
+        </div>
+        <div class="spl-block">
+            <div class="spl-title">Suspicious PowerShell Commands</div>
+            <div class="spl-meta">MITRE: T1059.001 | KQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">DeviceProcessEvents
+| where FileName in~ ("powershell.exe", "pwsh.exe")
+| where ProcessCommandLine has_any ("EncodedCommand", "DownloadString",
+    "Invoke-Expression", "IEX", "WebClient", "bypass")
+| project TimeGenerated, DeviceName, AccountName, ProcessCommandLine
+| sort by TimeGenerated desc</div>
+        </div>
+    </div>
+
+    <!-- QRADAR -->
+    <div id="siem-qradar" class="siem-content">
+        <div class="spl-block">
+            <div class="spl-title">Brute Force Detection</div>
+            <div class="spl-meta">MITRE: T1110 | QRadar AQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">SELECT sourceip, username, COUNT(*) as attempt_count
+FROM events
+WHERE LOGSOURCETYPENAME(logsourceid) = 'Linux OS'
+  AND "eventCategory" = 'Authentication'
+  AND "eventName" ILIKE '%failed%'
+GROUP BY sourceip, username
+HAVING COUNT(*) > 10
+ORDER BY attempt_count DESC
+LAST 24 HOURS</div>
+        </div>
+        <div class="spl-block">
+            <div class="spl-title">Lateral Movement Detection</div>
+            <div class="spl-meta">MITRE: T1021 | QRadar AQL</div>
+            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
+            <div class="spl-code">SELECT sourceip, destinationip, username, COUNT(*) as connections
+FROM events
+WHERE "eventName" ILIKE '%logon%'
+  AND "LogonType" = '3'
+  AND sourceip != destinationip
+GROUP BY sourceip, destinationip, username
+HAVING COUNT(*) > 5
+ORDER BY connections DESC
+LAST 24 HOURS</div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== TOOLS ==================== -->
+<div id="tab-tools" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128736;</div>
+        <h3>Analysis & Intelligence Tools</h3>
+    </div>
+    <div class="grid">
+        <div class="card"><div class="card-t">&#128202; IOC Manager</div><div class="card-d">Aggregate and deduplicate IOCs from 7+ threat feeds. Search, export, and maintain a local database.</div><div class="tags"><span class="tag">IOCs</span><span class="tag">7 Feeds</span><span class="tag">Dedup</span></div></div>
+        <div class="card"><div class="card-t">&#128232; Email Header Analyzer</div><div class="card-d">SPF/DKIM/DMARC validation, spoofing detection, phishing indicators, risk scoring.</div><div class="tags"><span class="tag tag-r">Phishing</span><span class="tag tag-r">Spoofing</span><span class="tag">Authentication</span></div></div>
+        <div class="card"><div class="card-t">&#127760; IP Reputation Checker</div><div class="card-d">AbuseIPDB, VirusTotal, blocklist.de, geolocation, reverse DNS, risk scoring.</div><div class="tags"><span class="tag">AbuseIPDB</span><span class="tag">VirusTotal</span><span class="tag tag-y">Risk Score</span></div></div>
+        <div class="card"><div class="card-t">&#128027; CVE Vulnerability Checker</div><div class="card-d">NVD search, CISA KEV cross-reference, CVSS scoring, active exploitation status.</div><div class="tags"><span class="tag tag-r">CVE</span><span class="tag tag-r">CISA KEV</span><span class="tag">NVD</span></div></div>
+        <div class="card"><div class="card-t">&#128337; Forensic Timeline</div><div class="card-d">Multi-format log parsing, event classification, chronological timeline generation.</div><div class="tags"><span class="tag tag-y">Forensics</span><span class="tag">Multi-source</span><span class="tag">JSON/CSV</span></div></div>
+        <div class="card"><div class="card-t">&#127919; ATT&CK Coverage Mapper</div><div class="card-d">Scans all rules and playbooks, maps to MITRE techniques, identifies coverage gaps.</div><div class="tags"><span class="tag tag-p">MITRE</span><span class="tag tag-g">Gap Detection</span></div></div>
+        <div class="card"><div class="card-t">&#128203; Threat Report Generator</div><div class="card-d">Automated reports combining IOC stats, detection coverage, feeds, recommendations.</div><div class="tags"><span class="tag">Reports</span><span class="tag">Markdown</span><span class="tag tag-g">Automated</span></div></div>
+        <div class="card"><div class="card-t">&#128200; Log Analyzer</div><div class="card-d">9 detection patterns across syslog, auth, and web logs with MITRE ATT&CK mapping.</div><div class="tags"><span class="tag">Syslog</span><span class="tag">Auth</span><span class="tag tag-p">MITRE</span></div></div>
+        <div class="card"><div class="card-t">&#128506; Network Scanner</div><div class="card-d">Connection baselining, anomaly detection, IOC correlation, suspicious connection alerts.</div><div class="tags"><span class="tag">Baseline</span><span class="tag tag-y">Anomaly</span><span class="tag">IOC Match</span></div></div>
+        <div class="card"><div class="card-t">&#128269; Hash Checker</div><div class="card-d">MD5/SHA1/SHA256 computation, VirusTotal, MalwareBazaar, local IOC database lookup.</div><div class="tags"><span class="tag">VirusTotal</span><span class="tag">MalwareBazaar</span><span class="tag tag-g">Hash</span></div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== DETECTION RULES ==================== -->
+<div id="tab-rules" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128680;</div>
+        <h3>Detection Rules Library</h3>
+    </div>
+    <div class="grid">
+        <div class="card"><div class="card-t">Sigma: Authentication Attacks (3)</div><div class="card-d">Brute force followed by success, Tor exit node login, suspicious scheduled task creation.</div><div class="tags"><span class="tag tag-r">T1110</span><span class="tag tag-r">T1078</span><span class="tag tag-y">T1053</span></div></div>
+        <div class="card"><div class="card-t">Sigma: Data Exfiltration (2)</div><div class="card-d">DNS tunneling detection and large outbound data transfer monitoring.</div><div class="tags"><span class="tag tag-r">T1048</span><span class="tag tag-r">T1041</span></div></div>
+        <div class="card"><div class="card-t">Sigma: Lateral Movement (4)</div><div class="card-d">PsExec service install, WMI remote exec, unusual RDP sources, SMB admin share access.</div><div class="tags"><span class="tag tag-r">T1570</span><span class="tag tag-r">T1021</span><span class="tag tag-y">T1047</span></div></div>
+        <div class="card"><div class="card-t">Sigma: Privilege Escalation (4)</div><div class="card-d">Sudo abuse, token impersonation, UAC bypass (3 methods), kernel exploit indicators.</div><div class="tags"><span class="tag tag-r">T1548</span><span class="tag tag-r">T1134</span><span class="tag tag-r">T1068</span></div></div>
+        <div class="card"><div class="card-t">Sigma: Defense Evasion (4)</div><div class="card-d">Security tool kill, log tampering, process injection, renamed system binaries.</div><div class="tags"><span class="tag tag-r">T1562</span><span class="tag tag-r">T1070</span><span class="tag tag-r">T1055</span><span class="tag tag-y">T1036</span></div></div>
+        <div class="card"><div class="card-t">YARA: Common Malware (6)</div><div class="card-d">PowerShell encoded commands, webshells, Mimikatz, macro documents, ransomware notes, Cobalt Strike.</div><div class="tags"><span class="tag tag-r">Malware</span><span class="tag tag-r">C2</span><span class="tag tag-y">Webshells</span></div></div>
+        <div class="card"><div class="card-t">YARA: Advanced Threats (7)</div><div class="card-d">APT loaders, reverse shells, credential harvesters, rootkits, cryptominers, info stealers, ransomware behavior.</div><div class="tags"><span class="tag tag-r">APT</span><span class="tag tag-r">Rootkit</span><span class="tag tag-y">Stealer</span><span class="tag tag-r">Ransomware</span></div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== THREAT HUNTING ==================== -->
+<div id="tab-hunting" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128270;</div>
+        <h3>Threat Hunting Queries (18)</h3>
+    </div>
+    <div class="grid">
+        <div class="card"><div class="card-t">Initial Access (2)</div><div class="card-d">Phishing link clicks to new domains, external RDP connection monitoring.</div><div class="tags"><span class="tag">Splunk</span><span class="tag">Elastic</span><span class="tag tag-r">T1566</span><span class="tag tag-r">T1133</span></div></div>
+        <div class="card"><div class="card-t">Execution (2)</div><div class="card-d">PowerShell download cradle, suspicious script interpreter (wscript/mshta).</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1059.001</span><span class="tag tag-y">T1059.005</span></div></div>
+        <div class="card"><div class="card-t">Persistence (3)</div><div class="card-d">Scheduled task creation, registry run key modification, new service installation.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1053</span><span class="tag tag-r">T1547</span><span class="tag tag-y">T1543</span></div></div>
+        <div class="card"><div class="card-t">Credential Access (2)</div><div class="card-d">LSASS memory access (credential dumping), Kerberoasting TGS requests.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1003</span><span class="tag tag-r">T1558</span></div></div>
+        <div class="card"><div class="card-t">Lateral Movement (2)</div><div class="card-d">PsExec activity detection, WMI remote process creation.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1570</span><span class="tag tag-y">T1047</span></div></div>
+        <div class="card"><div class="card-t">Defense Evasion (2)</div><div class="card-d">Timestomping detection, security log clearing (Event 1102/104).</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1070.006</span><span class="tag tag-r">T1070.001</span></div></div>
+        <div class="card"><div class="card-t">Exfiltration (2)</div><div class="card-d">DNS tunneling anomalous queries, large file upload to external services.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1048</span><span class="tag tag-r">T1041</span></div></div>
+        <div class="card"><div class="card-t">Command & Control (2)</div><div class="card-d">C2 beaconing via time-series jitter analysis, connections to suspicious TLDs.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1071</span><span class="tag tag-y">Beaconing</span></div></div>
+        <div class="card"><div class="card-t">Impact (1)</div><div class="card-d">Mass file encryption detection indicating ransomware activity.</div><div class="tags"><span class="tag">Splunk</span><span class="tag tag-r">T1486</span><span class="tag tag-r">Ransomware</span></div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== PLAYBOOKS ==================== -->
+<div id="tab-playbooks" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#128214;</div>
+        <h3>Incident Response Playbooks</h3>
+    </div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Compromised Account</div><span class="pb-id sev-h">IR-001 | HIGH</span></div><div class="card-d">Authentication log review, session revocation, MFA reset, 30-day post-incident monitoring.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Malware Infection</div><span class="pb-id sev-c">IR-002 | CRITICAL</span></div><div class="card-d">YARA scanning, C2 blocking, network isolation, system rebuild from clean images.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Data Exfiltration</div><span class="pb-id sev-c">IR-003 | CRITICAL</span></div><div class="card-d">DLP alert triage, exfiltration method identification, legal engagement, exposure assessment.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Ransomware</div><span class="pb-id sev-c">IR-004 | CRITICAL</span></div><div class="card-d">Family identification, encryption scope, backup verification, offline restoration.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Insider Threat</div><span class="pb-id sev-h">IR-005 | HIGH</span></div><div class="card-d">User behavior analytics, HR/legal coordination, covert monitoring, evidence preservation.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">DDoS Attack</div><span class="pb-id sev-h">IR-006 | HIGH</span></div><div class="card-d">Attack classification, mitigation provider engagement, rate limiting, infrastructure scaling.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Supply Chain Compromise</div><span class="pb-id sev-c">IR-007 | CRITICAL</span></div><div class="card-d">Third-party software response, SBOM tracking, dependency auditing, vendor risk management.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Cloud Account Compromise</div><span class="pb-id sev-c">IR-008 | CRITICAL</span></div><div class="card-d">AWS/Azure/GCP IAM audit, access key deactivation, resource audit, CSPM deployment.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+    <div class="pb"><div class="pb-hdr"><div class="card-t">Zero-Day Exploitation</div><span class="pb-id sev-c">IR-009 | CRITICAL</span></div><div class="card-d">Virtual patching, exploit artifact collection, vendor coordination, compensating controls.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
+</div>
+</div>
+
+<!-- ==================== MITRE ATT&CK ==================== -->
+<div id="tab-mitre" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#127919;</div>
+        <h3>MITRE ATT&CK Coverage Map</h3>
+    </div>
+    <div class="mitre">
+        <div class="mc"><b>Initial Access</b><span>4 techniques</span></div>
+        <div class="mc"><b>Execution</b><span>3 techniques</span></div>
+        <div class="mc"><b>Persistence</b><span>4 techniques</span></div>
+        <div class="mc"><b>Priv Escalation</b><span>4 techniques</span></div>
+        <div class="mc"><b>Defense Evasion</b><span>4 techniques</span></div>
+        <div class="mc"><b>Credential Access</b><span>3 techniques</span></div>
+        <div class="mc"><b>Discovery</b><span>2 techniques</span></div>
+        <div class="mc"><b>Lateral Movement</b><span>4 techniques</span></div>
+        <div class="mc"><b>Collection</b><span>2 techniques</span></div>
+        <div class="mc"><b>Exfiltration</b><span>3 techniques</span></div>
+        <div class="mc"><b>C2</b><span>3 techniques</span></div>
+        <div class="mc"><b>Impact</b><span>2 techniques</span></div>
+    </div>
+    <div class="arch" style="margin-top:1.5rem">
+<span class="h">THREAT FEEDS</span>                    <span class="h">ANALYSIS TOOLS</span>                  <span class="h">DETECTION</span>
+ Feodo Tracker &#9472;&#9488;                  Email Analyzer &#9472;&#9472;&#9488;             Sigma Rules (16) &#9472;&#9472;&#9488;
+ URLhaus &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9508;                  IP Reputation &#9472;&#9472;&#9472;&#9508;             YARA Rules (13) &#9472;&#9472;&#9472;&#9508;
+ ET Compromised &#9508;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;   CVE Checker &#9472;&#9472;&#9472;&#9472;&#9472;&#9508;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  Hunting Queries &#9472;&#9472;&#9472;&#9508;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+ SSL Blacklist &#9472;&#9508;&#9472;&gt;&#9474; <span class="g">IOC</span>       &#9474;   Log Analyzer &#9472;&#9472;&#9472;&#9472;&#9508;&#9472;&gt;&#9474; <span class="w">RISK</span>   &#9474;  Log Patterns (9) &#9472;&#9472;&#9508;&#9472;&gt;&#9474; <span class="h">RESPONSE</span>   &#9474;
+ Tor Exit Nodes &#9508;  &#9474; <span class="g">DATABASE</span>  &#9474;   Timeline Gen &#9472;&#9472;&#9472;&#9472;&#9508;  &#9474; <span class="w">ENGINE</span> &#9474;                     &#9474;  &#9474; 9 Playbooks &#9474;
+ MalwareBazaar &#9472;&#9508;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   Network Scan &#9472;&#9472;&#9472;&#9472;&#9508;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  Threat Reports &#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+ ThreatFox &#9472;&#9472;&#9472;&#9472;&#9472;&#9496;                  Hash Checker &#9472;&#9472;&#9472;&#9472;&#9496;
+    </div>
+</div>
+</div>
+
+<!-- ==================== QUICK START ==================== -->
+<div id="tab-quickstart" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128187;</div>
+        <h3>Quick Start</h3>
+    </div>
+    <div class="code">
+<span class="c"># Clone and setup</span>
+<span class="cmd">git clone</span> https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam.git
+<span class="cmd">cd</span> threat-intelligence-blueteam
+<span class="cmd">pip install</span> <span class="fl">-r requirements.txt</span>
+
+<span class="c"># Collect IOCs from 7 threat feeds</span>
+<span class="cmd">python</span> ioc/ioc_manager.py collect
+
+<span class="c"># Analyze suspicious email headers</span>
+<span class="cmd">python</span> scripts/email_analyzer.py <span class="fl">-f</span> suspicious_headers.txt
+
+<span class="c"># Check IP reputation</span>
+<span class="cmd">python</span> scripts/ip_reputation.py 8.8.8.8 1.2.3.4
+
+<span class="c"># Search CVE vulnerabilities + CISA KEV</span>
+<span class="cmd">python</span> scripts/cve_checker.py search <span class="fl">"apache log4j"</span>
+<span class="cmd">python</span> scripts/cve_checker.py kev <span class="fl">--recent 20</span>
+
+<span class="c"># Generate forensic timeline</span>
+<span class="cmd">python</span> scripts/timeline_generator.py /var/log/auth.log /var/log/syslog
+
+<span class="c"># Map MITRE ATT&CK coverage and find gaps</span>
+<span class="cmd">python</span> scripts/attack_mapper.py <span class="fl">--gaps-only</span>
+
+<span class="c"># Generate threat intelligence report</span>
+<span class="cmd">python</span> scripts/threat_report.py <span class="fl">--markdown</span> report.md
+
+<span class="c"># Analyze logs for threats</span>
+<span class="cmd">python</span> scripts/log_analyzer.py <span class="fl">--input</span> /var/log/syslog
+
+<span class="c"># Network baseline and scan</span>
+<span class="cmd">python</span> scripts/network_scan.py baseline
+<span class="cmd">python</span> scripts/network_scan.py scan
+    </div>
+</div>
+</div>
+
+<footer>
+    <p><strong>Blue Team Threat Intelligence Toolkit</strong> | MIT License<br>
+    Built for defenders | <a href="https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam">GitHub Repository</a><br>
+    <span style="color:var(--dim)">MITRE ATT&CK&reg; is a registered trademark of The MITRE Corporation</span></p>
+</footer>
+
+</div>
+
+<script>
+// Tab switching
+function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// SIEM tab switching
+function showSiem(id) {
+    document.querySelectorAll('.siem-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.siem-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('siem-'+id).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// Copy SPL query
+function copySpl(btn) {
+    const code = btn.parentElement.querySelector('.spl-code');
+    navigator.clipboard.writeText(code.textContent);
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+// Copy generated rule
+function copyRule() {
+    const code = document.getElementById('ruleCode');
+    navigator.clipboard.writeText(code.textContent);
+    const btn = document.querySelector('#ruleOutput .copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+function clearOutput() {
+    document.getElementById('ruleOutput').classList.remove('show');
+}
+
+// Preset quick buttons
+function preset(name, fmt, sev, src, tactic) {
+    document.getElementById('ruleName').value = name;
+    document.getElementById('ruleFormat').value = fmt;
+    document.getElementById('ruleSeverity').value = sev;
+    document.getElementById('ruleSource').value = src;
+    document.getElementById('ruleTactic').value = tactic;
+    generateRule();
+}
+
+// ==================== RULE GENERATOR ENGINE ====================
+const ruleTemplates = {
+    // Keywords mapped to detection logic
+    patterns: {
+        'mimikatz': { technique: 'T1003.001', tactic: 'credential-access', keywords: ['sekurlsa','logonpasswords','lsass','wdigest','kerberos::list'], process: 'lsass.exe', description: 'Mimikatz credential dumping tool execution' },
+        'credential dump': { technique: 'T1003', tactic: 'credential-access', keywords: ['procdump','lsass','comsvcs','MiniDump','sekurlsa'], process: 'lsass.exe', description: 'Credential dumping from memory' },
+        'brute force': { technique: 'T1110', tactic: 'credential-access', keywords: ['Failed password','authentication failure','invalid user','failed login'], description: 'Brute force authentication attack' },
+        'ssh brute': { technique: 'T1110.001', tactic: 'credential-access', keywords: ['Failed password','sshd','invalid user','authentication failure'], description: 'SSH brute force password guessing' },
+        'powershell download': { technique: 'T1059.001', tactic: 'execution', keywords: ['DownloadString','IEX','Invoke-Expression','WebClient','DownloadFile','EncodedCommand','bypass'], process: 'powershell.exe', description: 'PowerShell download and execute cradle' },
+        'powershell': { technique: 'T1059.001', tactic: 'execution', keywords: ['EncodedCommand','bypass','hidden','NonInteractive','Invoke-Expression'], process: 'powershell.exe', description: 'Suspicious PowerShell execution' },
+        'ransomware': { technique: 'T1486', tactic: 'impact', keywords: ['vssadmin delete','wmic shadowcopy','bcdedit.*recoveryenabled','encrypted','YOUR FILES'], description: 'Ransomware encryption and recovery destruction' },
+        'dns tunnel': { technique: 'T1048.003', tactic: 'exfiltration', keywords: ['dns','query_len > 50','subdomain','high entropy'], description: 'DNS tunneling data exfiltration' },
+        'cobalt strike': { technique: 'T1071.001', tactic: 'command-and-control', keywords: ['beacon','cobaltstrike','sleeptime','watermark','C2','malleable'], description: 'Cobalt Strike C2 beacon activity' },
+        'webshell': { technique: 'T1505.003', tactic: 'persistence', keywords: ['eval(','base64_decode','cmd.exe','/bin/sh','upload','system(','passthru'], description: 'Web shell upload or execution' },
+        'psexec': { technique: 'T1570', tactic: 'lateral-movement', keywords: ['PSEXESVC','psexec','RemCom','paexec','admin$'], process: 'psexec.exe', description: 'PsExec lateral movement tool' },
+        'kerberoast': { technique: 'T1558.003', tactic: 'credential-access', keywords: ['TGS','4769','Ticket_Encryption_Type','0x17','service account'], description: 'Kerberoasting attack against service accounts' },
+        'phishing': { technique: 'T1566', tactic: 'initial-access', keywords: ['macro','VBA','AutoOpen','Document_Open','DDEAUTO','attachment'], description: 'Phishing email with malicious content' },
+        'uac bypass': { technique: 'T1548.002', tactic: 'privilege-escalation', keywords: ['eventvwr.exe','fodhelper.exe','computerdefaults.exe','sdclt.exe'], description: 'UAC bypass privilege escalation' },
+        'cryptominer': { technique: 'T1496', tactic: 'impact', keywords: ['stratum+tcp','xmrig','cryptonight','randomx','minerd','coinhive','minergate'], description: 'Cryptocurrency mining software' },
+        'log clear': { technique: 'T1070.001', tactic: 'defense-evasion', keywords: ['1102','wevtutil cl','Clear-EventLog','auditpol /clear'], description: 'Windows event log clearing' },
+        'data exfil': { technique: 'T1041', tactic: 'exfiltration', keywords: ['bytes_out','POST','upload','large transfer','outbound'], description: 'Data exfiltration over network' },
+        'scheduled task': { technique: 'T1053.005', tactic: 'persistence', keywords: ['schtasks','at.exe','/create','TaskScheduler'], description: 'Scheduled task persistence mechanism' },
+        'aws root': { technique: 'T1078.004', tactic: 'initial-access', keywords: ['ConsoleLogin','Root','rootaccount','signin.aws'], description: 'AWS root account login' },
+        'reverse shell': { technique: 'T1059', tactic: 'execution', keywords: ['/dev/tcp/','bash -i','nc -e','ncat -e','TCPSocket','fsockopen'], description: 'Reverse shell connection' },
+        'rootkit': { technique: 'T1014', tactic: 'defense-evasion', keywords: ['ZwQuerySystemInformation','NtCreateThreadEx','hidden process','kernel hook'], description: 'Rootkit system hiding techniques' },
+        'rdp': { technique: 'T1021.001', tactic: 'lateral-movement', keywords: ['3389','Remote Desktop','LogonType.*10','mstsc'], description: 'Remote Desktop Protocol access' },
+    },
+
+    findMatch(input) {
+        const lower = input.toLowerCase();
+        for (const [key, val] of Object.entries(this.patterns)) {
+            if (lower.includes(key)) return { key, ...val };
+        }
+        // Fuzzy: check individual words
+        const words = lower.split(/\s+/);
+        for (const [key, val] of Object.entries(this.patterns)) {
+            const keyWords = key.split(/\s+/);
+            if (keyWords.some(kw => words.some(w => w.includes(kw) || kw.includes(w)))) {
+                return { key, ...val };
+            }
+        }
+        return null;
+    }
+};
+
+function generateRule() {
+    const name = document.getElementById('ruleName').value.trim();
+    if (!name) { alert('Enter a rule name or description'); return; }
+
+    const format = document.getElementById('ruleFormat').value;
+    const severity = document.getElementById('ruleSeverity').value;
+    const source = document.getElementById('ruleSource').value;
+    const tactic = document.getElementById('ruleTactic').value;
+
+    const match = ruleTemplates.findMatch(name);
+    const technique = match ? match.technique : 'T1059';
+    const tacticFinal = (tactic !== 'auto') ? tactic : (match ? match.tactic : 'execution');
+    const description = match ? match.description : `Detection rule for: ${name}`;
+    const keywords = match ? match.keywords : [name.split(' ').pop()];
+    const proc = match ? match.process : '';
+
+    const safeName = name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    const now = new Date().toISOString().split('T')[0].replace(/-/g, '/');
+    let rule = '';
+
+    if (format === 'sigma') {
+        rule = generateSigma(safeName, name, description, severity, source, technique, tacticFinal, keywords, proc, now);
+    } else if (format === 'splunk') {
+        rule = generateSplunk(safeName, name, description, severity, source, technique, tacticFinal, keywords, proc);
+    } else if (format === 'elastic') {
+        rule = generateElastic(safeName, name, description, severity, source, technique, tacticFinal, keywords, proc);
+    } else if (format === 'yara') {
+        rule = generateYara(safeName, name, description, severity, technique, keywords);
+    }
+
+    document.getElementById('ruleCode').textContent = rule;
+    document.getElementById('ruleOutput').classList.add('show');
+}
+
+function generateSigma(id, title, desc, severity, source, technique, tactic, keywords, proc, date) {
+    const tacticTag = tactic.replace(/-/g, '_');
+    const sourceMap = {
+        'windows': 'product: windows\n  category: process_creation',
+        'linux': 'product: linux\n  service: auth',
+        'network': 'category: firewall',
+        'web': 'category: webserver\n  service: access',
+        'endpoint': 'product: windows\n  category: process_creation',
+        'cloud': 'product: aws\n  service: cloudtrail',
+        'email': 'product: microsoft365\n  service: exchange'
+    };
+
+    let detection = '';
+    if (proc) {
+        detection += `  selection_process:\n    Image|endswith: '\\\\${proc}'\n  selection_commands:\n    CommandLine|contains:\n`;
+        keywords.forEach(k => detection += `      - '${k}'\n`);
+        detection += `  condition: selection_process and selection_commands`;
+    } else {
+        detection += `  selection:\n`;
+        if (keywords.length > 0) detection += `    |contains:\n`;
+        keywords.forEach(k => detection += `      - '${k}'\n`);
+        detection += `  condition: selection`;
+    }
+
+    return `title: ${title}
+id: sigma-gen-${id.toLowerCase().substring(0,20)}
+status: experimental
+level: ${severity}
+description: ${desc}
+author: Blue Team Toolkit - Auto Generated
+date: ${date}
+tags:
+  - attack.${tacticTag}
+  - attack.${technique.toLowerCase()}
+logsource:
+  ${sourceMap[source] || sourceMap.windows}
+detection:
+${detection}
+falsepositives:
+  - Legitimate administrative activity
+  - Verify before escalating`;
+}
+
+function generateSplunk(id, title, desc, severity, source, technique, tactic, keywords, proc) {
+    const indexMap = {
+        'windows': 'index=sysmon OR index=windows',
+        'linux': 'index=linux sourcetype=linux_secure',
+        'network': 'index=firewall OR index=proxy',
+        'web': 'index=web sourcetype=access_combined',
+        'endpoint': 'index=sysmon EventCode=1',
+        'cloud': 'index=cloudtrail',
+        'email': 'index=exchange OR index=o365'
+    };
+
+    const searchTerms = keywords.map(k => `"${k}"`).join(' OR ');
+    let spl = `\`comment("${title}")\`
+\`comment("MITRE: ${technique} | Severity: ${severity.toUpperCase()}")\`
+${indexMap[source] || indexMap.windows}
+| search ${searchTerms}`;
+
+    if (proc) {
+        spl += `\n| where match(Image, "(?i)${proc.replace('.', '\\\\.')}")`;
+    }
+
+    spl += `
+| stats count values(${source === 'linux' ? 'src_ip' : 'Computer'}) as hosts by ${source === 'linux' ? 'user' : 'User'} _time
+| where count > 1
+| sort -count
+| table _time ${source === 'linux' ? 'user src_ip' : 'User Computer'} count`;
+
+    return spl;
+}
+
+function generateElastic(id, title, desc, severity, source, technique, tactic, keywords, proc) {
+    let query = `// ${title}\n// MITRE: ${technique} | Severity: ${severity.toUpperCase()}\n\n`;
+
+    if (proc) {
+        query += `process where process.name == "${proc}" and\n  process.command_line : (\n`;
+        query += keywords.map(k => `    "*${k}*"`).join(',\n');
+        query += `\n  )`;
+    } else {
+        query += `event.category: "process" AND (\n`;
+        query += keywords.map(k => `  message: "*${k}*"`).join(' OR\n');
+        query += `\n)`;
+    }
+
+    return query;
+}
+
+function generateYara(id, title, desc, severity, technique, keywords) {
+    const ruleName = id.replace(/[^a-zA-Z0-9_]/g, '_');
+    let strings = '';
+    keywords.forEach((k, i) => {
+        const varName = `$s${i+1}`;
+        if (k.includes('\\') || k.includes('*')) {
+            strings += `        ${varName} = "${k}" ascii nocase\n`;
+        } else {
+            strings += `        ${varName} = "${k}" ascii nocase\n`;
+        }
+    });
+
+    const threshold = Math.max(1, Math.floor(keywords.length * 0.4));
+
+    return `rule ${ruleName} {
+    meta:
+        description = "${desc}"
+        author = "Blue Team Toolkit - Auto Generated"
+        severity = "${severity}"
+        mitre = "${technique}"
+        date = "${new Date().toISOString().split('T')[0]}"
+
+    strings:
+${strings}
+    condition:
+        ${keywords.length > 2 ? `${threshold} of them` : 'any of them'}
+}`;
+}
+</script>
+
 </body>
 </html>
