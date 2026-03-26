@@ -301,163 +301,173 @@
 
     <div class="siem-tabs">
         <div class="siem-tab active" onclick="showSiem('splunk')">Splunk SPL</div>
-        <div class="siem-tab" onclick="showSiem('elastic')">Elastic / KQL</div>
+        <div class="siem-tab" onclick="showSiem('elastic')">Elastic SIEM</div>
         <div class="siem-tab" onclick="showSiem('sentinel')">Microsoft Sentinel</div>
         <div class="siem-tab" onclick="showSiem('qradar')">IBM QRadar</div>
+        <div class="siem-tab" onclick="showSiem('chronicle')">Google Chronicle</div>
+        <div class="siem-tab" onclick="showSiem('arcsight')">ArcSight ESM</div>
+        <div class="siem-tab" onclick="showSiem('fortisiem')">FortiSIEM</div>
+        <div class="siem-tab" onclick="showSiem('wazuh')">Wazuh</div>
+        <div class="siem-tab" onclick="showSiem('logrhythm')">LogRhythm</div>
+        <div class="siem-tab" onclick="showSiem('exabeam')">Exabeam</div>
+        <div class="siem-tab" onclick="showSiem('securonix')">Securonix</div>
+        <div class="siem-tab" onclick="showSiem('logpoint')">LogPoint</div>
+        <div class="siem-tab" onclick="showSiem('r7')">Rapid7 InsightIDR</div>
+        <div class="siem-tab" onclick="showSiem('crowdstrike')">CrowdStrike Falcon</div>
     </div>
 
-    <!-- SPLUNK -->
+    <!-- ===== SPLUNK ===== -->
     <div id="siem-splunk" class="siem-content active">
-        <div class="spl-block">
-            <div class="spl-title">Brute Force Detection Dashboard</div>
-            <div class="spl-meta">MITRE: T1110 | Source: Authentication Logs | Severity: High</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect multiple failed logins followed by success</span>
-<span class="kw">index</span>=auth sourcetype=linux_secure
-| <span class="fn">rex</span> field=_raw "(?i)(failed|accepted)\s+password\s+for\s+(?:invalid\s+user\s+)?(?&lt;user&gt;\S+)\s+from\s+(?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)"
-| <span class="fn">eval</span> status=<span class="kw">if</span>(<span class="fn">match</span>(_raw,"(?i)failed"),"failure","success")
-| <span class="fn">stats</span> count(eval(status="failure")) <span class="kw">as</span> failures count(eval(status="success")) <span class="kw">as</span> successes values(src_ip) <span class="kw">as</span> source_ips <span class="kw">by</span> user
-| <span class="kw">where</span> failures > 5 AND successes > 0
-| <span class="fn">sort</span> -failures
-| <span class="fn">table</span> user failures successes source_ips</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">Brute Force Detection Dashboard</div><div class="spl-meta">MITRE: T1110 | Source: Authentication Logs | Severity: High</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=auth sourcetype=linux_secure
+| rex field=_raw "(?i)(failed|accepted)\s+password\s+for\s+(?:invalid\s+user\s+)?(?&lt;user&gt;\S+)\s+from\s+(?&lt;src_ip&gt;\d+\.\d+\.\d+\.\d+)"
+| eval status=if(match(_raw,"(?i)failed"),"failure","success")
+| stats count(eval(status="failure")) as failures count(eval(status="success")) as successes values(src_ip) as source_ips by user
+| where failures > 5 AND successes > 0
+| sort -failures
+| table user failures successes source_ips</div></div>
 
-        <div class="spl-block">
-            <div class="spl-title">PowerShell Empire / Download Cradle Detection</div>
-            <div class="spl-meta">MITRE: T1059.001 | Source: Sysmon | Severity: Critical</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect PowerShell download and execute patterns</span>
-<span class="kw">index</span>=sysmon EventCode=1 Image="*\\powershell.exe" OR Image="*\\pwsh.exe"
-| <span class="kw">where</span> <span class="fn">match</span>(CommandLine, "(?i)(IEX|Invoke-Expression|DownloadString|DownloadFile|WebClient|Net\.WebClient|Start-BitsTransfer|Invoke-WebRequest|wget|curl|IO\.MemoryStream|FromBase64String)")
-| <span class="fn">eval</span> risk_score=<span class="kw">case</span>(
-    <span class="fn">match</span>(CommandLine,"(?i)EncodedCommand"), 90,
-    <span class="fn">match</span>(CommandLine,"(?i)bypass"), 85,
-    <span class="fn">match</span>(CommandLine,"(?i)hidden"), 80,
-    1=1, 70)
-| <span class="fn">stats</span> count values(CommandLine) <span class="kw">as</span> commands max(risk_score) <span class="kw">as</span> max_risk <span class="kw">by</span> Computer User ParentImage
-| <span class="fn">sort</span> -max_risk</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">PowerShell Download Cradle Detection</div><div class="spl-meta">MITRE: T1059.001 | Source: Sysmon | Severity: Critical</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=sysmon EventCode=1 Image="*\\powershell.exe" OR Image="*\\pwsh.exe"
+| where match(CommandLine, "(?i)(IEX|Invoke-Expression|DownloadString|DownloadFile|WebClient|Start-BitsTransfer|Invoke-WebRequest|FromBase64String)")
+| eval risk_score=case(match(CommandLine,"(?i)EncodedCommand"),90, match(CommandLine,"(?i)bypass"),85, match(CommandLine,"(?i)hidden"),80, 1=1,70)
+| stats count values(CommandLine) as commands max(risk_score) as max_risk by Computer User ParentImage
+| sort -max_risk</div></div>
 
-        <div class="spl-block">
-            <div class="spl-title">DNS Tunneling / Data Exfiltration</div>
-            <div class="spl-meta">MITRE: T1048.003 | Source: DNS Logs | Severity: Critical</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect anomalous DNS queries indicating tunneling</span>
-<span class="kw">index</span>=dns sourcetype=dns
-| <span class="fn">eval</span> query_len=<span class="fn">len</span>(query)
-| <span class="fn">eval</span> subdomain_count=<span class="fn">mvcount</span>(<span class="fn">split</span>(query, "."))
-| <span class="kw">where</span> query_len > 50 AND subdomain_count > 4
-| <span class="fn">rex</span> field=query "\.(?&lt;base_domain&gt;[^.]+\.[^.]+)$"
-| <span class="fn">stats</span> count avg(query_len) <span class="kw">as</span> avg_len dc(query) <span class="kw">as</span> unique_queries sum(query_len) <span class="kw">as</span> total_bytes <span class="kw">by</span> src_ip base_domain
-| <span class="fn">eval</span> total_kb=<span class="fn">round</span>(total_bytes/1024,2)
-| <span class="kw">where</span> unique_queries > 50 AND avg_len > 40
-| <span class="fn">sort</span> -total_kb</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">DNS Tunneling / Data Exfiltration</div><div class="spl-meta">MITRE: T1048.003 | Source: DNS Logs | Severity: Critical</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=dns sourcetype=dns
+| eval query_len=len(query)
+| eval subdomain_count=mvcount(split(query, "."))
+| where query_len > 50 AND subdomain_count > 4
+| rex field=query "\.(?&lt;base_domain&gt;[^.]+\.[^.]+)$"
+| stats count avg(query_len) as avg_len dc(query) as unique_queries sum(query_len) as total_bytes by src_ip base_domain
+| eval total_kb=round(total_bytes/1024,2)
+| where unique_queries > 50 AND avg_len > 40
+| sort -total_kb</div></div>
 
-        <div class="spl-block">
-            <div class="spl-title">Lateral Movement - PsExec & Remote Services</div>
-            <div class="spl-meta">MITRE: T1570, T1021.002 | Source: Windows Events | Severity: High</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect PsExec-style lateral movement</span>
-<span class="kw">index</span>=windows (EventCode=7045 ServiceName="PSEXESVC*") OR (EventCode=4624 LogonType=3)
-| <span class="fn">eval</span> detection_type=<span class="kw">case</span>(
-    EventCode=7045, "service_install",
-    EventCode=4624, "network_logon")
-| <span class="fn">stats</span> count values(detection_type) <span class="kw">as</span> detections values(ServiceName) <span class="kw">as</span> services <span class="kw">by</span> ComputerName SourceNetworkAddress Account_Name
-| <span class="kw">where</span> <span class="fn">mvcount</span>(detections) > 1 OR <span class="fn">match</span>(<span class="fn">mvindex</span>(services,0),"PSEXESVC")
-| <span class="fn">sort</span> -count</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">Lateral Movement - PsExec &amp; Remote Services</div><div class="spl-meta">MITRE: T1570, T1021.002 | Source: Windows Events | Severity: High</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=windows (EventCode=7045 ServiceName="PSEXESVC*") OR (EventCode=4624 LogonType=3)
+| eval detection_type=case(EventCode=7045,"service_install", EventCode=4624,"network_logon")
+| stats count values(detection_type) as detections values(ServiceName) as services by ComputerName SourceNetworkAddress Account_Name
+| where mvcount(detections) > 1 OR match(mvindex(services,0),"PSEXESVC")
+| sort -count</div></div>
 
-        <div class="spl-block">
-            <div class="spl-title">C2 Beaconing Detection (Statistical)</div>
-            <div class="spl-meta">MITRE: T1071.001 | Source: Proxy/Firewall | Severity: High</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect periodic C2 callbacks using time-series analysis</span>
-<span class="kw">index</span>=proxy OR <span class="kw">index</span>=firewall action=allowed
-| <span class="fn">bin</span> _time span=60s
-| <span class="fn">stats</span> count <span class="kw">by</span> _time src_ip dest_ip dest_port
-| <span class="fn">streamstats</span> window=120 current=f stdev(count) <span class="kw">as</span> jitter avg(count) <span class="kw">as</span> avg_count <span class="kw">by</span> src_ip dest_ip
-| <span class="kw">where</span> jitter &lt; 2 AND avg_count > 0
-| <span class="fn">stats</span> count dc(_time) <span class="kw">as</span> beacon_intervals avg(jitter) <span class="kw">as</span> avg_jitter <span class="kw">by</span> src_ip dest_ip dest_port
-| <span class="kw">where</span> beacon_intervals > 30
-| <span class="fn">eval</span> confidence=<span class="kw">if</span>(avg_jitter &lt; 0.5, "HIGH", <span class="kw">if</span>(avg_jitter &lt; 1.5, "MEDIUM", "LOW"))
-| <span class="fn">sort</span> -beacon_intervals</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">C2 Beaconing Detection (Statistical)</div><div class="spl-meta">MITRE: T1071.001 | Source: Proxy/Firewall | Severity: High</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=proxy OR index=firewall action=allowed
+| bin _time span=60s
+| stats count by _time src_ip dest_ip dest_port
+| streamstats window=120 current=f stdev(count) as jitter avg(count) as avg_count by src_ip dest_ip
+| where jitter &lt; 2 AND avg_count > 0
+| stats count dc(_time) as beacon_intervals avg(jitter) as avg_jitter by src_ip dest_ip dest_port
+| where beacon_intervals > 30
+| eval confidence=if(avg_jitter &lt; 0.5,"HIGH",if(avg_jitter &lt; 1.5,"MEDIUM","LOW"))
+| sort -beacon_intervals</div></div>
 
-        <div class="spl-block">
-            <div class="spl-title">Ransomware Activity - Mass File Modification</div>
-            <div class="spl-meta">MITRE: T1486 | Source: Sysmon | Severity: Critical</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code"><span class="cm">| Detect mass file encryption indicating ransomware</span>
-<span class="kw">index</span>=sysmon (EventCode=11 OR EventCode=2)
-| <span class="fn">rex</span> field=TargetFilename "\.(?&lt;ext&gt;[^.\\]+)$"
-| <span class="fn">eval</span> suspicious_ext=<span class="kw">if</span>(<span class="fn">match</span>(ext,"(?i)(encrypted|locked|crypt|enc|locky|cerber|zepto|wnry|wcry)"),1,0)
-| <span class="fn">bin</span> _time span=5m
-| <span class="fn">stats</span> dc(TargetFilename) <span class="kw">as</span> files_modified sum(suspicious_ext) <span class="kw">as</span> suspicious_files values(ext) <span class="kw">as</span> extensions <span class="kw">by</span> _time Computer Image
-| <span class="kw">where</span> files_modified > 100 OR suspicious_files > 5
-| <span class="fn">sort</span> -files_modified</div>
-        </div>
+        <div class="spl-block"><div class="spl-title">Ransomware - Mass File Encryption</div><div class="spl-meta">MITRE: T1486 | Source: Sysmon | Severity: Critical</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=sysmon (EventCode=11 OR EventCode=2)
+| rex field=TargetFilename "\.(?&lt;ext&gt;[^.\\]+)$"
+| eval suspicious_ext=if(match(ext,"(?i)(encrypted|locked|crypt|enc|locky|cerber|zepto|wnry|wcry)"),1,0)
+| bin _time span=5m
+| stats dc(TargetFilename) as files_modified sum(suspicious_ext) as suspicious_files values(ext) as extensions by _time Computer Image
+| where files_modified > 100 OR suspicious_files > 5
+| sort -files_modified</div></div>
+
+        <div class="spl-block"><div class="spl-title">Credential Dumping - LSASS Access</div><div class="spl-meta">MITRE: T1003.001 | Source: Sysmon | Severity: Critical</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=sysmon EventCode=10 TargetImage="*\\lsass.exe"
+| where NOT match(SourceImage,"(?i)(csrss|services|svchost|wininit|wmiprvse|MsMpEng|RuntimeBroker)")
+| eval granted_hex=printf("%08x",GrantedAccess)
+| stats count values(SourceImage) as tools values(granted_hex) as access_masks by Computer
+| where count > 0
+| sort -count</div></div>
+
+        <div class="spl-block"><div class="spl-title">Kerberoasting Attack Detection</div><div class="spl-meta">MITRE: T1558.003 | Source: Windows Security | Severity: High</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index=windows EventCode=4769 Ticket_Encryption_Type=0x17 Service_Name!="krbtgt"
+| where Service_Name!="$*"
+| stats count dc(Service_Name) as unique_services values(Service_Name) as services by Client_Address Account_Name
+| where unique_services > 3
+| sort -unique_services</div></div>
     </div>
 
-    <!-- ELASTIC -->
+    <!-- ===== ELASTIC SIEM ===== -->
     <div id="siem-elastic" class="siem-content">
-        <div class="spl-block">
-            <div class="spl-title">Brute Force Detection</div>
-            <div class="spl-meta">MITRE: T1110 | Elastic KQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">event.category: "authentication" AND event.outcome: "failure"
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | Elastic KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event.category: "authentication" AND event.outcome: "failure"
 | stats count by source.ip, user.name
-| where count > 10</div>
-        </div>
-        <div class="spl-block">
-            <div class="spl-title">PowerShell Suspicious Execution</div>
-            <div class="spl-meta">MITRE: T1059.001 | Elastic EQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">process where process.name == "powershell.exe" and
+| where count > 10</div></div>
+
+        <div class="spl-block"><div class="spl-title">PowerShell Suspicious Execution</div><div class="spl-meta">MITRE: T1059.001 | Elastic EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process where process.name == "powershell.exe" and
   process.command_line : ("*EncodedCommand*", "*DownloadString*",
-    "*IEX*", "*Invoke-Expression*", "*WebClient*", "*bypass*")</div>
-        </div>
-        <div class="spl-block">
-            <div class="spl-title">Lateral Movement - Remote Service Creation</div>
-            <div class="spl-meta">MITRE: T1021.002 | Elastic KQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">event.code: "7045" AND winlog.event_data.ServiceName: ("PSEXESVC" OR "RemCom" OR "csexec")</div>
-        </div>
+    "*IEX*", "*Invoke-Expression*", "*WebClient*", "*bypass*")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement - Remote Services</div><div class="spl-meta">MITRE: T1021.002 | Elastic KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event.code: "7045" AND winlog.event_data.ServiceName: ("PSEXESVC" OR "RemCom" OR "csexec")</div></div>
+
+        <div class="spl-block"><div class="spl-title">DNS Tunneling Detection</div><div class="spl-meta">MITRE: T1048.003 | Elastic EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dns where length(dns.question.name) > 50 and
+  stringContains(dns.question.name, ".") and
+  dns.question.type == "TXT"</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware - Shadow Copy Deletion</div><div class="spl-meta">MITRE: T1490 | Elastic EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process where process.name : ("vssadmin.exe", "wmic.exe", "bcdedit.exe") and
+  process.command_line : ("*delete*shadow*", "*shadowcopy*delete*", "*recoveryenabled*No*")</div></div>
+
+        <div class="spl-block"><div class="spl-title">LSASS Credential Dumping</div><div class="spl-meta">MITRE: T1003.001 | Elastic EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process where event.type == "access" and
+  process.name : "lsass.exe" and
+  not process.executable : ("*\\csrss.exe", "*\\svchost.exe", "*\\MsMpEng.exe")</div></div>
     </div>
 
-    <!-- SENTINEL -->
+    <!-- ===== MICROSOFT SENTINEL ===== -->
     <div id="siem-sentinel" class="siem-content">
-        <div class="spl-block">
-            <div class="spl-title">Brute Force Detection</div>
-            <div class="spl-meta">MITRE: T1110 | KQL (Microsoft Sentinel)</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">SigninLogs
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SigninLogs
 | where ResultType != 0
 | summarize FailedAttempts = count(), SuccessCount = countif(ResultType == 0)
     by UserPrincipalName, IPAddress, bin(TimeGenerated, 1h)
 | where FailedAttempts > 10 and SuccessCount > 0
-| sort by FailedAttempts desc</div>
-        </div>
-        <div class="spl-block">
-            <div class="spl-title">Suspicious PowerShell Commands</div>
-            <div class="spl-meta">MITRE: T1059.001 | KQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">DeviceProcessEvents
+| sort by FailedAttempts desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious PowerShell Commands</div><div class="spl-meta">MITRE: T1059.001 | KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">DeviceProcessEvents
 | where FileName in~ ("powershell.exe", "pwsh.exe")
 | where ProcessCommandLine has_any ("EncodedCommand", "DownloadString",
     "Invoke-Expression", "IEX", "WebClient", "bypass")
 | project TimeGenerated, DeviceName, AccountName, ProcessCommandLine
-| sort by TimeGenerated desc</div>
-        </div>
+| sort by TimeGenerated desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Anomalous Azure AD Sign-In</div><div class="spl-meta">MITRE: T1078.004 | KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SigninLogs
+| where RiskLevelDuringSignIn in ("high", "medium")
+| where ResultType == 0
+| project TimeGenerated, UserPrincipalName, IPAddress, Location,
+    RiskLevelDuringSignIn, AppDisplayName, DeviceDetail
+| sort by TimeGenerated desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Data Exfiltration via Email</div><div class="spl-meta">MITRE: T1048.003 | KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">OfficeActivity
+| where Operation == "Send"
+| where RecipientCount > 10 or
+    AttachmentCount > 5 or
+    todynamic(AttachmentNames) has_any (".zip", ".rar", ".7z")
+| summarize EmailCount = count(), TotalRecipients = sum(RecipientCount)
+    by UserId, bin(TimeGenerated, 1h)
+| where EmailCount > 20
+| sort by TotalRecipients desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement via RDP</div><div class="spl-meta">MITRE: T1021.001 | KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SecurityEvent
+| where EventID == 4624 and LogonType == 10
+| summarize RDPSessions = count(), DistinctTargets = dcount(Computer)
+    by SourceIP = IpAddress, Account, bin(TimeGenerated, 1h)
+| where DistinctTargets > 3
+| sort by DistinctTargets desc</div></div>
     </div>
 
-    <!-- QRADAR -->
+    <!-- ===== IBM QRADAR ===== -->
     <div id="siem-qradar" class="siem-content">
-        <div class="spl-block">
-            <div class="spl-title">Brute Force Detection</div>
-            <div class="spl-meta">MITRE: T1110 | QRadar AQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">SELECT sourceip, username, COUNT(*) as attempt_count
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | QRadar AQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceip, username, COUNT(*) as attempt_count
 FROM events
 WHERE LOGSOURCETYPENAME(logsourceid) = 'Linux OS'
   AND "eventCategory" = 'Authentication'
@@ -465,13 +475,10 @@ WHERE LOGSOURCETYPENAME(logsourceid) = 'Linux OS'
 GROUP BY sourceip, username
 HAVING COUNT(*) > 10
 ORDER BY attempt_count DESC
-LAST 24 HOURS</div>
-        </div>
-        <div class="spl-block">
-            <div class="spl-title">Lateral Movement Detection</div>
-            <div class="spl-meta">MITRE: T1021 | QRadar AQL</div>
-            <button class="copy-btn" onclick="copySpl(this)">Copy</button>
-            <div class="spl-code">SELECT sourceip, destinationip, username, COUNT(*) as connections
+LAST 24 HOURS</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement Detection</div><div class="spl-meta">MITRE: T1021 | QRadar AQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceip, destinationip, username, COUNT(*) as connections
 FROM events
 WHERE "eventName" ILIKE '%logon%'
   AND "LogonType" = '3'
@@ -479,8 +486,394 @@ WHERE "eventName" ILIKE '%logon%'
 GROUP BY sourceip, destinationip, username
 HAVING COUNT(*) > 5
 ORDER BY connections DESC
-LAST 24 HOURS</div>
-        </div>
+LAST 24 HOURS</div></div>
+
+        <div class="spl-block"><div class="spl-title">DNS Anomaly Detection</div><div class="spl-meta">MITRE: T1048.003 | QRadar AQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceip, DOMAINNAME(domainid) as domain,
+  COUNT(*) as query_count, AVG(LENGTH(URL)) as avg_query_len
+FROM events
+WHERE category = 'DNS'
+GROUP BY sourceip, DOMAINNAME(domainid)
+HAVING COUNT(*) > 500 AND AVG(LENGTH(URL)) > 50
+ORDER BY query_count DESC
+LAST 24 HOURS</div></div>
+
+        <div class="spl-block"><div class="spl-title">Privilege Escalation Monitoring</div><div class="spl-meta">MITRE: T1548 | QRadar AQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceip, username, "eventName", COUNT(*) as events
+FROM events
+WHERE ("eventName" ILIKE '%sudo%' OR "eventName" ILIKE '%su:%'
+  OR "eventName" ILIKE '%privilege%' OR "eventName" ILIKE '%escalat%')
+  AND category = 'Authentication'
+GROUP BY sourceip, username, "eventName"
+HAVING COUNT(*) > 3
+ORDER BY events DESC
+LAST 24 HOURS</div></div>
+    </div>
+
+    <!-- ===== GOOGLE CHRONICLE ===== -->
+    <div id="siem-chronicle" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | Chronicle YARA-L</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">rule brute_force_detection {
+  meta:
+    author = "Blue Team Toolkit"
+    severity = "HIGH"
+    mitre_attack_tactic = "Credential Access"
+    mitre_attack_technique = "T1110"
+  events:
+    $fail.metadata.event_type = "USER_LOGIN"
+    $fail.security_result.action = "BLOCK"
+    $fail.target.user.userid = $user
+    $fail.principal.ip = $ip
+  match:
+    $user, $ip over 1h
+  condition:
+    #fail > 10
+}</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious Process Execution</div><div class="spl-meta">MITRE: T1059.001 | Chronicle YARA-L</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">rule suspicious_powershell {
+  meta:
+    severity = "CRITICAL"
+    mitre_attack_technique = "T1059.001"
+  events:
+    $exec.metadata.event_type = "PROCESS_LAUNCH"
+    $exec.target.process.file.full_path = /powershell/i nocase
+    $exec.target.process.command_line = /EncodedCommand|DownloadString|IEX|Invoke-Expression|bypass/i nocase
+    $exec.principal.hostname = $host
+  match:
+    $host over 5m
+  condition:
+    $exec
+}</div></div>
+
+        <div class="spl-block"><div class="spl-title">DNS Tunneling Detection</div><div class="spl-meta">MITRE: T1048.003 | Chronicle YARA-L</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">rule dns_tunneling {
+  meta:
+    severity = "HIGH"
+    mitre_attack_technique = "T1048.003"
+  events:
+    $dns.metadata.event_type = "NETWORK_DNS"
+    strings.length($dns.network.dns.questions.name) > 50
+    $dns.principal.ip = $src
+  match:
+    $src over 1h
+  condition:
+    #dns > 100
+}</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement via SMB</div><div class="spl-meta">MITRE: T1021.002 | Chronicle UDM Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">metadata.event_type = "NETWORK_CONNECTION"
+AND target.port = 445
+AND NOT principal.ip = target.ip
+AND principal.ip != ""
+| group principal.ip, target.ip
+| count() as smb_connections
+| filter smb_connections > 5
+| sort smb_connections desc</div></div>
+    </div>
+
+    <!-- ===== ARCSIGHT ESM ===== -->
+    <div id="siem-arcsight" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | ArcSight Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceAddress, destinationUserName,
+  COUNT(*) AS failedAttempts
+FROM events
+WHERE categoryOutcome = '/Failure'
+  AND categoryBehavior = '/Authentication/Verify'
+  AND endTime &gt; NOW() - INTERVAL '24' HOUR
+GROUP BY sourceAddress, destinationUserName
+HAVING COUNT(*) > 10
+ORDER BY failedAttempts DESC</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious Process Execution</div><div class="spl-meta">MITRE: T1059 | ArcSight Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceHostName, sourceUserName, fileName, filePath,
+  requestUrl AS commandLine
+FROM events
+WHERE (fileName LIKE '%powershell%' OR fileName LIKE '%cmd.exe%')
+  AND (requestUrl LIKE '%EncodedCommand%' OR requestUrl LIKE '%DownloadString%'
+    OR requestUrl LIKE '%Invoke-Expression%' OR requestUrl LIKE '%bypass%')
+  AND endTime &gt; NOW() - INTERVAL '24' HOUR
+ORDER BY endTime DESC</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement Detection</div><div class="spl-meta">MITRE: T1021 | ArcSight Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">SELECT sourceAddress, destinationAddress, destinationUserName,
+  COUNT(DISTINCT destinationAddress) AS unique_targets
+FROM events
+WHERE categoryBehavior = '/Authentication/Verify'
+  AND categoryOutcome = '/Success'
+  AND sourceAddress != destinationAddress
+  AND endTime &gt; NOW() - INTERVAL '24' HOUR
+GROUP BY sourceAddress, destinationUserName
+HAVING COUNT(DISTINCT destinationAddress) > 3
+ORDER BY unique_targets DESC</div></div>
+    </div>
+
+    <!-- ===== FORTISIEM ===== -->
+    <div id="siem-fortisiem" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | FortiSIEM Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">eventType = "Failed Login" AND
+reptDevIpAddr IN (GROUP BY reptDevIpAddr, user
+  HAVING COUNT(*) > 10
+  LAST 1 HOUR)
+| DISPLAY reptDevIpAddr, user, srcIpAddr, COUNT(*) as attempts
+| SORT BY attempts DESC</div></div>
+
+        <div class="spl-block"><div class="spl-title">Malware C2 Communication</div><div class="spl-meta">MITRE: T1071 | FortiSIEM Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">eventType IN ("Firewall Permit", "Web Traffic") AND
+destIpAddr IN (Threat Intelligence Feed) AND
+srcIpAddr IN (Internal Network)
+| GROUP BY srcIpAddr, destIpAddr, destName
+| DISPLAY srcIpAddr, destIpAddr, destName, COUNT(*) as hits
+| HAVING COUNT(*) > 5
+| SORT BY hits DESC
+| LAST 24 HOURS</div></div>
+
+        <div class="spl-block"><div class="spl-title">Privilege Escalation</div><div class="spl-meta">MITRE: T1548 | FortiSIEM Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">eventType IN ("Sudo Command", "Su Command", "User Added to Admin Group") AND
+reptDevIpAddr = $target
+| GROUP BY user, reptDevIpAddr, eventType
+| DISPLAY user, reptDevIpAddr, eventType, COUNT(*) as events, rawEventMsg
+| SORT BY events DESC
+| LAST 24 HOURS</div></div>
+    </div>
+
+    <!-- ===== WAZUH ===== -->
+    <div id="siem-wazuh" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | Wazuh Rule + API Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">&lt;!-- Wazuh Custom Rule (ossec.conf) --&gt;
+&lt;group name="authentication,brute_force"&gt;
+  &lt;rule id="100100" level="10" frequency="8" timeframe="120"&gt;
+    &lt;if_matched_sid&gt;5710&lt;/if_matched_sid&gt;
+    &lt;description&gt;Brute force attack (8+ failed logins in 2 min)&lt;/description&gt;
+    &lt;mitre&gt;
+      &lt;id&gt;T1110&lt;/id&gt;
+    &lt;/mitre&gt;
+  &lt;/rule&gt;
+&lt;/group&gt;
+
+# Wazuh API query for brute force events:
+GET /alerts?q=rule.mitre.id=T1110&amp;limit=50&amp;sort=-timestamp</div></div>
+
+        <div class="spl-block"><div class="spl-title">Rootkit Detection</div><div class="spl-meta">MITRE: T1014 | Wazuh Rootcheck</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">&lt;!-- Enable rootcheck in ossec.conf --&gt;
+&lt;rootcheck&gt;
+  &lt;disabled&gt;no&lt;/disabled&gt;
+  &lt;check_files&gt;yes&lt;/check_files&gt;
+  &lt;check_trojans&gt;yes&lt;/check_trojans&gt;
+  &lt;check_dev&gt;yes&lt;/check_dev&gt;
+  &lt;check_sys&gt;yes&lt;/check_sys&gt;
+  &lt;check_pids&gt;yes&lt;/check_pids&gt;
+  &lt;check_ports&gt;yes&lt;/check_ports&gt;
+  &lt;check_if&gt;yes&lt;/check_if&gt;
+  &lt;frequency&gt;36000&lt;/frequency&gt;
+  &lt;rootkit_files&gt;etc/shared/rootkit_files.txt&lt;/rootkit_files&gt;
+  &lt;rootkit_trojans&gt;etc/shared/rootkit_trojans.txt&lt;/rootkit_trojans&gt;
+&lt;/rootcheck&gt;</div></div>
+
+        <div class="spl-block"><div class="spl-title">File Integrity Monitoring (FIM)</div><div class="spl-meta">MITRE: T1070 | Wazuh Syscheck</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">&lt;!-- Monitor critical files for changes --&gt;
+&lt;syscheck&gt;
+  &lt;directories check_all="yes" realtime="yes"&gt;/etc,/usr/bin,/usr/sbin&lt;/directories&gt;
+  &lt;directories check_all="yes" realtime="yes"&gt;/bin,/sbin,/boot&lt;/directories&gt;
+  &lt;directories check_all="yes"&gt;/var/www&lt;/directories&gt;
+  &lt;ignore&gt;/etc/mtab&lt;/ignore&gt;
+  &lt;ignore&gt;/etc/resolv.conf&lt;/ignore&gt;
+  &lt;frequency&gt;7200&lt;/frequency&gt;
+&lt;/syscheck&gt;
+
+# API query for FIM alerts:
+GET /alerts?q=rule.groups=syscheck&amp;sort=-timestamp&amp;limit=50</div></div>
+
+        <div class="spl-block"><div class="spl-title">Vulnerability Detection</div><div class="spl-meta">MITRE: T1190 | Wazuh Vulnerability Detector</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">&lt;!-- Enable vulnerability-detector --&gt;
+&lt;vulnerability-detector&gt;
+  &lt;enabled&gt;yes&lt;/enabled&gt;
+  &lt;interval&gt;5m&lt;/interval&gt;
+  &lt;run_on_start&gt;yes&lt;/run_on_start&gt;
+  &lt;provider name="canonical"&gt;&lt;enabled&gt;yes&lt;/enabled&gt;&lt;/provider&gt;
+  &lt;provider name="redhat"&gt;&lt;enabled&gt;yes&lt;/enabled&gt;&lt;/provider&gt;
+  &lt;provider name="nvd"&gt;&lt;enabled&gt;yes&lt;/enabled&gt;&lt;/provider&gt;
+&lt;/vulnerability-detector&gt;
+
+# API query for critical vulnerabilities:
+GET /vulnerability/{agent_id}?q=severity=Critical&amp;sort=-cvss3_score</div></div>
+    </div>
+
+    <!-- ===== LOGRHYTHM ===== -->
+    <div id="siem-logrhythm" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | LogRhythm Advanced Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">Classification: Authentication Failure
+DateRange: Last 24 Hours
+GroupBy: ImpactedHostName, Login
+Filter: Count > 10
+| Summarize: Count, Distinct(OriginHostName) as Sources
+| Sort: Count DESC
+| Include: MsgSourceTypeName, CommonEventName</div></div>
+
+        <div class="spl-block"><div class="spl-title">Malware Activity Detection</div><div class="spl-meta">MITRE: T1059 | LogRhythm Advanced Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">Classification: Suspicious OR Malware
+Process: powershell.exe OR cmd.exe
+DateRange: Last 24 Hours
+Filter: Command CONTAINS "EncodedCommand" OR Command CONTAINS "DownloadString"
+    OR Command CONTAINS "Invoke-Expression" OR Command CONTAINS "bypass"
+| GroupBy: ImpactedHostName, Login, Command
+| Sort: DateRange DESC</div></div>
+
+        <div class="spl-block"><div class="spl-title">Data Exfiltration Monitoring</div><div class="spl-meta">MITRE: T1041 | LogRhythm Advanced Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">Classification: Network Traffic
+Direction: Outbound
+DateRange: Last 24 Hours
+Filter: BytesOut > 104857600
+| GroupBy: OriginHostName, ImpactedHostName, Protocol
+| Summarize: SUM(BytesOut) as TotalBytes, Count
+| Sort: TotalBytes DESC
+| Filter: TotalBytes > 524288000</div></div>
+    </div>
+
+    <!-- ===== EXABEAM ===== -->
+    <div id="siem-exabeam" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Anomalous Authentication</div><div class="spl-meta">MITRE: T1110 | Exabeam Advanced Analytics Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">activity_type = "authentication"
+AND result = "failure"
+AND is_anomaly = true
+| groupby user, src_ip
+| stats count() as failures, dc(src_ip) as unique_sources
+| filter failures > 5
+| sort -failures</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement Detection</div><div class="spl-meta">MITRE: T1021 | Exabeam Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">activity_type IN ("remote-logon", "network-connection-made")
+AND is_anomaly = true
+| groupby user, src_host, dest_host
+| stats count() as connections, dc(dest_host) as unique_targets
+| filter unique_targets > 3 AND is_first_for_user = true
+| sort -risk_score</div></div>
+
+        <div class="spl-block"><div class="spl-title">Privileged Account Anomaly</div><div class="spl-meta">MITRE: T1078 | Exabeam UEBA</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">user_type = "privileged"
+AND (is_anomaly = true OR risk_score > 75)
+| groupby user, activity_type
+| stats count() as activities, max(risk_score) as max_risk
+| filter max_risk > 75
+| sort -max_risk</div></div>
+    </div>
+
+    <!-- ===== SECURONIX ===== -->
+    <div id="siem-securonix" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | Securonix Spotter Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index = activity AND eventoutcome = "Failure"
+AND baseeventid IN ("4625", "AuthenticationFailed")
+| stats count by accountname, sourceaddress
+| where count > 10
+| sort -count</div></div>
+
+        <div class="spl-block"><div class="spl-title">Data Exfiltration via Cloud</div><div class="spl-meta">MITRE: T1567 | Securonix Spotter Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index = activity AND resourcetype = "CloudApp"
+AND eventname IN ("FileUploaded", "FileShared", "FileSyncUploadedFull")
+| stats count, sum(filesize) as total_bytes by accountname, resourcename
+| eval total_mb = total_bytes / 1048576
+| where total_mb > 100 OR count > 50
+| sort -total_mb</div></div>
+
+        <div class="spl-block"><div class="spl-title">Insider Threat - Abnormal Access</div><div class="spl-meta">MITRE: T1078 | Securonix Spotter Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">index = activity AND riskScore > 80
+AND violationtype = "Policy"
+| stats count, max(riskScore) as maxRisk by accountname, violationname
+| where maxRisk > 80
+| sort -maxRisk</div></div>
+    </div>
+
+    <!-- ===== LOGPOINT ===== -->
+    <div id="siem-logpoint" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | LogPoint Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">"norm_id"=WinServer event_id=4625
+| chart count() as failures by source_address, user
+| search failures > 10
+| sort by failures desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">PowerShell Suspicious Activity</div><div class="spl-meta">MITRE: T1059.001 | LogPoint Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">"norm_id"=WindowsSysmon event_id=1 image="*powershell*"
+| filter(command IN ["*EncodedCommand*", "*DownloadString*",
+    "*Invoke-Expression*", "*IEX*", "*WebClient*", "*bypass*"])
+| chart count() by host, user, command
+| sort by count desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement Detection</div><div class="spl-meta">MITRE: T1021 | LogPoint Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">"norm_id"=WinServer event_id IN [4624, 4625] logon_type=3
+| chart count() as logins, distinct_count(destination) as targets
+    by source_address, user
+| search targets > 3
+| sort by targets desc</div></div>
+    </div>
+
+    <!-- ===== RAPID7 INSIGHTIDR ===== -->
+    <div id="siem-r7" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Brute Force Detection</div><div class="spl-meta">MITRE: T1110 | InsightIDR LEQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">where(authentication.result = FAILURE)
+groupby(authentication.source_ip, authentication.target_user)
+calculate(COUNT)
+sort(desc)
+filter(COUNT > 10)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Process Execution Monitoring</div><div class="spl-meta">MITRE: T1059 | InsightIDR LEQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">where(process.name = "powershell.exe" AND
+  process.cmd_line = /EncodedCommand|DownloadString|IEX|bypass/i)
+groupby(host.name, process.user, process.cmd_line)
+calculate(COUNT)
+sort(desc)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Network Traffic Anomaly</div><div class="spl-meta">MITRE: T1071 | InsightIDR LEQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">where(network.direction = OUTBOUND AND
+  network.bytes_out > 10485760)
+groupby(network.source_ip, network.dest_ip, network.dest_port)
+calculate(SUM:network.bytes_out)
+sort(desc)
+filter(SUM > 104857600)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement via RDP</div><div class="spl-meta">MITRE: T1021.001 | InsightIDR LEQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">where(authentication.logon_type = RemoteInteractive OR
+  network.dest_port = 3389)
+groupby(authentication.source_ip, authentication.target_host)
+calculate(COUNT)
+filter(COUNT > 1)
+sort(desc)</div></div>
+    </div>
+
+    <!-- ===== CROWDSTRIKE FALCON ===== -->
+    <div id="siem-crowdstrike" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Suspicious Process Detection</div><div class="spl-meta">MITRE: T1059 | Falcon Event Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event_simpleName=ProcessRollup2
+| ImageFileName=/\\powershell\.exe$/i
+| CommandLine=/(EncodedCommand|DownloadString|IEX|Invoke-Expression|bypass)/i
+| groupBy([ComputerName, UserName, CommandLine])
+| count(aid) as executions
+| sort(executions, order=desc)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Credential Theft Detection</div><div class="spl-meta">MITRE: T1003 | Falcon Event Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event_simpleName=ProcessRollup2
+| TargetProcessImageFileName=/\\lsass\.exe$/i
+| event_simpleName != ProcessRollup2 ImageFileName=/(csrss|svchost|wininit|services)\.exe$/i
+| groupBy([ComputerName, ImageFileName, UserName])
+| count(aid) as access_count
+| sort(access_count, order=desc)</div></div>
+
+        <div class="spl-block"><div class="spl-title">DNS Tunneling Detection</div><div class="spl-meta">MITRE: T1048.003 | Falcon Event Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event_simpleName=DnsRequest
+| DomainName=*
+| length(DomainName) as domain_len
+| domain_len > 50
+| groupBy([ComputerName, DomainName])
+| count(aid) as query_count
+| sort(query_count, order=desc)
+| head(100)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Behavior Detection</div><div class="spl-meta">MITRE: T1486 | Falcon Event Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">event_simpleName IN (ProcessRollup2, FileWritten)
+| CommandLine=/(vssadmin.*delete|wmic.*shadowcopy|bcdedit.*recoveryenabled)/i
+  OR TargetFileName=/(\.encrypted|\.locked|\.crypt|\.locky|\.wcry)$/i
+| groupBy([ComputerName, ImageFileName])
+| count(aid) as events
+| sort(events, order=desc)</div></div>
     </div>
 </div>
 </div>
