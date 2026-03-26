@@ -173,12 +173,12 @@
 
 <!-- Stats -->
 <div class="stats">
-    <div class="stat"><span class="stat-n">8</span><div class="stat-l">Python Tools</div></div>
-    <div class="stat"><span class="stat-n">16</span><div class="stat-l">Sigma Rules</div></div>
-    <div class="stat"><span class="stat-n">13</span><div class="stat-l">YARA Rules</div></div>
-    <div class="stat"><span class="stat-n">9</span><div class="stat-l">IR Playbooks</div></div>
-    <div class="stat"><span class="stat-n">18</span><div class="stat-l">Hunting Queries</div></div>
-    <div class="stat"><span class="stat-n">7</span><div class="stat-l">Threat Feeds</div></div>
+    <div class="stat"><span class="stat-n">10</span><div class="stat-l">Python Tools</div></div>
+    <div class="stat"><span class="stat-n">14</span><div class="stat-l">SIEM Platforms</div></div>
+    <div class="stat"><span class="stat-n">7</span><div class="stat-l">EDR Platforms</div></div>
+    <div class="stat"><span class="stat-n">4</span><div class="stat-l">XDR Platforms</div></div>
+    <div class="stat"><span class="stat-n">7</span><div class="stat-l">SOAR Platforms</div></div>
+    <div class="stat"><span class="stat-n">29</span><div class="stat-l">Detection Rules</div></div>
 </div>
 
 <!-- Nav Tabs -->
@@ -891,6 +891,1037 @@ sort(desc)</div></div>
 | groupBy([ComputerName, ImageFileName])
 | count(aid) as events
 | sort(events, order=desc)</div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== EDR ==================== -->
+<div id="tab-edr" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128737;</div>
+        <h3>EDR Platform Queries &amp; Hunts</h3>
+    </div>
+    <div class="siem-tabs">
+        <div class="siem-tab active" onclick="showSiem('edr-defender')">Microsoft Defender</div>
+        <div class="siem-tab" onclick="showSiem('edr-crowdstrike')">CrowdStrike Falcon</div>
+        <div class="siem-tab" onclick="showSiem('edr-sentinelone')">SentinelOne</div>
+        <div class="siem-tab" onclick="showSiem('edr-carbonblack')">Carbon Black</div>
+        <div class="siem-tab" onclick="showSiem('edr-cortex')">Cortex XDR</div>
+        <div class="siem-tab" onclick="showSiem('edr-trellix')">Trellix EDR</div>
+        <div class="siem-tab" onclick="showSiem('edr-elastic')">Elastic EDR</div>
+    </div>
+
+    <!-- Microsoft Defender for Endpoint -->
+    <div id="siem-edr-defender" class="siem-content active">
+        <div class="spl-block"><div class="spl-title">Credential Dumping - LSASS Access</div><div class="spl-meta">MITRE: T1003.001 | Defender Advanced Hunting KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName in~ ("mimikatz.exe", "procdump.exe", "procdump64.exe")
+    or (InitiatingProcessFileName != "svchost.exe"
+        and FileName == "lsass.exe"
+        and ActionType == "ProcessAccess")
+| extend AlertSeverity = iff(FileName =~ "mimikatz.exe", "Critical", "High")
+| project Timestamp, DeviceName, AccountName, FileName,
+    InitiatingProcessFileName, InitiatingProcessCommandLine,
+    FolderPath, AlertSeverity
+| sort by Timestamp desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">PowerShell Download &amp; Execute</div><div class="spl-meta">MITRE: T1059.001 | Defender Advanced Hunting KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName in~ ("powershell.exe", "pwsh.exe")
+| where ProcessCommandLine has_any (
+    "DownloadString", "DownloadFile", "IEX", "Invoke-Expression",
+    "Net.WebClient", "Start-BitsTransfer", "Invoke-WebRequest",
+    "EncodedCommand", "FromBase64String", "bypass")
+| extend RiskScore = case(
+    ProcessCommandLine has "EncodedCommand" and ProcessCommandLine has "bypass", 95,
+    ProcessCommandLine has "EncodedCommand", 85,
+    ProcessCommandLine has "DownloadString", 80,
+    ProcessCommandLine has "IEX", 75,
+    60)
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine,
+    InitiatingProcessFileName, RiskScore
+| sort by RiskScore desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Behavior Detection</div><div class="spl-meta">MITRE: T1486, T1490 | Defender KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">union DeviceProcessEvents, DeviceFileEvents
+| where Timestamp > ago(1h)
+| where (FileName in~ ("vssadmin.exe", "wmic.exe", "bcdedit.exe")
+    and ProcessCommandLine has_any ("delete shadows", "shadowcopy delete",
+        "recoveryenabled no"))
+    or (ActionType == "FileRenamed"
+        and FileName endswith_cs ".encrypted"
+        or FileName endswith_cs ".locked"
+        or FileName endswith_cs ".crypted")
+| summarize EventCount = count(),
+    Commands = make_set(ProcessCommandLine),
+    FileCount = dcountif(FileName, ActionType == "FileRenamed")
+    by DeviceName, bin(Timestamp, 5m)
+| where EventCount > 5 or FileCount > 50
+| extend Alert = "CRITICAL: Possible Ransomware Activity"</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement Detection</div><div class="spl-meta">MITRE: T1021 | Defender KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">DeviceLogonEvents
+| where Timestamp > ago(24h)
+| where LogonType in ("RemoteInteractive", "Network", "NewCredentials")
+| where ActionType == "LogonSuccess"
+| where isnotempty(RemoteIP)
+| summarize TargetCount = dcount(DeviceName),
+    Targets = make_set(DeviceName),
+    LogonTypes = make_set(LogonType)
+    by RemoteIP, AccountName, bin(Timestamp, 1h)
+| where TargetCount > 3
+| extend Alert = strcat("Lateral Movement: ", AccountName,
+    " accessed ", TargetCount, " hosts from ", RemoteIP)
+| sort by TargetCount desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Persistence - Scheduled Tasks &amp; Services</div><div class="spl-meta">MITRE: T1053, T1543 | Defender KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where (FileName =~ "schtasks.exe" and ProcessCommandLine has "/create")
+    or (FileName =~ "sc.exe" and ProcessCommandLine has_any ("create", "config"))
+    or (FileName =~ "reg.exe" and ProcessCommandLine has "CurrentVersion\\Run")
+| where AccountName !in~ ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE")
+| project Timestamp, DeviceName, AccountName, FileName,
+    ProcessCommandLine, InitiatingProcessFileName
+| extend PersistenceType = case(
+    FileName =~ "schtasks.exe", "Scheduled Task",
+    FileName =~ "sc.exe", "Windows Service",
+    FileName =~ "reg.exe", "Registry Run Key",
+    "Unknown")
+| sort by Timestamp desc</div></div>
+    </div>
+
+    <!-- CrowdStrike Falcon -->
+    <div id="siem-edr-crowdstrike" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Theft - LSASS Access</div><div class="spl-meta">MITRE: T1003.001 | Falcon LogScale / Event Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#event_simpleName=ProcessRollup2 OR #event_simpleName=SyntheticProcessRollup2
+| TargetFileName=/\\lsass\.exe$/i
+| ImageFileName!=/\\(csrss|svchost|wininit|services|MsMpEng)\.exe$/i
+| groupBy([ComputerName, ImageFileName, UserName, CommandLine])
+| count(aid, as=accessCount)
+| sort(accessCount, order=desc, limit=100)
+| test(accessCount > 0)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious PowerShell Execution</div><div class="spl-meta">MITRE: T1059.001 | Falcon LogScale</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#event_simpleName=ProcessRollup2
+| ImageFileName=/\\(powershell|pwsh)\.exe$/i
+| CommandLine=/(EncodedCommand|DownloadString|IEX|Invoke-Expression|bypass|hidden|WebClient|FromBase64String)/i
+| eval(riskScore = case {
+    regex("EncodedCommand.*bypass", field=CommandLine, flags="i") | riskScore := 95;
+    regex("EncodedCommand", field=CommandLine, flags="i") | riskScore := 85;
+    regex("DownloadString|IEX", field=CommandLine, flags="i") | riskScore := 80;
+    * | riskScore := 65; })
+| groupBy([ComputerName, UserName, CommandLine, riskScore])
+| sort(riskScore, order=desc)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Indicators</div><div class="spl-meta">MITRE: T1486 | Falcon LogScale</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#event_simpleName=ProcessRollup2
+| CommandLine=/(vssadmin.*delete.*shadows|wmic.*shadowcopy.*delete|bcdedit.*recoveryenabled.*no|wbadmin.*delete.*catalog)/i
+| groupBy([ComputerName, ImageFileName, CommandLine, UserName, ParentBaseFileName])
+| count(aid, as=events)
+| rename(ComputerName, as="Hostname")
+| sort(events, order=desc)</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement via RDP/PsExec</div><div class="spl-meta">MITRE: T1021, T1570 | Falcon LogScale</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#event_simpleName=UserLogon LogonType=10
+| groupBy([UserName, RemoteAddressIP4, ComputerName])
+| count(aid, as=sessions)
+| rdpTargets := groupBy(UserName, function=[count(ComputerName, as=targetCount, distinct=true)])
+| test(targetCount > 2)
+| sort(targetCount, order=desc)</div></div>
+    </div>
+
+    <!-- SentinelOne -->
+    <div id="siem-edr-sentinelone" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Dumping Detection</div><div class="spl-meta">MITRE: T1003 | SentinelOne Deep Visibility Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">EventType = "Process Creation" AND
+(TgtProcName = "mimikatz.exe" OR
+ TgtProcName = "procdump.exe" OR
+ TgtProcName = "procdump64.exe" OR
+ (TgtProcName = "lsass.exe" AND
+  SrcProcName NOT IN ("csrss.exe","svchost.exe","wininit.exe","services.exe")))
+| columns SrcProcName, TgtProcName, TgtProcCmdLine, EndpointName,
+    UserName, EventTime
+| sort -EventTime
+| limit 100</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious PowerShell Activity</div><div class="spl-meta">MITRE: T1059.001 | Deep Visibility</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">EventType = "Process Creation" AND
+TgtProcName IN ("powershell.exe", "pwsh.exe") AND
+TgtProcCmdLine ContainsCIS "encodedcommand" OR
+TgtProcCmdLine ContainsCIS "downloadstring" OR
+TgtProcCmdLine ContainsCIS "invoke-expression" OR
+TgtProcCmdLine ContainsCIS "bypass" OR
+TgtProcCmdLine ContainsCIS "iex" OR
+TgtProcCmdLine ContainsCIS "webclient"
+| columns EndpointName, UserName, TgtProcCmdLine, SrcProcName,
+    SrcProcCmdLine, EventTime
+| sort -EventTime</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Shadow Copy Deletion</div><div class="spl-meta">MITRE: T1490 | Deep Visibility</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">EventType = "Process Creation" AND
+(TgtProcName = "vssadmin.exe" AND TgtProcCmdLine ContainsCIS "delete") OR
+(TgtProcName = "wmic.exe" AND TgtProcCmdLine ContainsCIS "shadowcopy") OR
+(TgtProcName = "bcdedit.exe" AND TgtProcCmdLine ContainsCIS "recoveryenabled")
+| columns EndpointName, UserName, TgtProcName, TgtProcCmdLine,
+    SrcProcName, EventTime
+| sort -EventTime</div></div>
+
+        <div class="spl-block"><div class="spl-title">Network Connections to Suspicious Destinations</div><div class="spl-meta">MITRE: T1071 | Deep Visibility</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">EventType = "IP Connect" OR EventType = "IP Listen" AND
+DstPort IN (4444, 5555, 8888, 1234, 9999, 6666, 7777) OR
+DstPort IN (4443, 8443, 50050) OR
+TgtProcName IN ("nc.exe", "ncat.exe", "powershell.exe") AND
+NetConnOutCount > 0
+| columns EndpointName, TgtProcName, DstIP, DstPort, Direction,
+    NetConnOutCount, EventTime
+| sort -EventTime
+| limit 200</div></div>
+    </div>
+
+    <!-- Carbon Black -->
+    <div id="siem-edr-carbonblack" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Dumping Detection</div><div class="spl-meta">MITRE: T1003 | Carbon Black Cloud Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process_name:mimikatz.exe OR process_name:procdump.exe
+OR (crossproc_name:lsass.exe
+    AND -process_name:csrss.exe
+    AND -process_name:svchost.exe
+    AND -process_name:services.exe)
+| sort last_update desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious PowerShell Execution</div><div class="spl-meta">MITRE: T1059.001 | Carbon Black Cloud</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">(process_name:powershell.exe OR process_name:pwsh.exe)
+AND (process_cmdline:EncodedCommand
+    OR process_cmdline:DownloadString
+    OR process_cmdline:Invoke-Expression
+    OR process_cmdline:IEX
+    OR process_cmdline:bypass
+    OR process_cmdline:WebClient
+    OR process_cmdline:FromBase64String)
+| sort last_update desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Lateral Movement - Remote Services</div><div class="spl-meta">MITRE: T1021 | Carbon Black Cloud</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">(process_name:psexec.exe OR process_name:paexec.exe
+    OR process_name:wmic.exe)
+AND (process_cmdline:"\\\\*" OR process_cmdline:"/node:")
+| sort last_update desc</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Behavior</div><div class="spl-meta">MITRE: T1486 | Carbon Black Cloud</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">(process_name:vssadmin.exe AND process_cmdline:"delete shadows")
+OR (process_name:wmic.exe AND process_cmdline:"shadowcopy delete")
+OR (process_name:bcdedit.exe AND process_cmdline:"recoveryenabled")
+OR (process_name:wbadmin.exe AND process_cmdline:"delete catalog")
+| sort last_update desc</div></div>
+    </div>
+
+    <!-- Cortex XDR -->
+    <div id="siem-edr-cortex" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Theft Detection</div><div class="spl-meta">MITRE: T1003 | Cortex XDR XQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dataset = xdr_data
+| filter event_type = PROCESS and
+    (action_process_image_name = "mimikatz.exe" or
+     action_process_image_name = "procdump.exe" or
+     (action_process_image_name = "lsass.exe" and
+      actor_process_image_name not in ("csrss.exe","svchost.exe","wininit.exe")))
+| fields agent_hostname, actor_process_image_name,
+    action_process_image_name, action_process_command_line,
+    actor_effective_username, _time
+| sort desc _time
+| limit 100</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious Script Execution</div><div class="spl-meta">MITRE: T1059 | Cortex XDR XQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dataset = xdr_data
+| filter event_type = PROCESS and
+    action_process_image_name in ("powershell.exe","pwsh.exe","cmd.exe",
+        "wscript.exe","cscript.exe","mshta.exe") and
+    (action_process_command_line contains "EncodedCommand" or
+     action_process_command_line contains "DownloadString" or
+     action_process_command_line contains "Invoke-Expression" or
+     action_process_command_line contains "bypass" or
+     action_process_command_line contains "hidden")
+| comp count() as total by agent_hostname, actor_effective_username
+| sort desc total</div></div>
+
+        <div class="spl-block"><div class="spl-title">Network Beaconing Detection</div><div class="spl-meta">MITRE: T1071 | Cortex XDR XQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dataset = xdr_data
+| filter event_type = NETWORK and action_external_hostname != null
+| comp count() as conn_count,
+    avg(action_total_download) as avg_bytes
+    by agent_hostname, action_remote_ip, action_remote_port,
+       bin(_time, 10m) as time_bucket
+| sort desc conn_count
+| filter conn_count > 20
+| fields agent_hostname, action_remote_ip, action_remote_port,
+    conn_count, avg_bytes, time_bucket</div></div>
+    </div>
+
+    <!-- Trellix EDR -->
+    <div id="siem-edr-trellix" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Dumping</div><div class="spl-meta">MITRE: T1003 | Trellix EDR Real-Time Search</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">HostInfo hostname and Processes name equals "mimikatz.exe"
+OR Processes name equals "procdump.exe"
+OR (Processes name equals "lsass.exe"
+    AND Processes parentname not_equals "wininit.exe")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious Script Execution</div><div class="spl-meta">MITRE: T1059.001 | Trellix EDR</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">Processes name equals "powershell.exe"
+AND (Processes cmdline contains "EncodedCommand"
+    OR Processes cmdline contains "DownloadString"
+    OR Processes cmdline contains "Invoke-Expression"
+    OR Processes cmdline contains "bypass"
+    OR Processes cmdline contains "hidden")</div></div>
+    </div>
+
+    <!-- Elastic EDR -->
+    <div id="siem-edr-elastic" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Credential Theft via LSASS</div><div class="spl-meta">MITRE: T1003 | Elastic Security EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process where event.type == "start" and event.action == "access" and
+  Target.process.name == "lsass.exe" and
+  not process.executable :
+    ("?:\\Windows\\System32\\csrss.exe",
+     "?:\\Windows\\System32\\svchost.exe",
+     "?:\\Windows\\System32\\wininit.exe",
+     "?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Malicious PowerShell Detection</div><div class="spl-meta">MITRE: T1059.001 | Elastic Security EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">process where event.type == "start" and
+  process.name : ("powershell.exe", "pwsh.exe") and
+  process.args : ("-enc*", "-EncodedCommand*", "-ec *") and
+  process.args : ("*bypass*", "*hidden*", "*NonInteractive*")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Suspicious File Creation in Temp</div><div class="spl-meta">MITRE: T1059 | Elastic Security EQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">file where event.type == "creation" and
+  file.path : ("?:\\Users\\*\\AppData\\Local\\Temp\\*.exe",
+               "?:\\Users\\*\\AppData\\Local\\Temp\\*.dll",
+               "?:\\Users\\*\\AppData\\Local\\Temp\\*.ps1",
+               "?:\\Users\\*\\AppData\\Local\\Temp\\*.bat") and
+  not process.executable : ("?:\\Windows\\System32\\*",
+                            "?:\\Program Files\\*")</div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== XDR ==================== -->
+<div id="tab-xdr" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#127760;</div>
+        <h3>XDR Platform Queries &amp; Correlation</h3>
+    </div>
+    <div class="siem-tabs">
+        <div class="siem-tab active" onclick="showSiem('xdr-cortex')">Palo Alto Cortex XDR</div>
+        <div class="siem-tab" onclick="showSiem('xdr-m365')">Microsoft 365 Defender</div>
+        <div class="siem-tab" onclick="showSiem('xdr-trendmicro')">Trend Micro Vision One</div>
+        <div class="siem-tab" onclick="showSiem('xdr-sentinelone')">SentinelOne Singularity</div>
+    </div>
+
+    <!-- Cortex XDR -->
+    <div id="siem-xdr-cortex" class="siem-content active">
+        <div class="spl-block"><div class="spl-title">Cross-Source Attack Chain Detection</div><div class="spl-meta">MITRE: Multiple | Cortex XDR XQL - Correlates endpoint + network + cloud</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dataset = xdr_data
+| filter event_type in (PROCESS, NETWORK, FILE) and
+    event_sub_type in (PROCESS_START, NETWORK_CONNECTION, FILE_CREATE_NEW)
+| alter risk = if(
+    action_process_image_name in ("mimikatz.exe","procdump.exe"), 95,
+    action_process_command_line contains "EncodedCommand", 85,
+    action_process_command_line contains "DownloadString", 80,
+    action_remote_port in (4444,5555,8888,1234), 75,
+    action_file_path contains "\\Temp\\", 50, 10)
+| filter risk > 50
+| comp count() as events, max(risk) as max_risk,
+    values(event_type) as event_types
+    by agent_hostname, actor_effective_username,
+       bin(_time, 15m) as time_window
+| sort desc max_risk</div></div>
+
+        <div class="spl-block"><div class="spl-title">Incident Auto-Investigation Query</div><div class="spl-meta">Full Kill Chain | Cortex XDR XQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">dataset = xdr_data
+| filter agent_hostname = "$HOSTNAME" and
+    _time between "$START_TIME" and "$END_TIME"
+| alter event_category = if(
+    event_type = "PROCESS", "Execution",
+    event_type = "NETWORK", "Communication",
+    event_type = "FILE", "File Activity",
+    event_type = "REGISTRY", "Persistence",
+    "Other")
+| fields _time, event_category, event_type,
+    actor_process_image_name, action_process_image_name,
+    action_process_command_line, action_remote_ip,
+    action_remote_port, action_file_path,
+    actor_effective_username
+| sort asc _time</div></div>
+    </div>
+
+    <!-- Microsoft 365 Defender -->
+    <div id="siem-xdr-m365" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Cross-Domain Attack Detection</div><div class="spl-meta">MITRE: Multiple | M365 Defender Advanced Hunting - Correlates Email + Endpoint + Identity</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">// Phase 1: Phishing email delivered
+let phishing_emails = EmailEvents
+| where Timestamp > ago(24h)
+| where ThreatTypes has "Phish" or DetectionMethods has "URL detonation"
+| project EmailTimestamp = Timestamp, RecipientEmailAddress,
+    SenderFromAddress, Subject, NetworkMessageId;
+// Phase 2: User clicked link
+let clicked = UrlClickEvents
+| where Timestamp > ago(24h)
+| where ActionType == "ClickAllowed"
+| project ClickTime = Timestamp, AccountUpn, Url, NetworkMessageId;
+// Phase 3: Malware executed on endpoint
+let endpoint_activity = DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where InitiatingProcessFileName in~ ("outlook.exe","msedge.exe","chrome.exe")
+| where FileName in~ ("powershell.exe","cmd.exe","wscript.exe","mshta.exe")
+| project ExecTime = Timestamp, DeviceName, AccountName,
+    FileName, ProcessCommandLine;
+// Correlate all phases
+phishing_emails
+| join kind=inner clicked on NetworkMessageId
+| join kind=inner endpoint_activity
+    on $left.RecipientEmailAddress == $right.AccountName
+| project EmailTimestamp, ClickTime, ExecTime, RecipientEmailAddress,
+    SenderFromAddress, Subject, Url, DeviceName, FileName,
+    ProcessCommandLine
+| extend AttackChain = "Phishing > Click > Execution"</div></div>
+
+        <div class="spl-block"><div class="spl-title">Identity Threat: Impossible Travel</div><div class="spl-meta">MITRE: T1078 | M365 Defender KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">let user_logins = IdentityLogonEvents
+| where Timestamp > ago(7d)
+| where ActionType == "LogonSuccess"
+| project Timestamp, AccountUpn, IPAddress, Location
+| sort by AccountUpn, Timestamp asc;
+user_logins
+| extend PrevTimestamp = prev(Timestamp, 1),
+    PrevLocation = prev(Location, 1),
+    PrevIP = prev(IPAddress, 1)
+| where AccountUpn == prev(AccountUpn, 1)
+| extend TimeDiffMinutes = datetime_diff('minute', Timestamp, PrevTimestamp)
+| where TimeDiffMinutes < 120 and Location != PrevLocation
+    and PrevLocation != ""
+| project Timestamp, AccountUpn, IPAddress, Location,
+    PrevIP, PrevLocation, TimeDiffMinutes
+| extend Alert = strcat("Impossible travel: ", PrevLocation,
+    " to ", Location, " in ", TimeDiffMinutes, " min")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Ransomware Full Chain Detection</div><div class="spl-meta">MITRE: T1486 | M365 Defender KQL</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">AlertInfo
+| where Timestamp > ago(24h)
+| where Title has_any ("ransomware", "shadow copy", "file encryption",
+    "suspicious file rename")
+| join kind=inner AlertEvidence on AlertId
+| where EntityType in ("Process", "File", "Machine")
+| summarize Alerts = dcount(AlertId),
+    AlertTitles = make_set(Title),
+    Machines = make_set(DeviceName),
+    Processes = make_set(FileName)
+    by bin(Timestamp, 1h)
+| where Alerts > 2
+| extend Severity = "CRITICAL - Multi-stage Ransomware Detected"</div></div>
+    </div>
+
+    <!-- Trend Micro Vision One -->
+    <div id="siem-xdr-trendmicro" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Cross-Layer Threat Detection</div><div class="spl-meta">MITRE: Multiple | Vision One Search Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">eventId:1 AND
+(processCmd:*mimikatz* OR processCmd:*sekurlsa* OR
+ processCmd:*EncodedCommand* OR processCmd:*DownloadString* OR
+ processCmd:*vssadmin*delete*) AND
+hostName:*
+| select eventTime, hostName, processName, processCmd,
+    parentName, userName, riskLevel
+| dedup hostName, processCmd
+| sort -eventTime</div></div>
+
+        <div class="spl-block"><div class="spl-title">Email-to-Endpoint Correlation</div><div class="spl-meta">MITRE: T1566 | Vision One</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">productCode:sao AND mailMsgSubject:*urgent* AND
+(attachmentFileType:doc* OR attachmentFileType:xls* OR
+ attachmentFileType:zip OR attachmentFileType:exe)
+| join type=inner hostName [
+    productCode:sds AND eventId:1 AND
+    parentName:(*outlook* OR *winword* OR *excel*)]
+| select eventTime, mailFrom, mailTo, mailMsgSubject,
+    hostName, processName, processCmd</div></div>
+    </div>
+
+    <!-- SentinelOne Singularity XDR -->
+    <div id="siem-xdr-sentinelone" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Cross-Surface Threat Correlation</div><div class="spl-meta">MITRE: Multiple | Singularity XDR Storyline Query</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">EventType = "Process Creation" AND
+(TgtProcName IN ("mimikatz.exe","procdump.exe") OR
+ TgtProcCmdLine ContainsCIS "EncodedCommand" OR
+ TgtProcCmdLine ContainsCIS "DownloadString" OR
+ TgtProcCmdLine ContainsCIS "vssadmin")
+| columns EndpointName, SiteName, TgtProcName, TgtProcCmdLine,
+    SrcProcName, SrcProcCmdLine, UserName, EventTime,
+    StorylineId, ThreatIndicatorCategory
+| sort -EventTime
+| limit 500</div></div>
+
+        <div class="spl-block"><div class="spl-title">Storyline-Based Kill Chain Analysis</div><div class="spl-meta">Full Attack Chain | Singularity XDR</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">StorylineId = "$STORYLINE_ID"
+| columns EventTime, EventType, TgtProcName, TgtProcCmdLine,
+    SrcProcName, DstIP, DstPort, TgtFileName,
+    RegistryKeyPath, RegistryValue,
+    ThreatIndicatorCategory, MITRETactic
+| sort EventTime asc</div></div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== SOAR ==================== -->
+<div id="tab-soar" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#9881;</div>
+        <h3>SOAR Automation Playbooks</h3>
+    </div>
+    <div class="siem-tabs">
+        <div class="siem-tab active" onclick="showSiem('soar-xsoar')">Palo Alto XSOAR</div>
+        <div class="siem-tab" onclick="showSiem('soar-phantom')">Splunk SOAR</div>
+        <div class="siem-tab" onclick="showSiem('soar-sentinel')">Sentinel Logic Apps</div>
+        <div class="siem-tab" onclick="showSiem('soar-thehive')">TheHive + Cortex</div>
+        <div class="siem-tab" onclick="showSiem('soar-swimlane')">Swimlane</div>
+        <div class="siem-tab" onclick="showSiem('soar-tines')">Tines</div>
+        <div class="siem-tab" onclick="showSiem('soar-shuffle')">Shuffle</div>
+    </div>
+
+    <!-- XSOAR -->
+    <div id="siem-soar-xsoar" class="siem-content active">
+        <div class="spl-block"><div class="spl-title">Phishing Auto-Triage Playbook</div><div class="spl-meta">Palo Alto XSOAR (Demisto) - YAML Playbook</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">id: Phishing_Auto_Triage
+version: 1
+name: Phishing Email Auto-Triage
+description: Automated phishing email analysis and response
+starttaskid: "0"
+tasks:
+  "0":
+    id: "0"
+    taskid: extract_indicators
+    type: regular
+    task:
+      id: extract-indicators
+      name: Extract Indicators from Email
+      script: '|||extractIndicators'
+      args:
+        text: ${incident.details}
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    taskid: enrich_indicators
+    type: playbook
+    task:
+      name: Enrich Indicators
+      playbookId: Indicator_Enrichment
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    taskid: check_reputation
+    type: condition
+    task:
+      name: Is Malicious?
+      conditions:
+        - label: "yes"
+          condition:
+            - - operator: greaterThan
+                left: ${DBotScore.Score}
+                right: 2
+        - label: "no"
+    nexttasks:
+      "yes": ["3"]
+      "no": ["5"]
+  "3":
+    id: "3"
+    taskid: block_sender
+    type: regular
+    task:
+      name: Block Sender in Email Gateway
+      script: '|||blocksender'
+      args:
+        sender: ${incident.sender}
+  "4":
+    id: "4"
+    taskid: quarantine_email
+    type: regular
+    task:
+      name: Search and Quarantine in All Mailboxes
+      script: '|||ews-search-and-delete'
+      args:
+        query: "from:${incident.sender} subject:${incident.subject}"
+        action: quarantine
+  "5":
+    id: "5"
+    taskid: close_incident
+    type: regular
+    task:
+      name: Close Incident
+      script: '|||closeInvestigation'</div></div>
+
+        <div class="spl-block"><div class="spl-title">Malware Auto-Response Playbook</div><div class="spl-meta">XSOAR - Isolate + Investigate + Remediate</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">id: Malware_Auto_Response
+name: Malware Detection Auto-Response
+tasks:
+  "0":
+    task:
+      name: Isolate Endpoint
+      script: '|||isolate-endpoint'
+      args:
+        hostname: ${incident.hostname}
+  "1":
+    task:
+      name: Get File Hash Reputation
+      script: '|||file'
+      args:
+        file: ${incident.filehash}
+  "2":
+    task:
+      name: Search Hash in VirusTotal
+      script: '|||vt-file-report'
+      args:
+        resource: ${incident.filehash}
+  "3":
+    task:
+      name: Detonate File in Sandbox
+      script: '|||wildfire-upload'
+      args:
+        file_hash: ${incident.filehash}
+  "4":
+    task:
+      name: Block Hash on All Endpoints
+      script: '|||block-hash'
+      args:
+        hash: ${incident.filehash}
+  "5":
+    task:
+      name: Search for Hash Across Environment
+      script: '|||cs-falcon-search-device'
+      args:
+        filter: "local_ip:'${incident.filehash}'"
+  "6":
+    task:
+      name: Generate Investigation Report
+      script: '|||generateReport'</div></div>
+    </div>
+
+    <!-- Splunk SOAR (Phantom) -->
+    <div id="siem-soar-phantom" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Phishing Response Playbook</div><div class="spl-meta">Splunk SOAR (Phantom) - Python Playbook</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">import phantom.rules as phantom
+import json
+
+def on_start(container):
+    phantom.act("extract indicators", parameters=[{
+        "text": container.get("description", "")
+    }], callback=enrich_indicators, name="extract_iocs")
+
+def enrich_indicators(action, success, container, results, handle):
+    indicators = results[0]["data"]
+    for ioc in indicators:
+        if ioc["type"] == "url":
+            phantom.act("url reputation", parameters=[{
+                "url": ioc["value"]
+            }], assets=["virustotal"], callback=evaluate_risk)
+        elif ioc["type"] == "ip":
+            phantom.act("ip reputation", parameters=[{
+                "ip": ioc["value"]
+            }], assets=["abuseipdb"], callback=evaluate_risk)
+        elif ioc["type"] == "file_hash":
+            phantom.act("file reputation", parameters=[{
+                "hash": ioc["value"]
+            }], assets=["virustotal"], callback=evaluate_risk)
+
+def evaluate_risk(action, success, container, results, handle):
+    severity = results[0].get("summary", {}).get("positives", 0)
+    if severity > 3:
+        phantom.act("block sender", parameters=[{
+            "sender": container.get("source_data_identifier")
+        }], assets=["email_gateway"])
+        phantom.act("quarantine device", parameters=[{
+            "ip_hostname": container.get("source_address")
+        }], assets=["crowdstrike"])
+        phantom.set_severity(container, "high")
+        phantom.add_note(container, "Auto-blocked: malicious indicators found")
+    else:
+        phantom.set_severity(container, "low")
+        phantom.close(container, "Benign - no malicious indicators")</div></div>
+
+        <div class="spl-block"><div class="spl-title">Endpoint Containment Playbook</div><div class="spl-meta">Splunk SOAR - Auto Isolate + Investigate</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">import phantom.rules as phantom
+
+def on_start(container):
+    # Step 1: Isolate the endpoint immediately
+    phantom.act("quarantine device", parameters=[{
+        "ip_hostname": container["artifacts"][0]["cef"]["sourceAddress"]
+    }], assets=["crowdstrike"], callback=get_processes)
+
+def get_processes(action, success, container, results, handle):
+    # Step 2: List running processes
+    phantom.act("list processes", parameters=[{
+        "ip_hostname": container["artifacts"][0]["cef"]["sourceAddress"]
+    }], assets=["crowdstrike"], callback=check_hash)
+
+def check_hash(action, success, container, results, handle):
+    # Step 3: Check file hashes
+    for process in results[0].get("data", []):
+        if process.get("sha256"):
+            phantom.act("file reputation", parameters=[{
+                "hash": process["sha256"]
+            }], assets=["virustotal"], callback=block_if_malicious)
+
+def block_if_malicious(action, success, container, results, handle):
+    positives = results[0].get("summary",{}).get("positives", 0)
+    if positives > 5:
+        phantom.act("block hash", parameters=[{
+            "hash": results[0]["parameter"]["hash"]
+        }], assets=["crowdstrike"])
+        phantom.add_note(container, f"Blocked malicious hash: {positives} detections")</div></div>
+    </div>
+
+    <!-- Sentinel Logic Apps -->
+    <div id="siem-soar-sentinel" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Auto-Disable Compromised Account</div><div class="spl-meta">Microsoft Sentinel - Logic App (ARM Template)</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">{
+  "definition": {
+    "triggers": {
+      "Microsoft_Sentinel_alert": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+          "method": "post",
+          "path": "/subscribe"
+        }
+      }
+    },
+    "actions": {
+      "Get_alert_entities": {
+        "type": "ApiConnection",
+        "inputs": {
+          "method": "post",
+          "path": "/entities/get",
+          "body": { "alertId": "@triggerBody()?['SystemAlertId']" }
+        }
+      },
+      "For_each_account": {
+        "type": "Foreach",
+        "foreach": "@body('Get_alert_entities')?['Accounts']",
+        "actions": {
+          "Disable_user_in_AAD": {
+            "type": "ApiConnection",
+            "inputs": {
+              "method": "patch",
+              "path": "/v1.0/users/@{items('For_each_account')?['AadUserId']}",
+              "body": { "accountEnabled": false }
+            }
+          },
+          "Revoke_sessions": {
+            "type": "ApiConnection",
+            "inputs": {
+              "method": "post",
+              "path": "/v1.0/users/@{items('For_each_account')?['AadUserId']}/revokeSignInSessions"
+            }
+          },
+          "Add_comment_to_incident": {
+            "type": "ApiConnection",
+            "inputs": {
+              "method": "post",
+              "body": { "message": "Auto-disabled account and revoked sessions" }
+            }
+          }
+        }
+      }
+    }
+  }
+}</div></div>
+
+        <div class="spl-block"><div class="spl-title">Auto-Block IP in Firewall</div><div class="spl-meta">Sentinel Logic App - Extract IP + Block</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">{
+  "definition": {
+    "triggers": { "Microsoft_Sentinel_alert": { "type": "ApiConnection" } },
+    "actions": {
+      "Get_IPs": {
+        "type": "ApiConnection",
+        "inputs": { "path": "/entities/get", "body": { "alertId": "@triggerBody()?['SystemAlertId']" } }
+      },
+      "For_each_IP": {
+        "type": "Foreach",
+        "foreach": "@body('Get_IPs')?['IPs']",
+        "actions": {
+          "Check_IP_reputation": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "https://api.abuseipdb.com/api/v2/check",
+              "queries": { "ipAddress": "@items('For_each_IP')?['Address']" },
+              "headers": { "Key": "@parameters('AbuseIPDB_Key')" }
+            }
+          },
+          "Condition_is_malicious": {
+            "type": "If",
+            "expression": "@greater(body('Check_IP_reputation')?['data']?['abuseConfidenceScore'], 80)",
+            "actions": {
+              "Block_IP_in_NSG": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "method": "put",
+                  "body": {
+                    "properties": {
+                      "access": "Deny",
+                      "sourceAddressPrefix": "@items('For_each_IP')?['Address']",
+                      "priority": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}</div></div>
+    </div>
+
+    <!-- TheHive + Cortex -->
+    <div id="siem-soar-thehive" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Phishing Analysis Responder</div><div class="spl-meta">TheHive + Cortex Analyzer - Python Responder</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#!/usr/bin/env python3
+# TheHive Cortex Responder: Phishing Auto-Analysis
+from cortexutils.responder import Responder
+import requests
+
+class PhishingResponder(Responder):
+    def __init__(self):
+        Responder.__init__(self)
+        self.vt_key = self.get_param('config.vt_api_key')
+        self.abuse_key = self.get_param('config.abuseipdb_key')
+
+    def run(self):
+        case = self.get_param('data')
+        observables = case.get('observables', [])
+        results = []
+
+        for obs in observables:
+            if obs['dataType'] == 'url':
+                vt = requests.get('https://www.virustotal.com/api/v3/urls',
+                    headers={'x-apikey': self.vt_key},
+                    params={'url': obs['data']}).json()
+                results.append({'type':'url','value':obs['data'],
+                    'malicious': vt.get('data',{}).get('attributes',{})
+                        .get('last_analysis_stats',{}).get('malicious',0)})
+
+            elif obs['dataType'] == 'ip':
+                abuse = requests.get('https://api.abuseipdb.com/api/v2/check',
+                    headers={'Key': self.abuse_key},
+                    params={'ipAddress': obs['data']}).json()
+                results.append({'type':'ip','value':obs['data'],
+                    'abuse_score': abuse.get('data',{})
+                        .get('abuseConfidenceScore',0)})
+
+        malicious = [r for r in results
+            if r.get('malicious',0) > 3 or r.get('abuse_score',0) > 80]
+
+        if malicious:
+            self.report({'success': True, 'verdict': 'malicious',
+                'action': 'block_and_quarantine', 'findings': results})
+        else:
+            self.report({'success': True, 'verdict': 'clean',
+                'findings': results})
+
+if __name__ == '__main__':
+    PhishingResponder().run()</div></div>
+
+        <div class="spl-block"><div class="spl-title">Auto-Enrich Case Observables</div><div class="spl-meta">TheHive4py - Automated Case Enrichment</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">#!/usr/bin/env python3
+from thehive4py.api import TheHiveApi
+from thehive4py.models import CaseObservable
+from cortex4py.api import Api as CortexApi
+
+hive = TheHiveApi('http://thehive:9000', 'API_KEY')
+cortex = CortexApi('http://cortex:9001', 'CORTEX_KEY')
+
+def enrich_case(case_id):
+    """Auto-run analyzers on all case observables"""
+    observables = hive.get_case_observables(case_id).json()
+
+    for obs in observables:
+        analyzers = {
+            'ip': ['AbuseIPDB_1_0', 'VirusTotal_GetReport_3_1',
+                   'Shodan_Host_1_0', 'OTXQuery_2_0'],
+            'domain': ['VirusTotal_GetReport_3_1', 'DomainMailSPFDMARC_2_1',
+                       'Urlscan_io_Search_0_1_0'],
+            'hash': ['VirusTotal_GetReport_3_1', 'HybridAnalysis_GetReport_1_0',
+                     'MalwareBazaar_1_0'],
+            'url': ['VirusTotal_GetReport_3_1', 'Urlscan_io_Scan_0_1_0'],
+            'mail': ['EmailRep_1_0']
+        }
+
+        for analyzer in analyzers.get(obs['dataType'], []):
+            try:
+                job = cortex.analyzers.run_by_name(analyzer,
+                    {'data': obs['data'], 'dataType': obs['dataType']})
+                print(f"  Started {analyzer} on {obs['data']}")
+            except Exception as e:
+                print(f"  Error: {analyzer} - {e}")
+
+enrich_case('~case_id_here~')</div></div>
+    </div>
+
+    <!-- Swimlane -->
+    <div id="siem-soar-swimlane" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Phishing Triage Automation</div><div class="spl-meta">Swimlane Turbine - Python Integration</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code"># Swimlane Turbine Component: Phishing Triage
+# Trigger: New phishing alert from SIEM
+
+def phishing_triage(sw_context):
+    email = sw_context.inputs['email_data']
+
+    # Step 1: Extract IOCs
+    urls = sw_context.actions.run('extract_urls', text=email['body'])
+    ips = sw_context.actions.run('extract_ips', text=email['headers'])
+    hashes = sw_context.actions.run('extract_hashes', text=email['body'])
+
+    # Step 2: Enrich with threat intel
+    enrichment = {}
+    for url in urls:
+        enrichment[url] = sw_context.integrations.virustotal.scan_url(url)
+    for ip in ips:
+        enrichment[ip] = sw_context.integrations.abuseipdb.check(ip)
+
+    # Step 3: Calculate risk score
+    risk_score = 0
+    for key, result in enrichment.items():
+        if result.get('malicious', 0) > 3:
+            risk_score += 30
+        if result.get('abuse_score', 0) > 80:
+            risk_score += 25
+
+    # Step 4: Auto-respond based on risk
+    if risk_score > 50:
+        sw_context.integrations.email_gateway.block_sender(email['from'])
+        sw_context.integrations.edr.isolate_host(email['recipient_host'])
+        sw_context.record.update(severity='Critical', status='Containment')
+    else:
+        sw_context.record.update(severity='Low', status='Review')
+
+    return {'risk_score': risk_score, 'enrichment': enrichment}</div></div>
+    </div>
+
+    <!-- Tines -->
+    <div id="siem-soar-tines" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Phishing Response Story</div><div class="spl-meta">Tines - No-Code SOAR Story (JSON)</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">{
+  "name": "Phishing Auto-Response",
+  "agents": [
+    {
+      "type": "webhook",
+      "name": "Receive Phishing Alert",
+      "options": { "path": "phishing-alert", "secret": "webhook_secret" }
+    },
+    {
+      "type": "http_request",
+      "name": "Check URL in VirusTotal",
+      "options": {
+        "url": "https://www.virustotal.com/api/v3/urls/{{encode_url}}",
+        "method": "get",
+        "headers": { "x-apikey": "{{CREDENTIAL.virustotal}}" }
+      }
+    },
+    {
+      "type": "trigger",
+      "name": "Is Malicious?",
+      "options": {
+        "rules": [{ "type": "field>value",
+          "path": "$.check_url.body.data.attributes.last_analysis_stats.malicious",
+          "value": "3" }]
+      }
+    },
+    {
+      "type": "http_request",
+      "name": "Block in Email Gateway",
+      "options": {
+        "url": "https://emailgateway.example.com/api/blocklist",
+        "method": "post",
+        "body": { "sender": "{{receive_alert.body.sender}}", "action": "block" }
+      }
+    },
+    {
+      "type": "http_request",
+      "name": "Isolate Endpoint via CrowdStrike",
+      "options": {
+        "url": "https://api.crowdstrike.com/devices/entities/devices-actions/v2",
+        "method": "post",
+        "headers": { "Authorization": "Bearer {{CREDENTIAL.crowdstrike}}" },
+        "body": { "action_name": "contain", "ids": ["{{receive_alert.body.host_id}}"] }
+      }
+    },
+    {
+      "type": "http_request",
+      "name": "Create Slack Alert",
+      "options": {
+        "url": "https://hooks.slack.com/services/{{CREDENTIAL.slack_webhook}}",
+        "method": "post",
+        "body": { "text": "Phishing blocked: {{receive_alert.body.sender}} - Host isolated" }
+      }
+    }
+  ]
+}</div></div>
+    </div>
+
+    <!-- Shuffle -->
+    <div id="siem-soar-shuffle" class="siem-content">
+        <div class="spl-block"><div class="spl-title">Malware Response Workflow</div><div class="spl-meta">Shuffle SOAR - Open Source Workflow (JSON)</div><button class="copy-btn" onclick="copySpl(this)">Copy</button>
+<div class="spl-code">{
+  "name": "Malware_Auto_Response",
+  "description": "Automated malware detection and response workflow",
+  "triggers": [{ "name": "webhook", "environment": "cloud" }],
+  "actions": [
+    {
+      "name": "Check_Hash_VT",
+      "app_name": "VirusTotal",
+      "app_action": "get_file_report",
+      "parameters": [{ "name": "hash", "value": "$exec.hash" }]
+    },
+    {
+      "name": "Check_Hash_MalwareBazaar",
+      "app_name": "MalwareBazaar",
+      "app_action": "query_hash",
+      "parameters": [{ "name": "hash", "value": "$exec.hash" }]
+    },
+    {
+      "name": "Evaluate_Risk",
+      "app_name": "Shuffle Tools",
+      "app_action": "execute_python",
+      "parameters": [{ "name": "code", "value": "vt = json.loads('$Check_Hash_VT')\nmalicious = vt.get('positives', 0)\nreturn json.dumps({'malicious': malicious > 5, 'score': malicious})" }]
+    },
+    {
+      "name": "Isolate_Host",
+      "app_name": "CrowdStrike Falcon",
+      "app_action": "contain_host",
+      "parameters": [{ "name": "hostname", "value": "$exec.hostname" }],
+      "conditions": [{ "source": "$Evaluate_Risk.malicious", "equals": true }]
+    },
+    {
+      "name": "Block_Hash",
+      "app_name": "CrowdStrike Falcon",
+      "app_action": "block_ioc",
+      "parameters": [{ "name": "type", "value": "sha256" }, { "name": "value", "value": "$exec.hash" }],
+      "conditions": [{ "source": "$Evaluate_Risk.malicious", "equals": true }]
+    },
+    {
+      "name": "Create_Ticket",
+      "app_name": "TheHive",
+      "app_action": "create_alert",
+      "parameters": [
+        { "name": "title", "value": "Malware Detected: $exec.hash" },
+        { "name": "severity", "value": "3" },
+        { "name": "description", "value": "VT Score: $Evaluate_Risk.score\nHost: $exec.hostname\nAction: Isolated + Hash Blocked" }
+      ]
+    }
+  ]
+}</div></div>
     </div>
 </div>
 </div>
@@ -1852,6 +2883,30 @@ function generateRule() {
     } else if (format === 'yara') {
         rule = buildYara(name, severity, match, now);
         document.getElementById('dlYar').style.display='inline-block';
+    } else if (format === 'defender') {
+        rule = buildDefender(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'crowdstrike') {
+        rule = buildCrowdStrike(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'sentinelone') {
+        rule = buildSentinelOne(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'carbonblack') {
+        rule = buildCarbonBlack(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'cortex') {
+        rule = buildCortexXDR(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'xsoar') {
+        rule = buildXSOAR(name, severity, match, now);
+        document.getElementById('dlYaml').style.display='inline-block';
+    } else if (format === 'phantom') {
+        rule = buildPhantom(name, severity, match);
+        document.getElementById('dlSpl').style.display='inline-block';
+    } else if (format === 'thehive') {
+        rule = buildTheHive(name, severity, match, now);
+        document.getElementById('dlNdjson').style.display='inline-block';
     }
 
     lastGeneratedRule = rule;
@@ -1957,10 +3012,359 @@ function buildElastic(name, severity, m, date) {
 }
 
 function buildYara(name, severity, m, date) {
-    if (m && m.yara) {
-        return m.yara.replace(/__DATE__/g, date);
-    }
+    if (m && m.yara) return m.yara.replace(/__DATE__/g, date);
     return `/* No YARA template for "${name}" */\n/* YARA rules work best for: Mimikatz, Ransomware, Cobalt Strike, Webshell, Cryptominer, Reverse Shell, Rootkit */`;
+}
+
+function buildDefender(name, severity, m) {
+    if (!m) return `// No template for "${name}" - try: Mimikatz, Brute Force, Ransomware, PowerShell, etc.`;
+    const desc = m.desc;
+    const t = m.t;
+    const kws = m.sigma ? Object.values(m.sigma.detection).flat() : [];
+    // Build real Defender KQL from the Splunk/Sigma logic
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) return `// ${name} - Microsoft Defender for Endpoint
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName in~ ("mimikatz.exe","mimi.exe","procdump.exe","procdump64.exe")
+    or ProcessCommandLine has_any ("sekurlsa","logonpasswords","lsadump","kerberos::list","privilege::debug")
+    or (InitiatingProcessFileName !in~ ("csrss.exe","svchost.exe","wininit.exe","services.exe","MsMpEng.exe")
+        and FileName =~ "lsass.exe")
+| extend AlertSeverity = "Critical"
+| project Timestamp, DeviceName, AccountName, FileName, InitiatingProcessFileName, ProcessCommandLine, AlertSeverity
+| sort by Timestamp desc`;
+    if (m.key.includes('brute') || m.key.includes('ssh')) return `// ${name} - Microsoft Defender
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+DeviceLogonEvents
+| where Timestamp > ago(24h)
+| where ActionType == "LogonFailed"
+| summarize FailedAttempts = count(), SuccessAfter = countif(ActionType == "LogonSuccess") by RemoteIP, AccountName, DeviceName, bin(Timestamp, 5m)
+| where FailedAttempts > 10
+| extend Severity = iff(FailedAttempts > 50, "Critical", iff(FailedAttempts > 20, "High", "Medium"))
+| sort by FailedAttempts desc`;
+    if (m.key.includes('ransom')) return `// ${name} - Microsoft Defender
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+union DeviceProcessEvents, DeviceFileEvents
+| where Timestamp > ago(1h)
+| where (FileName in~ ("vssadmin.exe","wmic.exe","bcdedit.exe") and ProcessCommandLine has_any ("delete shadows","shadowcopy delete","recoveryenabled no"))
+    or (ActionType == "FileRenamed" and (FileName endswith ".encrypted" or FileName endswith ".locked" or FileName endswith ".crypted"))
+| summarize EventCount = count(), Commands = make_set(ProcessCommandLine), FileCount = dcountif(FileName, ActionType == "FileRenamed") by DeviceName, bin(Timestamp, 5m)
+| where EventCount > 3 or FileCount > 20
+| extend Alert = "CRITICAL: Possible Ransomware Activity"`;
+    if (m.key.includes('powershell')) return `// ${name} - Microsoft Defender
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName in~ ("powershell.exe","pwsh.exe")
+| where ProcessCommandLine has_any ("EncodedCommand","DownloadString","IEX","Invoke-Expression","bypass","WebClient","FromBase64String","hidden")
+| extend RiskScore = case(ProcessCommandLine has "EncodedCommand" and ProcessCommandLine has "bypass", 95, ProcessCommandLine has "EncodedCommand", 85, ProcessCommandLine has "DownloadString", 80, 65)
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName, RiskScore
+| sort by RiskScore desc`;
+    // Generic
+    return `// ${name} - Microsoft Defender for Endpoint
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+// Description: ${desc}
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where ProcessCommandLine has_any (${(m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,5).map(x=>`"${x}"`).join(', '):"\"keyword\"")})
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
+| sort by Timestamp desc`;
+}
+
+function buildCrowdStrike(name, severity, m) {
+    if (!m) return `// No template for "${name}"`;
+    const t = m.t;
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) return `// ${name} - CrowdStrike Falcon LogScale
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+#event_simpleName=ProcessRollup2 OR #event_simpleName=SyntheticProcessRollup2
+| ImageFileName=/\\\\(mimikatz|procdump|procdump64)\\.exe$/i
+  OR CommandLine=/(sekurlsa|logonpasswords|lsadump|kerberos::list|privilege::debug)/i
+| groupBy([ComputerName, ImageFileName, UserName, CommandLine])
+| count(aid, as=detections)
+| sort(detections, order=desc, limit=100)`;
+    if (m.key.includes('powershell')) return `// ${name} - CrowdStrike Falcon LogScale
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+#event_simpleName=ProcessRollup2
+| ImageFileName=/\\\\(powershell|pwsh)\\.exe$/i
+| CommandLine=/(EncodedCommand|DownloadString|IEX|Invoke-Expression|bypass|hidden|WebClient|FromBase64String)/i
+| groupBy([ComputerName, UserName, CommandLine, ParentBaseFileName])
+| count(aid, as=executions)
+| sort(executions, order=desc)`;
+    if (m.key.includes('ransom')) return `// ${name} - CrowdStrike Falcon LogScale
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+#event_simpleName=ProcessRollup2
+| CommandLine=/(vssadmin.*delete.*shadows|wmic.*shadowcopy.*delete|bcdedit.*recoveryenabled.*no)/i
+| groupBy([ComputerName, ImageFileName, CommandLine, UserName])
+| count(aid, as=events)
+| sort(events, order=desc)`;
+    return `// ${name} - CrowdStrike Falcon LogScale
+// MITRE: ${t} | ${m.desc}
+#event_simpleName=ProcessRollup2
+| CommandLine=/${m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,3).join('|'):'keyword'}/i
+| groupBy([ComputerName, UserName, ImageFileName, CommandLine])
+| count(aid, as=hits)
+| sort(hits, order=desc)`;
+}
+
+function buildSentinelOne(name, severity, m) {
+    if (!m) return `// No template for "${name}"`;
+    const t = m.t;
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) return `// ${name} - SentinelOne Deep Visibility
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+EventType = "Process Creation" AND
+(TgtProcName = "mimikatz.exe" OR TgtProcName = "procdump.exe" OR
+ TgtProcCmdLine ContainsCIS "sekurlsa" OR TgtProcCmdLine ContainsCIS "logonpasswords" OR
+ (TgtProcName = "lsass.exe" AND SrcProcName NOT IN ("csrss.exe","svchost.exe","wininit.exe","services.exe")))
+| columns EndpointName, UserName, TgtProcName, TgtProcCmdLine, SrcProcName, EventTime
+| sort -EventTime | limit 200`;
+    if (m.key.includes('powershell')) return `// ${name} - SentinelOne Deep Visibility
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+EventType = "Process Creation" AND
+TgtProcName IN ("powershell.exe","pwsh.exe") AND
+(TgtProcCmdLine ContainsCIS "EncodedCommand" OR TgtProcCmdLine ContainsCIS "DownloadString" OR
+ TgtProcCmdLine ContainsCIS "Invoke-Expression" OR TgtProcCmdLine ContainsCIS "bypass" OR
+ TgtProcCmdLine ContainsCIS "IEX" OR TgtProcCmdLine ContainsCIS "WebClient")
+| columns EndpointName, UserName, TgtProcCmdLine, SrcProcName, EventTime
+| sort -EventTime`;
+    return `// ${name} - SentinelOne Deep Visibility
+// MITRE: ${t} | ${m.desc}
+EventType = "Process Creation" AND
+(TgtProcCmdLine ContainsCIS "${m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string')[0]||'keyword':'keyword'}")
+| columns EndpointName, UserName, TgtProcName, TgtProcCmdLine, SrcProcName, EventTime
+| sort -EventTime | limit 200`;
+}
+
+function buildCarbonBlack(name, severity, m) {
+    if (!m) return `// No template for "${name}"`;
+    const kws = m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,5):['keyword'];
+    return `// ${name} - VMware Carbon Black Cloud
+// MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+// ${m.desc}
+(${kws.map(k => `process_cmdline:"${k}"`).join('\nOR ')})
+| sort last_update desc`;
+}
+
+function buildCortexXDR(name, severity, m) {
+    if (!m) return `// No template for "${name}"`;
+    const kws = m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword'];
+    return `// ${name} - Palo Alto Cortex XDR (XQL)
+// MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+dataset = xdr_data
+| filter event_type = PROCESS and
+    (${kws.map(k => `action_process_command_line contains "${k}"`).join(' or\n     ')})
+| fields _time, agent_hostname, actor_effective_username,
+    actor_process_image_name, action_process_image_name,
+    action_process_command_line
+| comp count() as total by agent_hostname, actor_effective_username
+| sort desc total`;
+}
+
+function buildXSOAR(name, severity, m, date) {
+    if (!m) return `# No template for "${name}"`;
+    const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
+    return `id: ${safeName}_auto_response
+version: 1
+name: "${name} - Auto Response"
+description: |
+  Automated detection and response playbook for: ${m.desc}
+  MITRE ATT&CK: ${m.t}
+starttaskid: "0"
+tasks:
+  "0":
+    id: "0"
+    taskid: detect_threat
+    type: regular
+    task:
+      id: detect-threat
+      name: "Detect: ${name}"
+      description: "Search for indicators of ${name}"
+      script: '|||searchIndicators'
+      args:
+        query: "type:${m.tac.includes('credential')?'hash':m.tac.includes('exfil')?'ip':m.tac.includes('initial')?'email':'process'}"
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    taskid: enrich_data
+    type: playbook
+    task:
+      name: "Enrich Indicators"
+      playbookId: Indicator_Enrichment
+      description: "Run VirusTotal, AbuseIPDB, and local IOC checks"
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    taskid: evaluate_severity
+    type: condition
+    task:
+      name: "Is Threat Confirmed?"
+      conditions:
+        - label: "yes"
+          condition:
+            - - operator: greaterThan
+                left: \${DBotScore.Score}
+                right: 2
+        - label: "no"
+    nexttasks:
+      "yes": ["3"]
+      "no": ["6"]
+  "3":
+    id: "3"
+    taskid: contain_threat
+    type: regular
+    task:
+      name: "Contain: Isolate Affected Host"
+      script: '|||isolate-endpoint'
+      args:
+        hostname: \${incident.hostname}
+    nexttasks:
+      '#none#': ["4"]
+  "4":
+    id: "4"
+    taskid: block_iocs
+    type: regular
+    task:
+      name: "Block Indicators"
+      script: '|||block-indicators'
+      args:
+        indicator_value: \${ExtractedIndicators}
+    nexttasks:
+      '#none#': ["5"]
+  "5":
+    id: "5"
+    taskid: create_ticket
+    type: regular
+    task:
+      name: "Create Investigation Ticket"
+      script: '|||createNewIncident'
+      args:
+        name: "${name} - \${incident.hostname}"
+        severity: "${severity === 'critical' ? '4' : severity === 'high' ? '3' : '2'}"
+        details: "Auto-generated by XSOAR playbook. MITRE: ${m.t}"
+    nexttasks:
+      '#none#': ["6"]
+  "6":
+    id: "6"
+    taskid: close_or_escalate
+    type: regular
+    task:
+      name: "Close / Escalate"
+      script: '|||closeInvestigation'
+      args:
+        closeReason: "Auto-triaged by SOAR playbook"`;
+}
+
+function buildPhantom(name, severity, m) {
+    if (!m) return `# No template for "${name}"`;
+    return `# ${name} - Splunk SOAR (Phantom) Playbook
+# MITRE: ${m.t} | Severity: ${severity.toUpperCase()}
+# ${m.desc}
+import phantom.rules as phantom
+import json
+
+def on_start(container):
+    """Phase 1: Initial detection and enrichment"""
+    phantom.debug("Starting ${name} response playbook")
+
+    # Extract relevant artifacts from the alert
+    artifacts = container.get("artifacts", [])
+    for artifact in artifacts:
+        cef = artifact.get("cef", {})
+
+        # Enrich IPs
+        if cef.get("sourceAddress"):
+            phantom.act("ip reputation", parameters=[{
+                "ip": cef["sourceAddress"]
+            }], assets=["virustotal","abuseipdb"], callback=evaluate_threat)
+
+        # Enrich file hashes
+        if cef.get("fileHash"):
+            phantom.act("file reputation", parameters=[{
+                "hash": cef["fileHash"]
+            }], assets=["virustotal"], callback=evaluate_threat)
+
+        # Enrich domains/URLs
+        if cef.get("requestURL"):
+            phantom.act("url reputation", parameters=[{
+                "url": cef["requestURL"]
+            }], assets=["virustotal"], callback=evaluate_threat)
+
+def evaluate_threat(action, success, container, results, handle):
+    """Phase 2: Evaluate threat level and auto-respond"""
+    if not success:
+        phantom.debug("Enrichment failed, escalating to analyst")
+        phantom.set_severity(container, "medium")
+        return
+
+    summary = results[0].get("summary", {})
+    positives = summary.get("positives", 0)
+    malicious = summary.get("malicious", 0)
+    abuse_score = summary.get("abuseConfidenceScore", 0)
+
+    risk = positives + malicious + (abuse_score // 20)
+
+    if risk > 5:
+        phantom.debug(f"HIGH RISK detected (score: {risk}), executing containment")
+        contain_threat(container, results)
+    elif risk > 2:
+        phantom.set_severity(container, "medium")
+        phantom.add_note(container,
+            f"Moderate risk detected (score: {risk}). Manual review required.")
+    else:
+        phantom.set_severity(container, "low")
+        phantom.close(container, "Benign - automated analysis found no threats")
+
+def contain_threat(container, results):
+    """Phase 3: Automated containment actions"""
+    cef = container["artifacts"][0].get("cef", {})
+
+    # Isolate the endpoint
+    if cef.get("sourceHostName"):
+        phantom.act("quarantine device", parameters=[{
+            "ip_hostname": cef["sourceHostName"]
+        }], assets=["crowdstrike"])
+
+    # Block the hash
+    if cef.get("fileHash"):
+        phantom.act("block hash", parameters=[{
+            "hash": cef["fileHash"]
+        }], assets=["crowdstrike"])
+
+    # Block the IP
+    if cef.get("sourceAddress"):
+        phantom.act("block ip", parameters=[{
+            "ip": cef["sourceAddress"]
+        }], assets=["firewall"])
+
+    phantom.set_severity(container, "${severity}")
+    phantom.add_note(container,
+        "AUTO-CONTAINED: Endpoint isolated, IOCs blocked. Investigate manually.")`;
+}
+
+function buildTheHive(name, severity, m, date) {
+    if (!m) return `// No template for "${name}"`;
+    const sevNum = {critical:3,high:2,medium:1,low:0}[severity]||2;
+    const alert = {
+        title: `[AUTO] ${name}`,
+        description: m.desc,
+        severity: sevNum,
+        type: "detection",
+        source: "Blue Team Toolkit",
+        sourceRef: `BTT-${Date.now()}`,
+        date: new Date().toISOString(),
+        tags: [`mitre:${m.t}`, `tactic:${m.tac}`, "auto-generated"],
+        customFields: {
+            mitreAttackTechnique: {string: m.t},
+            mitreTactic: {string: m.tac},
+            ruleFormat: {string: "thehive"},
+            severity: {string: severity}
+        },
+        artifacts: [
+            {dataType: "other", data: name, message: "Detection rule name", tags: ["rule"]},
+        ]
+    };
+    return JSON.stringify(alert, null, 2);
 }
 </script>
 
