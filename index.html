@@ -184,7 +184,10 @@
 <!-- Nav Tabs -->
 <div class="nav-tabs">
     <div class="nav-tab active" onclick="showTab('rule-gen')">&#9889; Rule Generator</div>
-    <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM / Splunk</div>
+    <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM</div>
+    <div class="nav-tab" onclick="showTab('edr')">&#128737; EDR</div>
+    <div class="nav-tab" onclick="showTab('xdr')">&#127760; XDR</div>
+    <div class="nav-tab" onclick="showTab('soar')">&#9881; SOAR</div>
     <div class="nav-tab" onclick="showTab('tools')">&#128736; Tools</div>
     <div class="nav-tab" onclick="showTab('rules')">&#128680; Detection Rules</div>
     <div class="nav-tab" onclick="showTab('hunting')">&#128270; Threat Hunting</div>
@@ -213,8 +216,16 @@
                 <select id="ruleFormat">
                     <option value="sigma">Sigma (SIEM)</option>
                     <option value="splunk">Splunk SPL</option>
-                    <option value="elastic">Elastic KQL</option>
+                    <option value="elastic">Elastic Security JSON</option>
                     <option value="yara">YARA</option>
+                    <option value="defender">Microsoft Defender KQL</option>
+                    <option value="crowdstrike">CrowdStrike Falcon</option>
+                    <option value="sentinelone">SentinelOne Deep Visibility</option>
+                    <option value="carbonblack">VMware Carbon Black</option>
+                    <option value="cortex">Palo Alto Cortex XDR</option>
+                    <option value="xsoar">Palo Alto XSOAR Playbook</option>
+                    <option value="phantom">Splunk SOAR (Phantom)</option>
+                    <option value="thehive">TheHive Response</option>
                 </select>
             </div>
             <div class="gen-field" style="flex:0.5;min-width:120px">
