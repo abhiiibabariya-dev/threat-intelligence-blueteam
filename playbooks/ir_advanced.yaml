@@ -1,0 +1,198 @@
+# Advanced Incident Response Playbooks
+# Additional playbooks for specialized incident types
+
+playbooks:
+  - name: Insider Threat
+    id: IR-005
+    severity: high
+    mitre_tactics: [Collection, Exfiltration, Impact]
+    description: Response procedures for suspected insider threat activity
+    phases:
+      identification:
+        - Review DLP alerts for unusual data access patterns
+        - Analyze user behavior analytics (UBA) for anomalies
+        - Check for after-hours access to sensitive systems
+        - Review badge access logs for physical access anomalies
+        - Identify bulk downloads or data staging activity
+        - Check for unauthorized cloud storage uploads (Dropbox, Google Drive, personal email)
+        - Review USB device connection history
+        - Correlate with HR flags (resignation notice, performance issues, termination pending)
+      containment:
+        - Engage HR and legal teams BEFORE taking technical action
+        - Increase monitoring without alerting the subject
+        - Restrict access to sensitive systems if imminent risk
+        - Preserve all email, chat, and file access logs
+        - Enable enhanced auditing on critical systems
+        - Do NOT confront the subject until coordinated with HR/legal
+      eradication:
+        - Disable access once authorized by HR/legal
+        - Revoke all tokens, VPN, and remote access
+        - Recover any exfiltrated data where possible
+        - Audit all systems and data the insider had access to
+        - Check for planted backdoors or logic bombs
+      recovery:
+        - Reset credentials for all shared accounts
+        - Review and tighten need-to-know access policies
+        - Implement additional DLP controls
+        - Update data classification for affected systems
+      lessons_learned:
+        - Review hiring and access provisioning procedures
+        - Assess adequacy of user behavior monitoring
+        - Update insider threat detection rules
+        - Consider mandatory access reviews for sensitive roles
+        - Document for potential legal proceedings
+
+  - name: DDoS Attack
+    id: IR-006
+    severity: high
+    mitre_tactics: [Impact]
+    description: Response procedures for Distributed Denial of Service attacks
+    phases:
+      identification:
+        - Confirm DDoS vs legitimate traffic spike
+        - Identify attack type (volumetric, protocol, application layer)
+        - Determine attack vector (UDP flood, SYN flood, HTTP flood, DNS amplification)
+        - Identify target systems and services
+        - Measure attack volume (Gbps, pps, rps)
+        - Check if attack is a distraction for another attack
+      containment:
+        - Engage DDoS mitigation provider (Cloudflare, Akamai, AWS Shield)
+        - Enable rate limiting on load balancers and WAF
+        - Implement geo-blocking if attack source is concentrated
+        - Null-route specific attack IPs at edge routers
+        - Scale up infrastructure if cloud-based
+        - Communicate with ISP for upstream filtering
+        - Activate CDN caching for application-layer attacks
+      eradication:
+        - Fine-tune mitigation rules based on traffic analysis
+        - Block identified botnet IPs at firewall
+        - Update WAF rules for application-layer attacks
+        - Verify no secondary attacks occurred during DDoS
+      recovery:
+        - Gradually remove mitigation rules
+        - Monitor for attack recurrence (48-hour watch)
+        - Verify all services are functioning normally
+        - Review DNS propagation and cache status
+      lessons_learned:
+        - Document attack characteristics for future reference
+        - Review DDoS protection adequacy
+        - Consider always-on vs on-demand mitigation
+        - Test auto-scaling and failover procedures
+        - Update ISP escalation procedures
+
+  - name: Supply Chain Compromise
+    id: IR-007
+    severity: critical
+    mitre_tactics: [Initial Access, Execution, Persistence]
+    description: Response for compromised third-party software or service providers
+    phases:
+      identification:
+        - Identify the compromised vendor/package/update
+        - Determine scope of affected systems using the component
+        - Check vendor advisories and threat intelligence feeds
+        - Identify the malicious payload (backdoor, malware, credential theft)
+        - Determine the compromise timeline (when was the malicious version released?)
+        - Identify all versions/channels affected
+      containment:
+        - Block network communication to attacker infrastructure
+        - Isolate systems running compromised software
+        - Disable automatic updates from the compromised source
+        - Revoke API keys and tokens shared with the vendor
+        - Block compromised package hashes at endpoint
+        - Notify other affected organizations if possible
+      eradication:
+        - Remove or rollback compromised software versions
+        - Scan all systems for indicators of compromise from the attack
+        - Reset credentials on all affected systems
+        - Rebuild systems that cannot be verified clean
+        - Audit dependency trees for additional compromised packages
+      recovery:
+        - Install verified clean version of the software
+        - Implement software composition analysis (SCA) scanning
+        - Enable package integrity verification (checksums, signatures)
+        - Restore from backups taken before compromise date
+      lessons_learned:
+        - Review vendor risk management procedures
+        - Implement software bill of materials (SBOM) tracking
+        - Consider vendored/pinned dependencies
+        - Review update and patch management policies
+        - Assess need for additional supply chain monitoring
+
+  - name: Cloud Account Compromise
+    id: IR-008
+    severity: critical
+    mitre_tactics: [Initial Access, Persistence, Impact]
+    description: Response for compromised cloud service accounts (AWS, Azure, GCP)
+    phases:
+      identification:
+        - Review CloudTrail/Activity logs for unauthorized API calls
+        - Identify compromised access keys or credentials
+        - Check for unauthorized resource creation (EC2, Lambda, S3)
+        - Identify cryptomining instances or unusual compute usage
+        - Check for data access to S3 buckets or databases
+        - Review IAM policy changes and role assumptions
+        - Check for new access keys created on existing users
+      containment:
+        - Deactivate compromised access keys immediately
+        - Revoke temporary security credentials
+        - Apply deny-all policy to compromised IAM user/role
+        - Enable MFA on root and all admin accounts
+        - Restrict IAM permissions to least privilege
+        - Block attacker IPs in security groups and NACLs
+      eradication:
+        - Delete unauthorized resources (instances, functions, users)
+        - Remove unauthorized IAM policies and roles
+        - Remove unauthorized S3 bucket policies
+        - Close any unauthorized cross-account access
+        - Rotate all secrets in Secrets Manager/Parameter Store
+        - Revoke OAuth grants to third-party applications
+      recovery:
+        - Generate new access keys with restricted permissions
+        - Re-enable services with enhanced monitoring
+        - Implement AWS GuardDuty/Azure Sentinel/GCP SCC
+        - Enable CloudTrail logging to immutable storage
+        - Review and enforce SCPs (Service Control Policies)
+      lessons_learned:
+        - Audit all cloud IAM configurations
+        - Implement automated credential rotation
+        - Deploy cloud security posture management (CSPM)
+        - Review cloud access patterns and implement anomaly detection
+        - Enforce principle of least privilege across all accounts
+
+  - name: Zero-Day Exploitation
+    id: IR-009
+    severity: critical
+    mitre_tactics: [Initial Access, Execution, Privilege Escalation]
+    description: Response for exploitation of previously unknown vulnerabilities
+    phases:
+      identification:
+        - Identify the exploited vulnerability and affected software
+        - Determine exploitation scope and affected systems
+        - Collect exploit artifacts (shellcode, payloads, traffic captures)
+        - Check for post-exploitation activity (lateral movement, persistence)
+        - Engage vendor for emergency advisory
+        - Check threat intelligence for related attacks on other organizations
+      containment:
+        - Apply virtual patching at WAF/IPS level
+        - Disable or restrict the vulnerable service if possible
+        - Implement network segmentation around affected systems
+        - Block exploit delivery vectors at perimeter
+        - Enable enhanced logging on vulnerable systems
+        - Deploy specific YARA/Sigma rules for the exploit
+      eradication:
+        - Apply vendor patch when available
+        - Remove all persistence mechanisms planted via exploit
+        - Rebuild compromised systems from clean images
+        - Scan all systems for indicators of the exploit
+        - Reset credentials on all affected systems
+      recovery:
+        - Verify patch deployment across all systems
+        - Validate system integrity before restoring to production
+        - Implement compensating controls until fully patched
+        - Monitor for exploit recurrence and variants
+      lessons_learned:
+        - Submit vulnerability details to vendor and CVE program
+        - Share IOCs with ISACs and trusted partners
+        - Review vulnerability management program
+        - Assess need for additional exploit detection capabilities
+        - Update incident response plans with zero-day procedures

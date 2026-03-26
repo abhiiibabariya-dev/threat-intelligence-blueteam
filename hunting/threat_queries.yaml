@@ -1,0 +1,293 @@
+# Threat Hunting Queries - Blue Team Toolkit
+# Curated queries for proactive threat hunting across SIEM platforms
+# Mapped to MITRE ATT&CK Framework
+
+queries:
+  # ===== Initial Access =====
+  - name: Phishing Link Clicks from Email
+    id: TH-001
+    description: Detect users clicking links in emails that redirect to newly registered domains
+    mitre: T1566.002
+    tactic: Initial Access
+    platform: [splunk, elastic]
+    splunk: |
+      index=proxy sourcetype=web_proxy
+      | eval domain=mvindex(split(url,"/"),2)
+      | lookup whois_lookup domain OUTPUT creation_date
+      | where creation_date > relative_time(now(), "-30d")
+      | stats count by src_ip, user, domain, creation_date
+      | where count > 0
+      | sort -count
+    elastic: |
+      GET _search
+      {
+        "query": {
+          "bool": {
+            "must": [
+              {"match": {"event.category": "web"}},
+              {"range": {"dns.question.registered_domain_age": {"lt": "30d"}}}
+            ]
+          }
+        }
+      }
+    tags: [phishing, email, proxy]
+
+  - name: External RDP Connections
+    id: TH-002
+    description: Detect RDP connections originating from external IP addresses
+    mitre: T1133
+    tactic: Initial Access
+    platform: [splunk, elastic]
+    splunk: |
+      index=firewall dest_port=3389 action=allowed
+      | where NOT cidrmatch("10.0.0.0/8", src_ip)
+        AND NOT cidrmatch("172.16.0.0/12", src_ip)
+        AND NOT cidrmatch("192.168.0.0/16", src_ip)
+      | stats count values(dest_ip) as targets by src_ip
+      | sort -count
+    tags: [rdp, remote-access, firewall]
+
+  # ===== Execution =====
+  - name: PowerShell Download Cradle Detection
+    id: TH-003
+    description: Detect PowerShell commands downloading and executing remote scripts
+    mitre: T1059.001
+    tactic: Execution
+    platform: [splunk, elastic]
+    splunk: |
+      index=sysmon EventCode=1 Image="*powershell*"
+      | regex CommandLine="(?i)(iex|invoke-expression|downloadstring|downloadfile|webclient|bitstransfer|start-bitstransfer|invoke-webrequest|wget|curl)"
+      | stats count by Computer, User, CommandLine, ParentImage
+      | sort -count
+    elastic: |
+      GET _search
+      {
+        "query": {
+          "bool": {
+            "must": [
+              {"wildcard": {"process.executable": "*powershell*"}},
+              {"regexp": {"process.command_line": ".*(IEX|Invoke-Expression|DownloadString|WebClient).*"}}
+            ]
+          }
+        }
+      }
+    tags: [powershell, download, execution]
+
+  - name: Suspicious Script Interpreter Execution
+    id: TH-004
+    description: Detect uncommon script interpreters (wscript, cscript, mshta) executing from unusual paths
+    mitre: T1059.005
+    tactic: Execution
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=1
+      (Image="*\\wscript.exe" OR Image="*\\cscript.exe" OR Image="*\\mshta.exe")
+      | where NOT match(CommandLine, "(?i)(windows\\system32|program files)")
+      | stats count by Computer, User, Image, CommandLine, ParentImage
+    tags: [scripting, wscript, mshta]
+
+  # ===== Persistence =====
+  - name: New Scheduled Task Creation
+    id: TH-005
+    description: Detect creation of new scheduled tasks which may indicate persistence
+    mitre: T1053.005
+    tactic: Persistence
+    platform: [splunk, elastic]
+    splunk: |
+      index=sysmon EventCode=1
+      (Image="*\\schtasks.exe" CommandLine="*/create*")
+      OR (Image="*\\at.exe")
+      | stats count by Computer, User, CommandLine, ParentImage
+      | sort -count
+    tags: [scheduled-task, persistence]
+
+  - name: Registry Run Key Modification
+    id: TH-006
+    description: Detect modifications to Registry Run keys for persistence
+    mitre: T1547.001
+    tactic: Persistence
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=13
+      TargetObject="*\\CurrentVersion\\Run*"
+      | stats count by Computer, Image, TargetObject, Details
+      | sort -count
+    tags: [registry, run-key, persistence]
+
+  - name: New Service Installation
+    id: TH-007
+    description: Detect new Windows services being installed
+    mitre: T1543.003
+    tactic: Persistence
+    platform: [splunk]
+    splunk: |
+      index=windows EventCode=7045
+      | stats count by ComputerName, Service_Name, Service_File_Name, Service_Type, Service_Start_Type
+      | sort -count
+    tags: [service, persistence, windows]
+
+  # ===== Credential Access =====
+  - name: LSASS Memory Access
+    id: TH-008
+    description: Detect processes accessing LSASS memory (credential dumping)
+    mitre: T1003.001
+    tactic: Credential Access
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=10 TargetImage="*\\lsass.exe"
+      | where NOT match(SourceImage, "(?i)(csrss|services|svchost|wininit|wmiprvse|MsMpEng)")
+      | stats count by Computer, SourceImage, GrantedAccess
+      | sort -count
+    tags: [lsass, credential-dumping, mimikatz]
+
+  - name: Kerberoasting Activity
+    id: TH-009
+    description: Detect potential Kerberoasting by identifying TGS requests for service accounts
+    mitre: T1558.003
+    tactic: Credential Access
+    platform: [splunk]
+    splunk: |
+      index=windows EventCode=4769 Ticket_Encryption_Type=0x17 Service_Name!="krbtgt"
+      | where Service_Name!="$*"
+      | stats count dc(Service_Name) as unique_services by Client_Address, Account_Name
+      | where unique_services > 3
+      | sort -unique_services
+    tags: [kerberoasting, kerberos, active-directory]
+
+  # ===== Lateral Movement =====
+  - name: PsExec Activity Detection
+    id: TH-010
+    description: Detect PsExec or similar remote execution tools
+    mitre: T1570
+    tactic: Lateral Movement
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=1
+      (Image="*\\psexec*" OR Image="*\\paexec*")
+      OR (EventCode=17 PipeName="\\PSEXESVC*")
+      OR (EventCode=13 TargetObject="*\\Services\\PSEXESVC*")
+      | stats count by Computer, User, Image, CommandLine
+      | sort -count
+    tags: [psexec, lateral-movement, remote-execution]
+
+  - name: WMI Remote Execution
+    id: TH-011
+    description: Detect WMI being used for remote command execution
+    mitre: T1047
+    tactic: Lateral Movement
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=1 Image="*\\wmic.exe" CommandLine="*/node:*"
+      | stats count by Computer, User, CommandLine
+      | sort -count
+    tags: [wmi, lateral-movement]
+
+  # ===== Defense Evasion =====
+  - name: Timestomping Detection
+    id: TH-012
+    description: Detect potential file timestamp manipulation
+    mitre: T1070.006
+    tactic: Defense Evasion
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=2
+      | where CreationUtcTime!=PreviousCreationUtcTime
+      | stats count by Computer, Image, TargetFilename, CreationUtcTime, PreviousCreationUtcTime
+      | sort -count
+    tags: [timestomping, anti-forensics]
+
+  - name: Security Log Clearing
+    id: TH-013
+    description: Detect Windows security event log being cleared
+    mitre: T1070.001
+    tactic: Defense Evasion
+    platform: [splunk, elastic]
+    splunk: |
+      index=windows (EventCode=1102 OR EventCode=104)
+      | stats count by ComputerName, Account_Name, EventCode
+    tags: [log-clearing, anti-forensics]
+
+  # ===== Exfiltration =====
+  - name: DNS Tunneling Detection
+    id: TH-014
+    description: Detect potential DNS tunneling by identifying anomalous DNS query patterns
+    mitre: T1048.003
+    tactic: Exfiltration
+    platform: [splunk, elastic]
+    splunk: |
+      index=dns
+      | eval query_len=len(query)
+      | where query_len > 50
+      | eval subdomain_count=mvcount(split(query, "."))
+      | where subdomain_count > 4
+      | stats count avg(query_len) as avg_len by src_ip, query
+      | where count > 10 AND avg_len > 40
+      | sort -count
+    tags: [dns-tunneling, exfiltration, dns]
+
+  - name: Large File Upload Detection
+    id: TH-015
+    description: Detect unusually large file uploads to external services
+    mitre: T1041
+    tactic: Exfiltration
+    platform: [splunk]
+    splunk: |
+      index=proxy http_method=POST
+      | where bytes_out > 10485760
+      | where NOT cidrmatch("10.0.0.0/8", dest_ip)
+      | stats sum(bytes_out) as total_bytes count by src_ip, user, dest, url
+      | eval total_mb=round(total_bytes/1048576, 2)
+      | where total_mb > 50
+      | sort -total_mb
+    tags: [data-upload, exfiltration, proxy]
+
+  # ===== Command and Control =====
+  - name: Beaconing Detection
+    id: TH-016
+    description: Detect C2 beaconing by identifying periodic network connections
+    mitre: T1071.001
+    tactic: Command and Control
+    platform: [splunk]
+    splunk: |
+      index=proxy OR index=firewall
+      | bin _time span=1m
+      | stats count by _time, src_ip, dest_ip, dest_port
+      | streamstats window=60 stdev(count) as std_dev avg(count) as avg_count by src_ip, dest_ip
+      | where std_dev < 1 AND avg_count > 0
+      | stats count dc(_time) as beacon_count by src_ip, dest_ip, dest_port
+      | where beacon_count > 30
+      | sort -beacon_count
+    tags: [beaconing, c2, periodic]
+
+  - name: Connection to Known Bad TLDs
+    id: TH-017
+    description: Detect connections to suspicious top-level domains
+    mitre: T1071
+    tactic: Command and Control
+    platform: [splunk]
+    splunk: |
+      index=dns OR index=proxy
+      | rex field=query "\.(?<tld>[^.]+)$"
+      | where tld IN ("top", "xyz", "club", "work", "date", "loan", "racing",
+                       "win", "bid", "stream", "download", "gdn", "ren", "science",
+                       "party", "review", "click", "country", "cricket")
+      | stats count by src_ip, query, tld
+      | sort -count
+    tags: [suspicious-tld, dns, c2]
+
+  # ===== Impact =====
+  - name: Mass File Encryption Detection
+    id: TH-018
+    description: Detect potential ransomware activity through mass file modifications
+    mitre: T1486
+    tactic: Impact
+    platform: [splunk]
+    splunk: |
+      index=sysmon EventCode=11
+      | rex field=TargetFilename "\.(?<ext>[^.]+)$"
+      | where ext IN ("encrypted", "locked", "crypto", "crypt", "enc", "locky",
+                       "cerber", "zepto", "thor", "aesir")
+      | stats dc(TargetFilename) as file_count by Computer, Image
+      | where file_count > 20
+      | sort -file_count
+    tags: [ransomware, encryption, impact]

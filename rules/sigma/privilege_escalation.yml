@@ -1,0 +1,122 @@
+# Sigma Rules - Privilege Escalation Detection
+
+title: Suspicious Sudo Usage Pattern
+id: sigma-pe-001
+status: stable
+level: high
+description: Detects suspicious sudo usage patterns including privilege escalation attempts
+author: Blue Team Toolkit
+date: 2024/01/15
+tags:
+  - attack.privilege_escalation
+  - attack.t1548.003
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection_sudo_abuse:
+    - 'sudo.*COMMAND=.*/bin/sh'
+    - 'sudo.*COMMAND=.*/bin/bash'
+    - 'sudo.*COMMAND=.*python.*-c'
+    - 'sudo.*COMMAND=.*perl.*-e'
+    - 'sudo.*COMMAND=.*vi.*-c'
+    - 'sudo.*COMMAND=.*find.*-exec'
+  condition: selection_sudo_abuse
+falsepositives:
+  - System administrators performing legitimate tasks
+  - Automated scripts running with sudo
+
+---
+
+title: Token Impersonation Activity
+id: sigma-pe-002
+status: experimental
+level: critical
+description: Detects potential token impersonation/theft for privilege escalation
+author: Blue Team Toolkit
+date: 2024/01/15
+tags:
+  - attack.privilege_escalation
+  - attack.t1134.001
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4624
+    LogonType: 9
+  selection_tools:
+    NewProcessName|contains:
+      - 'incognito'
+      - 'tokenvator'
+      - 'Rubeus'
+  condition: selection or selection_tools
+falsepositives:
+  - RunAs usage
+  - Legitimate delegation scenarios
+
+---
+
+title: UAC Bypass Attempt
+id: sigma-pe-003
+status: stable
+level: critical
+description: Detects common UAC bypass techniques
+author: Blue Team Toolkit
+date: 2024/01/15
+tags:
+  - attack.privilege_escalation
+  - attack.defense_evasion
+  - attack.t1548.002
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_eventvwr:
+    ParentImage|endswith: '\eventvwr.exe'
+    Image|endswith:
+      - '\powershell.exe'
+      - '\cmd.exe'
+  selection_fodhelper:
+    ParentImage|endswith: '\fodhelper.exe'
+    Image|endswith:
+      - '\powershell.exe'
+      - '\cmd.exe'
+  selection_computerdefaults:
+    ParentImage|endswith: '\computerdefaults.exe'
+    Image|endswith:
+      - '\powershell.exe'
+      - '\cmd.exe'
+  condition: selection_eventvwr or selection_fodhelper or selection_computerdefaults
+falsepositives:
+  - Very unlikely to be legitimate
+
+---
+
+title: Linux Kernel Exploit Indicators
+id: sigma-pe-004
+status: experimental
+level: critical
+description: Detects potential kernel exploitation for privilege escalation on Linux
+author: Blue Team Toolkit
+date: 2024/01/15
+tags:
+  - attack.privilege_escalation
+  - attack.t1068
+logsource:
+  product: linux
+  service: syslog
+detection:
+  selection:
+    - 'kernel:.*segfault.*in.*libc'
+    - 'kernel:.*BUG:.*unable to handle'
+    - 'kernel:.*general protection fault'
+    - 'Out of memory:.*Kill process'
+  selection_suid:
+    - 'chmod.*\\+s'
+    - 'chmod.*4755'
+    - 'chmod.*u\\+s'
+  condition: selection or selection_suid
+falsepositives:
+  - Legitimate system crashes
+  - Package installations setting SUID bits
