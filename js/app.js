@@ -239,6 +239,7 @@ function executeCommand() {
   xdr           - List XDR platforms
   soar          - List SOAR platforms
   tools         - List available tools
+  kb            - SOC Knowledge Base (kb search, kb list, kb show)
   mitre         - Show MITRE ATT&CK coverage
   fetch         - Run threat intel fetcher
   status        - System status
@@ -301,6 +302,13 @@ function executeCommand() {
   Lateral Move   ██████░░░ 67%
   Exfiltration   █████░░░░ 56%
   C2             ████░░░░░ 44%</span>`;
+            break;
+        case 'kb':
+            if (typeof handleKBTerminalCommand === 'function') {
+                output = handleKBTerminalCommand(parts.slice(1));
+            } else {
+                output = '<span class="error">Knowledge Base module not loaded.</span>';
+            }
             break;
         default:
             output = `<span class="error">Command not found: ${escapeHtml(cmd)}. Type 'help' for available commands.</span>`;
