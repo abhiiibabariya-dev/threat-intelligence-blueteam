@@ -1,0 +1,59 @@
+# Threat Intelligence Feed Definitions
+# Each feed has a name, URL, type, format, and refresh interval
+
+feeds:
+  - name: feodo_tracker
+    description: Feodo Tracker C2 IP Blocklist
+    url: https://feodotracker.abuse.ch/downloads/ipblocklist.csv
+    type: ip
+    format: csv
+    refresh_hours: 1
+    enabled: true
+
+  - name: urlhaus
+    description: URLhaus Malware URL List
+    url: https://urlhaus.abuse.ch/downloads/csv_recent/
+    type: url
+    format: csv
+    refresh_hours: 1
+    enabled: true
+
+  - name: emergingthreats_compromised
+    description: Emerging Threats Compromised IPs
+    url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+    type: ip
+    format: plaintext
+    refresh_hours: 4
+    enabled: true
+
+  - name: ssl_blacklist
+    description: SSL Blacklist - Malicious SSL certificates
+    url: https://sslbl.abuse.ch/blacklist/sslipblacklist.csv
+    type: ip
+    format: csv
+    refresh_hours: 6
+    enabled: true
+
+  - name: tor_exit_nodes
+    description: Tor Exit Node List
+    url: https://check.torproject.org/torbulkexitlist
+    type: ip
+    format: plaintext
+    refresh_hours: 12
+    enabled: true
+
+  - name: malware_bazaar_recent
+    description: MalwareBazaar Recent Samples (hashes)
+    url: https://bazaar.abuse.ch/export/csv/recent/
+    type: hash
+    format: csv
+    refresh_hours: 1
+    enabled: true
+
+  - name: threatfox_iocs
+    description: ThreatFox IOC Export
+    url: https://threatfox.abuse.ch/export/csv/recent/
+    type: mixed
+    format: csv
+    refresh_hours: 1
+    enabled: true

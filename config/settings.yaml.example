@@ -1,0 +1,34 @@
+# Threat Intelligence Blue Team - Configuration
+# Copy this file to settings.yaml and fill in your API keys
+
+api_keys:
+  virustotal: ""
+  abuseipdb: ""
+  otx: ""          # AlienVault OTX
+  misp_url: ""
+  misp_key: ""
+  shodan: ""
+
+feeds:
+  enabled:
+    - otx_pulses
+    - abuseipdb_blacklist
+    - emergingthreats
+    - feodo_tracker
+    - urlhaus
+
+logging:
+  level: INFO
+  file: output/blueteam.log
+
+output:
+  directory: output
+  format: json  # json, csv, or both
+
+network:
+  baseline_file: output/network_baseline.json
+  alert_threshold: 10  # new connections before alerting
+
+analysis:
+  lookback_hours: 24
+  min_severity: medium  # low, medium, high, critical

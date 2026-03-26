@@ -1,0 +1,57 @@
+title: Potential DNS Tunneling
+id: d4e5f6a1-b2c3-7890-def0-1234567890ab
+status: experimental
+level: high
+description: Detects unusually long DNS queries that may indicate DNS tunneling for data exfiltration
+author: Blue Team Toolkit
+date: 2024/01/01
+references:
+  - https://attack.mitre.org/techniques/T1048/
+  - https://attack.mitre.org/techniques/T1071/004/
+tags:
+  - attack.exfiltration
+  - attack.t1048
+  - attack.command_and_control
+  - attack.t1071.004
+logsource:
+  category: dns
+detection:
+  long_query:
+    QueryName|re: '.{50,}'
+  high_entropy_subdomain:
+    QueryName|contains:
+      - xn--
+  condition: long_query or high_entropy_subdomain
+falsepositives:
+  - CDN domains with long names
+  - Internationalized domain names
+---
+title: Large Outbound Data Transfer
+id: e5f6a1b2-c3d4-7890-ef01-234567890abc
+status: experimental
+level: medium
+description: Detects unusually large outbound data transfers that may indicate exfiltration
+author: Blue Team Toolkit
+date: 2024/01/01
+references:
+  - https://attack.mitre.org/techniques/T1048/
+tags:
+  - attack.exfiltration
+  - attack.t1048
+logsource:
+  category: firewall
+detection:
+  selection:
+    Direction: outbound
+    BytesSent|gte: 104857600  # 100MB
+  filter_known:
+    DestinationIP|cidr:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+  condition: selection and not filter_known
+timeframe: 1h
+falsepositives:
+  - Cloud backups
+  - Large file uploads to legitimate services
+  - Software updates/deployments
