@@ -193,7 +193,7 @@
     <div class="nav-tab" onclick="showTab('hunting')">&#128270; Hunt Builder</div>
     <div class="nav-tab" onclick="showTab('playbooks')">&#128214; IR Playbooks</div>
     <div class="nav-tab" onclick="showTab('mitre')">&#127919; MITRE Builder</div>
-    <div class="nav-tab" onclick="showTab('quickstart')">&#128187; Quick Start</div>
+    <div class="nav-tab" onclick="showTab('quickstart')">&#128187; Quick Access</div>
 </div>
 
 <!-- ==================== RULE GENERATOR ==================== -->
@@ -2867,9 +2867,178 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128187;</div>
-        <h3>Quick Start</h3>
+        <h3>Quick Access — All Features</h3>
     </div>
-    <div class="code">
+    <p style="color:var(--text2);margin-bottom:1.5rem">Jump directly into any builder or generate rules instantly. Click any card to go to that feature, or use the one-click generators below.</p>
+
+    <!-- Feature Hub Cards -->
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-bottom:2rem">
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('rule-gen')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(0,212,255,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(0,212,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#9889;</div>
+                <div><strong style="color:var(--text1)">Rule Generator</strong><br><span style="font-size:.7rem;color:var(--dim)">17 output formats</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">AI-powered detection rule builder. Describe any threat and generate Sigma, YARA, Splunk, Elastic, KQL, CrowdStrike, and more.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('siem')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(245,158,11,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128202;</div>
+                <div><strong style="color:var(--text1)">SIEM Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">14 platforms</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Generate queries for Splunk, Elastic, Sentinel, QRadar, Chronicle, Wazuh, FortiSIEM, LogRhythm, and 6 more platforms.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('edr')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(239,68,68,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128737;</div>
+                <div><strong style="color:var(--text1)">EDR Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">11 formats / 7 platforms</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Build EDR rules for Defender, CrowdStrike (IOA/IOC/Prevention/Firewall), SentinelOne, Carbon Black, Elastic, Trellix.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('xdr')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(124,58,237,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#127760;</div>
+                <div><strong style="color:var(--text1)">XDR Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">4 platforms</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Generate cross-source correlation rules for Cortex XDR, M365 Defender, Trend Micro Vision One, SentinelOne Singularity.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('soar')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(16,185,129,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#9881;</div>
+                <div><strong style="color:var(--text1)">SOAR Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">7 platforms</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Create automation playbooks for XSOAR, Phantom, Sentinel Logic Apps, TheHive, Swimlane, Tines, and Shuffle.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('tools')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(0,212,255,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(0,212,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128736;</div>
+                <div><strong style="color:var(--text1)">Tool Generator</strong><br><span style="font-size:.7rem;color:var(--dim)">10 tools / 3 languages</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Generate Python/Bash/PowerShell scripts: IOC Scanner, Email Analyzer, IP Reputation, Hash Checker, YARA Scanner, and more.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('rules')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(239,68,68,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128680;</div>
+                <div><strong style="color:var(--text1)">Rule Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">7 formats</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Build Sigma, YARA, Snort/Suricata, osquery, KQL, SPL, and EQL detection rules with MITRE ATT&CK mapping.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('hunting')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(245,158,11,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128270;</div>
+                <div><strong style="color:var(--text1)">Hunt Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">6 platforms</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Create threat hunting queries for Splunk, Elastic, Sentinel, CrowdStrike, Carbon Black, and Velociraptor (VQL).</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('playbooks')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(124,58,237,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#128214;</div>
+                <div><strong style="color:var(--text1)">IR Playbooks</strong><br><span style="font-size:.7rem;color:var(--dim)">12 incident types / 4 formats</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Generate incident response playbooks: Ransomware, Phishing, Malware, Data Breach, Insider Threat, and more in Markdown/YAML/Checklist/Runbook.</p>
+        </div>
+        <div class="card" style="cursor:pointer;transition:transform .2s,box-shadow .2s" onclick="showTabDirect('mitre')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 20px rgba(16,185,129,.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#127919;</div>
+                <div><strong style="color:var(--text1)">MITRE Builder</strong><br><span style="font-size:.7rem;color:var(--dim)">26 techniques</span></div>
+            </div>
+            <p style="color:var(--text2);font-size:.8rem;margin:0">Select any MITRE ATT&CK technique and auto-generate full detection bundles: Sigma + Splunk + Elastic + Defender + CrowdStrike + Response Actions.</p>
+        </div>
+    </div>
+
+    <!-- One-Click Instant Generators -->
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#9889;</div>
+            <h3>One-Click Instant Generate</h3>
+        </div>
+        <p style="color:var(--text2);margin-bottom:1rem">Generate rules instantly without leaving this page. Click any button to auto-generate and jump to the result.</p>
+
+        <h4 style="color:var(--cyan);font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">Critical Threat Detection</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-primary" style="font-size:.75rem;padding:.5rem 1rem" onclick="quickGen('mimikatz','rule-gen','sigma','critical')">Sigma: Mimikatz</button>
+            <button class="btn btn-primary" style="font-size:.75rem;padding:.5rem 1rem" onclick="quickGen('ransomware','rule-gen','yara','critical')">YARA: Ransomware</button>
+            <button class="btn btn-primary" style="font-size:.75rem;padding:.5rem 1rem" onclick="quickGen('cobalt strike','rule-gen','sigma','critical')">Sigma: Cobalt Strike</button>
+            <button class="btn btn-primary" style="font-size:.75rem;padding:.5rem 1rem" onclick="quickGen('powershell download','rule-gen','splunk','high')">Splunk: PowerShell</button>
+            <button class="btn btn-primary" style="font-size:.75rem;padding:.5rem 1rem" onclick="quickGen('webshell','rule-gen','yara','critical')">YARA: Webshell</button>
+        </div>
+
+        <h4 style="color:#ef4444;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">EDR / CrowdStrike Policies</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#ef4444;color:#ef4444" onclick="showTabDirect('edr');setTimeout(()=>edrPreset('Mimikatz Credential Dump','cs-ioa','critical'),100)">IOA: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#ef4444;color:#ef4444" onclick="showTabDirect('edr');setTimeout(()=>edrPreset('Ransomware File Encryption','cs-prevention','critical'),100)">Prevention Policy</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#ef4444;color:#ef4444" onclick="showTabDirect('edr');setTimeout(()=>edrPreset('DNS Tunneling Exfiltration','cs-firewall','critical'),100)">Firewall Rule</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#ef4444;color:#ef4444" onclick="showTabDirect('edr');setTimeout(()=>edrPreset('Cobalt Strike Beacon','defender','critical'),100)">Defender: C2</button>
+        </div>
+
+        <h4 style="color:#7c3aed;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">XDR Correlation Rules</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#7c3aed;color:#a78bfa" onclick="showTabDirect('xdr');setTimeout(()=>xdrPreset('Credential Theft Kill Chain','cortex-xdr','critical'),100)">Cortex: Credential Theft</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#7c3aed;color:#a78bfa" onclick="showTabDirect('xdr');setTimeout(()=>xdrPreset('Phishing to Lateral Movement','m365-xdr','critical'),100)">M365: Phishing Chain</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#7c3aed;color:#a78bfa" onclick="showTabDirect('xdr');setTimeout(()=>xdrPreset('Ransomware Attack Chain','cortex-xdr','critical'),100)">Cortex: Ransomware</button>
+        </div>
+
+        <h4 style="color:#10b981;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">SOAR Playbooks</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('soar');setTimeout(()=>soarPreset('Phishing Email Triage','xsoar','high'),100)">XSOAR: Phishing</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('soar');setTimeout(()=>soarPreset('Ransomware Containment','phantom','critical'),100)">Phantom: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('soar');setTimeout(()=>soarPreset('Compromised Account Lockdown','sentinel-la','high'),100)">Sentinel: Account</button>
+        </div>
+
+        <h4 style="color:var(--cyan);font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">Security Tool Scripts</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('ioc-scanner','','python'),100)">IOC Scanner</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('email-analyzer','','python'),100)">Email Analyzer</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('ip-reputation','','python'),100)">IP Reputation</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('hash-checker','','python'),100)">Hash Checker</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('yara-scanner','','python'),100)">YARA Scanner</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem" onclick="showTabDirect('tools');setTimeout(()=>toolPreset('log-analyzer','/var/log/auth.log','python'),100)">Log Analyzer</button>
+        </div>
+
+        <h4 style="color:#f59e0b;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">Incident Response</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#f59e0b;color:#f59e0b" onclick="showTabDirect('playbooks');setTimeout(()=>pbPreset('ransomware','markdown','critical'),100)">Ransomware IR</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#f59e0b;color:#f59e0b" onclick="showTabDirect('playbooks');setTimeout(()=>pbPreset('phishing','checklist','high'),100)">Phishing Checklist</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#f59e0b;color:#f59e0b" onclick="showTabDirect('playbooks');setTimeout(()=>pbPreset('malware','runbook','critical'),100)">Malware Runbook</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#f59e0b;color:#f59e0b" onclick="showTabDirect('playbooks');setTimeout(()=>pbPreset('data-exfil','markdown','critical'),100)">Data Breach IR</button>
+        </div>
+
+        <h4 style="color:#10b981;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;margin:1.2rem 0 .6rem">MITRE ATT&CK Bundles</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('mitre');setTimeout(()=>mitrePreset('T1003.001','full-bundle','critical'),100)">T1003.001 LSASS Bundle</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('mitre');setTimeout(()=>mitrePreset('T1486','full-bundle','critical'),100)">T1486 Ransomware Bundle</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('mitre');setTimeout(()=>mitrePreset('T1059.001','full-bundle','high'),100)">T1059 PowerShell Bundle</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem 1rem;border-color:#10b981;color:#10b981" onclick="showTabDirect('mitre');setTimeout(()=>mitrePreset('T1110.001','multi-siem','high'),100)">T1110 Brute Force (Multi-SIEM)</button>
+        </div>
+    </div>
+
+    <!-- Platform Stats -->
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:2rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128200;</div>
+            <h3>Platform Coverage</h3>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem">
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">14</div><div style="font-size:.75rem;color:var(--dim)">SIEM Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">11</div><div style="font-size:.75rem;color:var(--dim)">EDR Formats</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">4</div><div style="font-size:.75rem;color:var(--dim)">XDR Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#10b981">7</div><div style="font-size:.75rem;color:var(--dim)">SOAR Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">10</div><div style="font-size:.75rem;color:var(--dim)">Security Tools</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#f59e0b">7</div><div style="font-size:.75rem;color:var(--dim)">Rule Formats</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">6</div><div style="font-size:.75rem;color:var(--dim)">Hunt Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">12</div><div style="font-size:.75rem;color:var(--dim)">IR Playbook Types</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#10b981">26</div><div style="font-size:.75rem;color:var(--dim)">MITRE Techniques</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">21</div><div style="font-size:.75rem;color:var(--dim)">Threat Templates</div></div>
+        </div>
+    </div>
+
+    <!-- CLI Reference (collapsed) -->
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:2rem">
+        <div class="sec-hdr" style="cursor:pointer" onclick="document.getElementById('cliRef').style.display=document.getElementById('cliRef').style.display==='none'?'block':'none'">
+            <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128187;</div>
+            <h3>CLI Quick Reference (click to expand)</h3>
+        </div>
+        <div id="cliRef" style="display:none">
+            <div class="code">
 <span class="c"># Clone and setup</span>
 <span class="cmd">git clone</span> https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam.git
 <span class="cmd">cd</span> threat-intelligence-blueteam
@@ -2886,7 +3055,6 @@ def phishing_triage(sw_context):
 
 <span class="c"># Search CVE vulnerabilities + CISA KEV</span>
 <span class="cmd">python</span> scripts/cve_checker.py search <span class="fl">"apache log4j"</span>
-<span class="cmd">python</span> scripts/cve_checker.py kev <span class="fl">--recent 20</span>
 
 <span class="c"># Generate forensic timeline</span>
 <span class="cmd">python</span> scripts/timeline_generator.py /var/log/auth.log /var/log/syslog
@@ -2896,13 +3064,8 @@ def phishing_triage(sw_context):
 
 <span class="c"># Generate threat intelligence report</span>
 <span class="cmd">python</span> scripts/threat_report.py <span class="fl">--markdown</span> report.md
-
-<span class="c"># Analyze logs for threats</span>
-<span class="cmd">python</span> scripts/log_analyzer.py <span class="fl">--input</span> /var/log/syslog
-
-<span class="c"># Network baseline and scan</span>
-<span class="cmd">python</span> scripts/network_scan.py baseline
-<span class="cmd">python</span> scripts/network_scan.py scan
+            </div>
+        </div>
     </div>
 </div>
 </div>
@@ -2922,6 +3085,27 @@ function showTab(id) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-'+id).classList.add('active');
     event.target.classList.add('active');
+}
+// Direct tab switching (from Quick Access cards)
+function showTabDirect(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-'+id).classList.add('active');
+    // Highlight matching nav tab
+    document.querySelectorAll('.nav-tab').forEach(t => {
+        if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'"+id+"'")) t.classList.add('active');
+    });
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+// Quick generate from Quick Access page
+function quickGen(threat, tab, fmt, sev) {
+    showTabDirect(tab);
+    setTimeout(() => {
+        document.getElementById('ruleName').value = threat;
+        document.getElementById('ruleFormat').value = fmt;
+        document.getElementById('ruleSeverity').value = sev;
+        generateRule();
+    }, 100);
 }
 
 // SIEM tab switching
