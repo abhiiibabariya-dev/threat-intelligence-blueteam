@@ -184,15 +184,15 @@
 <!-- Nav Tabs -->
 <div class="nav-tabs">
     <div class="nav-tab active" onclick="showTab('rule-gen')">&#9889; Rule Generator</div>
-    <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM</div>
+    <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM Builder</div>
     <div class="nav-tab" onclick="showTab('edr')">&#128737; EDR Builder</div>
     <div class="nav-tab" onclick="showTab('xdr')">&#127760; XDR Builder</div>
-    <div class="nav-tab" onclick="showTab('soar')">&#9881; SOAR</div>
-    <div class="nav-tab" onclick="showTab('tools')">&#128736; Tools</div>
-    <div class="nav-tab" onclick="showTab('rules')">&#128680; Detection Rules</div>
-    <div class="nav-tab" onclick="showTab('hunting')">&#128270; Threat Hunting</div>
-    <div class="nav-tab" onclick="showTab('playbooks')">&#128214; Playbooks</div>
-    <div class="nav-tab" onclick="showTab('mitre')">&#127919; MITRE ATT&CK</div>
+    <div class="nav-tab" onclick="showTab('soar')">&#9881; SOAR Builder</div>
+    <div class="nav-tab" onclick="showTab('tools')">&#128736; Tool Generator</div>
+    <div class="nav-tab" onclick="showTab('rules')">&#128680; Rule Builder</div>
+    <div class="nav-tab" onclick="showTab('hunting')">&#128270; Hunt Builder</div>
+    <div class="nav-tab" onclick="showTab('playbooks')">&#128214; IR Playbooks</div>
+    <div class="nav-tab" onclick="showTab('mitre')">&#127919; MITRE Builder</div>
     <div class="nav-tab" onclick="showTab('quickstart')">&#128187; Quick Start</div>
 </div>
 
@@ -328,7 +328,104 @@
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128202;</div>
-        <h3>SIEM Queries & Dashboards</h3>
+        <h3>SIEM Query Builder</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate detection queries for any SIEM platform. Describe the threat, select your SIEM, and get a production-ready query with MITRE ATT&CK mapping.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Threat / Detection Description</label>
+                <input type="text" id="siemRuleName" placeholder="e.g. Brute Force Login, PowerShell Download, Lateral Movement, DNS Tunneling..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:170px">
+                <label>SIEM Platform</label>
+                <select id="siemPlatform">
+                    <option value="splunk">Splunk SPL</option>
+                    <option value="elastic">Elastic SIEM (KQL/EQL)</option>
+                    <option value="sentinel">Microsoft Sentinel (KQL)</option>
+                    <option value="qradar">IBM QRadar (AQL)</option>
+                    <option value="chronicle">Google Chronicle (YARA-L)</option>
+                    <option value="arcsight">ArcSight ESM</option>
+                    <option value="fortisiem">FortiSIEM</option>
+                    <option value="wazuh">Wazuh</option>
+                    <option value="logrhythm">LogRhythm</option>
+                    <option value="exabeam">Exabeam</option>
+                    <option value="securonix">Securonix (OCSF)</option>
+                    <option value="logpoint">LogPoint</option>
+                    <option value="rapid7">Rapid7 InsightIDR</option>
+                    <option value="falcon-siem">CrowdStrike Falcon LogScale</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="siemSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Log Source</label>
+                <select id="siemSource">
+                    <option value="windows">Windows Events</option>
+                    <option value="linux">Linux/Syslog</option>
+                    <option value="network">Network/Firewall</option>
+                    <option value="web">Web/Proxy</option>
+                    <option value="cloud">Cloud (AWS/Azure/GCP)</option>
+                    <option value="email">Email</option>
+                    <option value="endpoint">Endpoint/EDR</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Time Range</label>
+                <select id="siemTimeRange">
+                    <option value="1h">Last 1 Hour</option>
+                    <option value="4h">Last 4 Hours</option>
+                    <option value="24h" selected>Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateSIEMQuery()">Generate Query</button>
+                <button class="btn btn-secondary" onclick="clearSIEMOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="siemRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copySIEMRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadSIEMRule()">Download</button>
+        </div>
+        <code id="siemRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Brute Force Login','splunk','high')">Splunk: Brute Force</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('PowerShell Download Cradle','elastic','high')">Elastic: PowerShell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('DNS Tunneling Exfiltration','sentinel','critical')">Sentinel: DNS Tunnel</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Lateral Movement via PsExec','qradar','high')">QRadar: Lateral Move</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Mimikatz Credential Dump','chronicle','critical')">Chronicle: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Ransomware File Encryption','wazuh','critical')">Wazuh: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Cobalt Strike Beacon','logrhythm','critical')">LogRhythm: C2</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('SSH Brute Force Attack','fortisiem','high')">FortiSIEM: SSH Brute</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Kerberoasting Attack','securonix','high')">Securonix: Kerberoast</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="siemPreset('Webshell Upload Detection','rapid7','critical')">Rapid7: Webshell</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128270;</div>
+            <h3>SIEM Query Reference Library</h3>
+        </div>
     </div>
 
     <div class="siem-tabs">
@@ -1580,7 +1677,81 @@ hostName:*
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#9881;</div>
-        <h3>SOAR Automation Playbooks</h3>
+        <h3>SOAR Playbook Builder</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate automation playbooks for any SOAR platform. Describe the incident scenario, pick your platform, and get a deployable playbook with enrichment, containment, and response actions.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Incident Type / Scenario</label>
+                <input type="text" id="soarRuleName" placeholder="e.g. Phishing Email Triage, Malware Containment, Ransomware Response, Account Compromise..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:170px">
+                <label>SOAR Platform</label>
+                <select id="soarPlatform">
+                    <option value="xsoar">Palo Alto XSOAR (YAML)</option>
+                    <option value="phantom">Splunk SOAR / Phantom (Python)</option>
+                    <option value="sentinel-la">Sentinel Logic Apps (JSON)</option>
+                    <option value="thehive">TheHive + Cortex (Python)</option>
+                    <option value="swimlane">Swimlane Turbine (Python)</option>
+                    <option value="tines">Tines (JSON)</option>
+                    <option value="shuffle">Shuffle (JSON)</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="soarSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:150px">
+                <label>Response Actions</label>
+                <select id="soarActions">
+                    <option value="full" selected>Full (Enrich + Contain + Respond)</option>
+                    <option value="enrich">Enrich Only (Investigation)</option>
+                    <option value="contain">Contain + Isolate</option>
+                    <option value="notify">Notify + Ticket Only</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateSOARPlaybook()">Generate Playbook</button>
+                <button class="btn btn-secondary" onclick="clearSOAROutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="soarRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copySOARRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadSOARRule()">Download</button>
+        </div>
+        <code id="soarRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Phishing Email Triage','xsoar','high')">XSOAR: Phishing</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Malware Infection Response','phantom','critical')">Phantom: Malware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Compromised Account Lockdown','sentinel-la','high')">Sentinel: Account</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Ransomware Containment','thehive','critical')">TheHive: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Data Exfiltration Response','swimlane','critical')">Swimlane: Exfil</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('Suspicious IP Block','tines','medium')">Tines: IP Block</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="soarPreset('IOC Enrichment','shuffle','medium')">Shuffle: IOC Enrich</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#128270;</div>
+            <h3>SOAR Playbook Reference Library</h3>
+        </div>
     </div>
     <div class="siem-tabs">
         <div class="siem-tab active" onclick="showSiem('soar-xsoar')">Palo Alto XSOAR</div>
@@ -2136,7 +2307,86 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128736;</div>
-        <h3>Analysis & Intelligence Tools</h3>
+        <h3>Security Tool Script Generator</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate ready-to-run Python scripts for security analysis, forensics, and threat intelligence. Select the tool type and configure options to get a complete script.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:1;min-width:200px">
+                <label>Tool Type</label>
+                <select id="toolType">
+                    <option value="ioc-scanner">IOC Scanner / Threat Feed Checker</option>
+                    <option value="email-analyzer">Email Header Analyzer</option>
+                    <option value="ip-reputation">IP Reputation Checker</option>
+                    <option value="hash-checker">File Hash Checker (VT/MalwareBazaar)</option>
+                    <option value="log-analyzer">Log Analyzer (Pattern Detection)</option>
+                    <option value="network-scanner">Network Connection Scanner</option>
+                    <option value="forensic-timeline">Forensic Timeline Generator</option>
+                    <option value="yara-scanner">YARA Rule Scanner</option>
+                    <option value="cve-checker">CVE / Vulnerability Checker</option>
+                    <option value="password-audit">Password Policy Auditor</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:1;min-width:200px">
+                <label>Target / Input (optional)</label>
+                <input type="text" id="toolTarget" placeholder="e.g. 192.168.1.0/24, /var/log/auth.log, suspicious@email.com..." autocomplete="off">
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Output Format</label>
+                <select id="toolOutput">
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                    <option value="markdown">Markdown Report</option>
+                    <option value="terminal">Terminal / Console</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Language</label>
+                <select id="toolLang">
+                    <option value="python" selected>Python 3</option>
+                    <option value="bash">Bash Script</option>
+                    <option value="powershell">PowerShell</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateToolScript()">Generate Script</button>
+                <button class="btn btn-secondary" onclick="clearToolOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toolRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyToolRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadToolRule()">Download</button>
+        </div>
+        <code id="toolRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('ioc-scanner','','python')">IOC Scanner</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('email-analyzer','','python')">Email Analyzer</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('ip-reputation','8.8.8.8','python')">IP Reputation</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('hash-checker','','python')">Hash Checker</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('log-analyzer','/var/log/auth.log','python')">Log Analyzer</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('network-scanner','192.168.1.0/24','python')">Network Scanner</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('forensic-timeline','','python')">Forensic Timeline</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('yara-scanner','','python')">YARA Scanner</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('log-analyzer','/var/log/auth.log','bash')">Bash: Log Analyzer</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="toolPreset('network-scanner','','powershell')">PS: Network Scan</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(0,212,255,.15)">&#128270;</div>
+            <h3>Available Tools Reference</h3>
+        </div>
     </div>
     <div class="grid">
         <div class="card"><div class="card-t">&#128202; IOC Manager</div><div class="card-d">Aggregate and deduplicate IOCs from 7+ threat feeds. Search, export, and maintain a local database.</div><div class="tags"><span class="tag">IOCs</span><span class="tag">7 Feeds</span><span class="tag">Dedup</span></div></div>
@@ -2158,7 +2408,99 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128680;</div>
-        <h3>Detection Rules Library</h3>
+        <h3>Detection Rule Builder</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Build Sigma, YARA, and Snort/Suricata detection rules with full metadata, MITRE mapping, and deployment instructions.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Threat / Malware Description</label>
+                <input type="text" id="detRuleName" placeholder="e.g. Mimikatz Credential Dump, Ransomware Encryption, Cobalt Strike, Webshell..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:170px">
+                <label>Rule Format</label>
+                <select id="detFormat">
+                    <option value="sigma">Sigma (SIEM-agnostic)</option>
+                    <option value="yara">YARA (File/Memory)</option>
+                    <option value="snort">Snort / Suricata (Network)</option>
+                    <option value="osquery">osquery (Endpoint)</option>
+                    <option value="kql">KQL (Microsoft)</option>
+                    <option value="spl">Splunk SPL</option>
+                    <option value="eql">Elastic EQL</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="detSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:130px">
+                <label>MITRE Tactic</label>
+                <select id="detTactic">
+                    <option value="auto">Auto-Detect</option>
+                    <option value="initial-access">Initial Access</option>
+                    <option value="execution">Execution</option>
+                    <option value="persistence">Persistence</option>
+                    <option value="privilege-escalation">Privilege Escalation</option>
+                    <option value="defense-evasion">Defense Evasion</option>
+                    <option value="credential-access">Credential Access</option>
+                    <option value="lateral-movement">Lateral Movement</option>
+                    <option value="exfiltration">Exfiltration</option>
+                    <option value="command-and-control">Command &amp; Control</option>
+                    <option value="impact">Impact</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Target OS</label>
+                <select id="detOS">
+                    <option value="windows" selected>Windows</option>
+                    <option value="linux">Linux</option>
+                    <option value="macos">macOS</option>
+                    <option value="network">Network</option>
+                    <option value="any">Any / Cross-platform</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateDetRule()">Generate Rule</button>
+                <button class="btn btn-secondary" onclick="clearDetOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyDetRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadDetRule()">Download</button>
+        </div>
+        <code id="detRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Mimikatz Credential Dump','sigma','critical')">Sigma: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Cobalt Strike Beacon','yara','critical')">YARA: Cobalt Strike</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Ransomware File Encryption','yara','critical')">YARA: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('DNS Tunneling Exfiltration','snort','high')">Snort: DNS Tunnel</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Reverse Shell Detection','snort','critical')">Snort: Reverse Shell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Scheduled Task Persistence','osquery','high')">osquery: Sched Task</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('PowerShell Download Cradle','sigma','high')">Sigma: PowerShell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="detPreset('Webshell Upload Detection','yara','critical')">YARA: Webshell</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128270;</div>
+            <h3>Detection Rules Library</h3>
+        </div>
     </div>
     <div class="grid">
         <div class="card"><div class="card-t">Sigma: Authentication Attacks (3)</div><div class="card-d">Brute force followed by success, Tor exit node login, suspicious scheduled task creation.</div><div class="tags"><span class="tag tag-r">T1110</span><span class="tag tag-r">T1078</span><span class="tag tag-y">T1053</span></div></div>
@@ -2177,7 +2519,101 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128270;</div>
-        <h3>Threat Hunting Queries (18)</h3>
+        <h3>Threat Hunting Query Builder</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate proactive threat hunting queries based on MITRE ATT&CK techniques. Select the hypothesis, platform, and data source to create targeted hunt queries.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Hunt Hypothesis / Threat</label>
+                <input type="text" id="huntRuleName" placeholder="e.g. LSASS credential dumping, Scheduled task persistence, DNS beaconing, Living off the land..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:150px">
+                <label>Hunt Platform</label>
+                <select id="huntPlatform">
+                    <option value="splunk">Splunk SPL</option>
+                    <option value="elastic">Elastic (KQL/EQL)</option>
+                    <option value="sentinel">Microsoft Sentinel</option>
+                    <option value="crowdstrike">CrowdStrike LogScale</option>
+                    <option value="carbon-black">Carbon Black</option>
+                    <option value="velociraptor">Velociraptor (VQL)</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:130px">
+                <label>MITRE Tactic</label>
+                <select id="huntTactic">
+                    <option value="auto">Auto-Detect</option>
+                    <option value="initial-access">Initial Access</option>
+                    <option value="execution">Execution</option>
+                    <option value="persistence">Persistence</option>
+                    <option value="privilege-escalation">Privilege Escalation</option>
+                    <option value="defense-evasion">Defense Evasion</option>
+                    <option value="credential-access">Credential Access</option>
+                    <option value="discovery">Discovery</option>
+                    <option value="lateral-movement">Lateral Movement</option>
+                    <option value="exfiltration">Exfiltration</option>
+                    <option value="command-and-control">Command &amp; Control</option>
+                    <option value="impact">Impact</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Time Range</label>
+                <select id="huntTimeRange">
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d" selected>Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="90d">Last 90 Days</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Data Source</label>
+                <select id="huntSource">
+                    <option value="process">Process Events</option>
+                    <option value="network">Network Traffic</option>
+                    <option value="file">File Activity</option>
+                    <option value="registry">Registry Changes</option>
+                    <option value="auth">Authentication Logs</option>
+                    <option value="dns">DNS Logs</option>
+                    <option value="all" selected>All Sources</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateHuntQuery()">Generate Hunt</button>
+                <button class="btn btn-secondary" onclick="clearHuntOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="huntRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyHuntRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadHuntRule()">Download</button>
+        </div>
+        <code id="huntRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('LSASS Credential Dumping','splunk','credential-access')">Splunk: LSASS Dump</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('Scheduled Task Persistence','elastic','persistence')">Elastic: Sched Task</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('DNS Beaconing C2','sentinel','command-and-control')">Sentinel: DNS C2</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('Living Off the Land Binaries','crowdstrike','execution')">CS: LOLBins</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('Kerberoasting Attack','splunk','credential-access')">Splunk: Kerberoast</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('WMI Lateral Movement','elastic','lateral-movement')">Elastic: WMI</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('Security Log Tampering','velociraptor','defense-evasion')">Velociraptor: Log Clear</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="huntPreset('Data Staging Exfiltration','splunk','exfiltration')">Splunk: Data Exfil</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(245,158,11,.15)">&#128270;</div>
+            <h3>Threat Hunting Reference Library</h3>
+        </div>
     </div>
     <div class="grid">
         <div class="card"><div class="card-t">Initial Access (2)</div><div class="card-d">Phishing link clicks to new domains, external RDP connection monitoring.</div><div class="tags"><span class="tag">Splunk</span><span class="tag">Elastic</span><span class="tag tag-r">T1566</span><span class="tag tag-r">T1133</span></div></div>
@@ -2198,7 +2634,88 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#128214;</div>
-        <h3>Incident Response Playbooks</h3>
+        <h3>IR Playbook Generator</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate complete incident response playbooks with phases, procedures, commands, and checklists. Select the incident type and format to produce a deployable IR playbook.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Incident Type</label>
+                <select id="pbIncident">
+                    <option value="phishing">Phishing / Business Email Compromise</option>
+                    <option value="malware">Malware Infection</option>
+                    <option value="ransomware">Ransomware Attack</option>
+                    <option value="account-compromise">Account Compromise</option>
+                    <option value="data-exfil">Data Exfiltration / Data Breach</option>
+                    <option value="insider-threat">Insider Threat</option>
+                    <option value="ddos">DDoS Attack</option>
+                    <option value="supply-chain">Supply Chain Compromise</option>
+                    <option value="cloud-compromise">Cloud Account Compromise</option>
+                    <option value="zero-day">Zero-Day Exploitation</option>
+                    <option value="lateral-movement">Active Lateral Movement</option>
+                    <option value="cryptominer">Cryptominer / Cryptojacking</option>
+                    <option value="custom">Custom (Describe Below)</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:150px">
+                <label>Output Format</label>
+                <select id="pbFormat">
+                    <option value="markdown" selected>Markdown (Documentation)</option>
+                    <option value="yaml">YAML (Machine-Readable)</option>
+                    <option value="checklist">Checklist (Quick Reference)</option>
+                    <option value="runbook">Runbook (Commands Only)</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:1">
+                <label>Custom Description (optional)</label>
+                <input type="text" id="pbCustom" placeholder="Additional context: e.g. Cloud environment, specific malware family, regulatory requirements..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="pbSeverity">
+                    <option value="critical">Critical (P1)</option>
+                    <option value="high" selected>High (P2)</option>
+                    <option value="medium">Medium (P3)</option>
+                    <option value="low">Low (P4)</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generatePlaybook()">Generate Playbook</button>
+                <button class="btn btn-secondary" onclick="clearPBOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pbRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyPBRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadPBRule()">Download</button>
+        </div>
+        <code id="pbRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('ransomware','markdown','critical')">Ransomware IR</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('phishing','checklist','high')">Phishing Checklist</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('malware','runbook','critical')">Malware Runbook</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('account-compromise','yaml','high')">Account Compromise</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('data-exfil','markdown','critical')">Data Breach IR</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('cloud-compromise','runbook','critical')">Cloud IR Runbook</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('insider-threat','checklist','high')">Insider Threat</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="pbPreset('zero-day','markdown','critical')">Zero-Day Response</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#128270;</div>
+            <h3>Playbook Reference Library</h3>
+        </div>
     </div>
     <div class="pb"><div class="pb-hdr"><div class="card-t">Compromised Account</div><span class="pb-id sev-h">IR-001 | HIGH</span></div><div class="card-d">Authentication log review, session revocation, MFA reset, 30-day post-incident monitoring.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
     <div class="pb"><div class="pb-hdr"><div class="card-t">Malware Infection</div><span class="pb-id sev-c">IR-002 | CRITICAL</span></div><div class="card-d">YARA scanning, C2 blocking, network isolation, system rebuild from clean images.</div><div class="pb-phases"><span class="phase">Identification</span><span class="phase">Containment</span><span class="phase">Eradication</span><span class="phase">Recovery</span><span class="phase">Lessons Learned</span></div></div>
@@ -2217,7 +2734,106 @@ def phishing_triage(sw_context):
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#127919;</div>
-        <h3>MITRE ATT&CK Coverage Map</h3>
+        <h3>MITRE ATT&CK Rule Generator</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Select a MITRE ATT&CK technique to auto-generate detection rules, hunting queries, and response actions across all supported platforms.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:1;min-width:200px">
+                <label>MITRE ATT&CK Technique</label>
+                <select id="mitreTechnique">
+                    <option value="T1003.001">T1003.001 - LSASS Memory (Credential Dumping)</option>
+                    <option value="T1059.001">T1059.001 - PowerShell Execution</option>
+                    <option value="T1059.005">T1059.005 - Visual Basic Script</option>
+                    <option value="T1053.005">T1053.005 - Scheduled Task</option>
+                    <option value="T1547.001">T1547.001 - Registry Run Keys</option>
+                    <option value="T1543.003">T1543.003 - Windows Service</option>
+                    <option value="T1110.001">T1110.001 - Password Guessing</option>
+                    <option value="T1110.003">T1110.003 - Password Spraying</option>
+                    <option value="T1558.003">T1558.003 - Kerberoasting</option>
+                    <option value="T1021.001">T1021.001 - Remote Desktop (RDP)</option>
+                    <option value="T1021.002">T1021.002 - SMB/Admin Shares</option>
+                    <option value="T1570">T1570 - Lateral Tool Transfer</option>
+                    <option value="T1047">T1047 - WMI Execution</option>
+                    <option value="T1486">T1486 - Data Encrypted for Impact (Ransomware)</option>
+                    <option value="T1048">T1048 - Exfiltration Over Alternative Protocol</option>
+                    <option value="T1071.001">T1071.001 - Web Protocols (C2)</option>
+                    <option value="T1071.004">T1071.004 - DNS (C2/Tunneling)</option>
+                    <option value="T1055">T1055 - Process Injection</option>
+                    <option value="T1070.001">T1070.001 - Clear Windows Event Logs</option>
+                    <option value="T1036">T1036 - Masquerading</option>
+                    <option value="T1548.002">T1548.002 - UAC Bypass</option>
+                    <option value="T1134">T1134 - Access Token Manipulation</option>
+                    <option value="T1566.001">T1566.001 - Spearphishing Attachment</option>
+                    <option value="T1566.002">T1566.002 - Spearphishing Link</option>
+                    <option value="T1078">T1078 - Valid Accounts</option>
+                    <option value="T1190">T1190 - Exploit Public-Facing Application</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:160px">
+                <label>Output Bundle</label>
+                <select id="mitreOutput">
+                    <option value="full-bundle" selected>Full Detection Bundle</option>
+                    <option value="sigma-only">Sigma Rule Only</option>
+                    <option value="hunt-only">Hunting Query Only</option>
+                    <option value="response-only">Response Actions Only</option>
+                    <option value="multi-siem">Multi-SIEM Queries</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="mitreSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:150px">
+                <label>Primary SIEM</label>
+                <select id="mitreSiem">
+                    <option value="splunk">Splunk</option>
+                    <option value="elastic">Elastic</option>
+                    <option value="sentinel">Microsoft Sentinel</option>
+                    <option value="crowdstrike">CrowdStrike</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateMITREBundle()">Generate Detection</button>
+                <button class="btn btn-secondary" onclick="clearMITREOutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mitreRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyMITRERule()">Copy</button>
+            <button class="copy-btn" onclick="downloadMITRERule()">Download</button>
+        </div>
+        <code id="mitreRuleCode"></code>
+    </div>
+
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate — Common Techniques:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1003.001','full-bundle','critical')">T1003.001 LSASS</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1059.001','full-bundle','high')">T1059.001 PowerShell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1486','full-bundle','critical')">T1486 Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1110.001','multi-siem','high')">T1110 Brute Force</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1021.001','full-bundle','high')">T1021 RDP</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1566.001','full-bundle','high')">T1566 Phishing</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1055','full-bundle','critical')">T1055 Proc Injection</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#10b981;color:#10b981" onclick="mitrePreset('T1071.004','full-bundle','high')">T1071.004 DNS C2</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(16,185,129,.15)">&#128270;</div>
+            <h3>Coverage Map</h3>
+        </div>
     </div>
     <div class="mitre">
         <div class="mc"><b>Initial Access</b><span>4 techniques</span></div>
@@ -4709,6 +5325,516 @@ EventType = "Process Creation" AND
 | columns EndpointName, UserName, EventType, TgtProcName, TgtProcCmdLine,
     DstIp, DstPort, StorylineId, EventTime
 | sort -EventTime | limit 500`;
+}
+
+// ==================== SIEM QUERY BUILDER ====================
+let lastSIEMRule = '';
+function copySIEMRule() { navigator.clipboard.writeText(lastSIEMRule); const b=document.querySelector('#siemRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearSIEMOutput() { document.getElementById('siemRuleOutput').classList.remove('show'); }
+function downloadSIEMRule() { const n=document.getElementById('siemRuleName').value.trim().replace(/[^a-z0-9]/gi,'_').toLowerCase()||'siem_query'; const b=new Blob([lastSIEMRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.txt'; a.click(); }
+function siemPreset(name, platform, severity) { document.getElementById('siemRuleName').value=name; document.getElementById('siemPlatform').value=platform; document.getElementById('siemSeverity').value=severity; generateSIEMQuery(); }
+function generateSIEMQuery() {
+    const name = document.getElementById('siemRuleName').value.trim();
+    if (!name) { alert('Enter a threat description'); return; }
+    const platform = document.getElementById('siemPlatform').value;
+    const severity = document.getElementById('siemSeverity').value;
+    const timeRange = document.getElementById('siemTimeRange').value;
+    const match = findMatch(name);
+    const t = match ? match.t : 'T1078';
+    const desc = match ? match.desc : name;
+    const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,5) : [name.split(' ')[0].toLowerCase()];
+    let rule = '';
+
+    const siemBuilders = {
+        splunk: () => match && match.splunk ? `\`\`\` ${name} | MITRE: ${t} | ${severity.toUpperCase()} \`\`\`\n${match.splunk}` : `\`\`\` ${name} | MITRE: ${t} | ${severity.toUpperCase()} \`\`\`\nindex=* earliest=-${timeRange}\n| search ${kws.map(k=>`"${k}"`).join(' OR ')}\n| stats count by src_ip, dest_ip, user, _time\n| where count > 3\n| sort -count\n| eval severity="${severity}"\n| table _time, src_ip, dest_ip, user, count, severity`,
+        elastic: () => `// ${name} — Elastic SIEM (KQL)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n${kws.map(k=>`process.command_line: "*${k}*"`).join(' OR ')}\n\n// EQL Alternative:\nprocess where event.type == "start" and\n  process.args : (${kws.map(k=>`"*${k}*"`).join(', ')})`,
+        sentinel: () => `// ${name} — Microsoft Sentinel (KQL)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nSecurityEvent\n| where TimeGenerated > ago(${timeRange})\n| where EventID in (4688, 4624, 4625, 4672, 4720, 1)\n| where CommandLine has_any (${kws.map(k=>`"${k}"`).join(', ')})\n  or ProcessName has_any (${kws.map(k=>`"${k}"`).join(', ')})\n| project TimeGenerated, Computer, Account, ProcessName, CommandLine, EventID\n| extend Severity = "${severity}"\n| sort by TimeGenerated desc`,
+        qradar: () => `-- ${name} — IBM QRadar (AQL)\n-- MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nSELECT DATEFORMAT(starttime,'YYYY-MM-dd HH:mm:ss') AS event_time,\n    sourceip, destinationip, username,\n    LOGSOURCENAME(logsourceid) AS log_source,\n    QIDNAME(qid) AS event_name,\n    UTF8(payload) AS payload\nFROM events\nWHERE INOFFENSE(${severity === 'critical' ? 8 : severity === 'high' ? 6 : 4})\n    AND (${kws.map(k=>`UTF8(payload) ILIKE '%${k}%'`).join('\n    OR ')})\n    AND starttime > NOW() - ${timeRange === '24h' ? '1 DAYS' : timeRange === '7d' ? '7 DAYS' : '1 HOURS'}\nORDER BY starttime DESC\nLIMIT 100`,
+        chronicle: () => `// ${name} — Google Chronicle (YARA-L 2.0)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nrule ${name.replace(/[^a-zA-Z0-9]/g,'_')} {\n  meta:\n    author = "Blue Team Toolkit"\n    description = "${desc}"\n    severity = "${severity}"\n    mitre_attack = "${t}"\n\n  events:\n    $event.metadata.event_type = "PROCESS_LAUNCH"\n    (${kws.map(k=>`$event.target.process.command_line = /(?i)${k}/`).join(' or\n    ')})\n\n  condition:\n    $event\n}`,
+        arcsight: () => `// ${name} — ArcSight ESM\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Active Channel Filter:\nType = Event AND\nDevice Product = "Microsoft Windows"\nAND (${kws.map(k=>`(Name CONTAINS "${k}" OR Message CONTAINS "${k}")`).join('\nOR ')})\nAND End Time > NOW - ${timeRange}\n\n// Correlation Rule:\nRuleName: "${name}"\nCondition: Matching events >= 3 within ${timeRange}\nAction: Create Correlation Event (Severity: ${severity})`,
+        fortisiem: () => `// ${name} — FortiSIEM Analytics\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Rule Definition:\nGroup BY srcIpAddr, destIpAddr, user\nHaving COUNT(*) > 3\nFilter: eventType IN (${kws.map(k=>`"*${k}*"`).join(', ')})\nTime Range: ${timeRange}\nSeverity: ${severity === 'critical' ? 10 : severity === 'high' ? 7 : 4}\n\n// Search Query:\neventType CONTAIN "${kws[0]}" AND\nphCustId = 1 AND\neventSeverity >= ${severity === 'critical' ? 8 : severity === 'high' ? 5 : 3}`,
+        wazuh: () => `<!-- ${name} — Wazuh Detection Rule -->\n<!-- MITRE: ${t} | Severity: ${severity.toUpperCase()} -->\n\n<group name="${name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase()},attack,">\n  <rule id="100001" level="${severity === 'critical' ? 15 : severity === 'high' ? 12 : 8}">\n    <if_sid>60012</if_sid>\n    <field name="win.eventdata.commandLine" type="pcre2">${kws.join('|')}</field>\n    <description>${name} - $(win.eventdata.commandLine)</description>\n    <mitre>\n      <id>${t}</id>\n    </mitre>\n    <options>no_full_log</options>\n  </rule>\n</group>`,
+        logrhythm: () => `// ${name} — LogRhythm SIEM\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// AI Engine Rule:\nRule Name: "${name}"\nRule Type: Threshold\nPrimary Criteria:\n  Log Source Type: MS Windows Event Logging\n  Classification: Security\n  Common Event: Process Started\n  Regex Filter: ${kws.map(k=>`(?i)${k}`).join('|')}\nThreshold: 3 events in ${timeRange}\nSeverity: ${severity === 'critical' ? 'Critical' : severity === 'high' ? 'High' : 'Medium'}\nAction: Create Alarm, SmartResponse`,
+        exabeam: () => `// ${name} — Exabeam Advanced Analytics\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Custom Rule:\n{\n  "rule_name": "${name}",\n  "rule_reason": "${desc}",\n  "rule_severity": "${severity}",\n  "event_filters": {\n    "event_type": ["process-created", "authentication"],\n    "keywords": [${kws.map(k=>`"${k}"`).join(', ')}]\n  },\n  "trigger_condition": {\n    "operator": "threshold",\n    "value": 3,\n    "time_window": "${timeRange}"\n  },\n  "risk_score_adjustment": ${severity === 'critical' ? 50 : severity === 'high' ? 30 : 15},\n  "mitre_technique": "${t}"\n}`,
+        securonix: () => `// ${name} — Securonix SNYPR (OCSF)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Spotter Query:\nindex = activity AND\nrg_functionality = "Microsoft Windows" AND\n(${kws.map(k=>`resourcecustomfield1 CONTAINS "${k}"`).join(' OR\n')})\n| stats count BY accountname, devicename, datetime\n| where count > 2\n| sort -count`,
+        logpoint: () => `// ${name} — LogPoint SIEM\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Search Query:\n"source_type"="WinServer" (${kws.map(k=>`"${k}"`).join(' OR ')})\n| chart count() by source_address, user, device_name\n| search count > 3\n| sort -count\n\n// Alert Rule:\nname="${name}"\nseverity=${severity === 'critical' ? 10 : severity === 'high' ? 7 : 4}\nmitre_technique="${t}"`,
+        rapid7: () => `// ${name} — Rapid7 InsightIDR (LEQL)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n// Log Search Query:\nwhere(${kws.map(k=>`process.cmd_line ICONTAINS "${k}"`).join(' OR ')})\ngroupby(source_asset_address, account)\ncalculate(COUNT)\nhaving(COUNT > 3)\n\n// Detection Rule:\n{\n  "name": "${name}",\n  "rule_type": "custom",\n  "log_type": "Process Start Logs",\n  "severity": "${severity}",\n  "mitre": "${t}",\n  "query": "where(${kws.map(k=>`process.cmd_line ICONTAINS \\"${k}\\"`).join(' OR ')})"\n}`,
+        'falcon-siem': () => match ? buildCrowdStrike(name, severity, match) : `// ${name} — CrowdStrike Falcon LogScale\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n#event_simpleName=ProcessRollup2\n| CommandLine=/${kws.join('|')}/i\n| groupBy([ComputerName, UserName, ImageFileName, CommandLine])\n| count(aid, as=hits)\n| sort(hits, order=desc)`
+    };
+
+    rule = (siemBuilders[platform] || siemBuilders.splunk)();
+    lastSIEMRule = rule;
+    document.getElementById('siemRuleCode').textContent = rule;
+    document.getElementById('siemRuleOutput').classList.add('show');
+}
+
+// ==================== SOAR PLAYBOOK BUILDER ====================
+let lastSOARRule = '';
+function copySOARRule() { navigator.clipboard.writeText(lastSOARRule); const b=document.querySelector('#soarRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearSOAROutput() { document.getElementById('soarRuleOutput').classList.remove('show'); }
+function downloadSOARRule() { const p=document.getElementById('soarPlatform').value; const ext={xsoar:'yml',phantom:'py','sentinel-la':'json',thehive:'py',swimlane:'py',tines:'json',shuffle:'json'}[p]||'txt'; const n=(document.getElementById('soarRuleName').value||'playbook').replace(/[^a-z0-9]/gi,'_').toLowerCase(); const b=new Blob([lastSOARRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.'+ext; a.click(); }
+function soarPreset(name, platform, severity) { document.getElementById('soarRuleName').value=name; document.getElementById('soarPlatform').value=platform; document.getElementById('soarSeverity').value=severity; generateSOARPlaybook(); }
+function generateSOARPlaybook() {
+    const name = document.getElementById('soarRuleName').value.trim();
+    if (!name) { alert('Enter an incident type or scenario'); return; }
+    const platform = document.getElementById('soarPlatform').value;
+    const severity = document.getElementById('soarSeverity').value;
+    const actions = document.getElementById('soarActions').value;
+    const match = findMatch(name);
+    const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
+    const desc = match ? match.desc : name;
+    const t = match ? match.t : 'T1078';
+    let rule = '';
+
+    if (platform === 'xsoar') {
+        rule = `id: ${safeName}_Playbook\nversion: 1\nname: "${name} - Automated Response"\ndescription: |\n  ${desc}\n  MITRE ATT&CK: ${t} | Severity: ${severity.toUpperCase()}\n  Auto-generated by Blue Team Toolkit\nstarttaskid: "0"\ntasks:\n  "0":\n    id: "0"\n    taskid: detect_and_triage\n    type: regular\n    task:\n      name: "Detect & Triage: ${name}"\n      description: "Initial detection and triage"\n      script: '|||searchIndicators'\n      args:\n        query: "type:${match&&match.tac&&match.tac.includes('credential')?'hash':'ip'}"\n    nexttasks:\n      '#none#': ["1"]\n  "1":\n    id: "1"\n    taskid: enrich_indicators\n    type: playbook\n    task:\n      name: "Enrich Indicators"\n      playbookId: Indicator_Enrichment\n      description: "VirusTotal, AbuseIPDB, local IOC enrichment"\n    nexttasks:\n      '#none#': ["2"]${actions !== 'enrich' ? `\n  "2":\n    id: "2"\n    taskid: evaluate_threat\n    type: condition\n    task:\n      name: "Is Threat Confirmed?"\n      conditions:\n        - label: "yes"\n          condition:\n            - - operator: greaterThan\n                left: \${DBotScore.Score}\n                right: 2\n        - label: "no"\n    nexttasks:\n      "yes": ["3"]\n      "no": ["5"]\n  "3":\n    id: "3"\n    taskid: contain_threat\n    type: regular\n    task:\n      name: "Contain: Isolate & Block"\n      script: '|||isolate-endpoint'\n      args:\n        hostname: \${Endpoint.Hostname}\n    nexttasks:\n      '#none#': ["4"]\n  "4":\n    id: "4"\n    taskid: create_ticket\n    type: regular\n    task:\n      name: "Create Incident Ticket"\n      script: '|||createNewIncident'\n      args:\n        name: "${name} - \${incident.id}"\n        severity: "${severity === 'critical' ? '4' : severity === 'high' ? '3' : '2'}"\n    nexttasks:\n      '#none#': ["5"]\n  "5":\n    id: "5"\n    taskid: close_investigation\n    type: regular\n    task:\n      name: "Close Investigation"\n      description: "Document findings and close"` : `\n  "2":\n    id: "2"\n    taskid: document_findings\n    type: regular\n    task:\n      name: "Document Enrichment Results"\n      description: "Save enrichment data for analyst review"`}`;
+    } else if (platform === 'phantom') {
+        rule = `"""${name} — Splunk SOAR (Phantom) Playbook\nMITRE: ${t} | Severity: ${severity.toUpperCase()}\nAuto-generated by Blue Team Toolkit\n"""\n\nimport phantom.rules as phantom\nimport json\n\ndef on_start(container):\n    phantom.debug("Starting: ${name}")\n    # Phase 1: Collect artifacts\n    collect_data(container)\n\ndef collect_data(container, **kwargs):\n    """Gather indicators from the event"""\n    artifacts = phantom.collect2(container=container,\n        datapath=["artifact:*.cef.sourceAddress",\n                  "artifact:*.cef.destinationAddress",\n                  "artifact:*.cef.fileHash",\n                  "artifact:*.cef.fileName"],\n        action_results=kwargs.get("action_results"))\n\n    for artifact in artifacts:\n        src_ip, dst_ip, file_hash, file_name = artifact\n        # Phase 2: Enrich\n        if src_ip:\n            phantom.act("ip reputation", targets=[{"contains":["ip"], "data":src_ip}],\n                callback=enrich_complete, name="ip_rep")\n        if file_hash:\n            phantom.act("file reputation", targets=[{"contains":["hash"], "data":file_hash}],\n                callback=enrich_complete, name="hash_rep")\n\ndef enrich_complete(action, success, container, results, handle, **kwargs):\n    """Process enrichment results"""\n    if not success:\n        phantom.debug("Enrichment failed")\n        return\n${actions !== 'enrich' ? `\n    # Phase 3: Containment\n    for result in results:\n        data = result.get_data()\n        if data and data[0].get("positives", 0) > 5:\n            phantom.debug("THREAT CONFIRMED — initiating containment")\n            # Block IP at firewall\n            phantom.act("block ip", targets=[{"contains":["ip"], "data":result}],\n                name="block_threat")\n            # Isolate endpoint\n            phantom.act("quarantine device",\n                targets=[{"contains":["hostname"], "data":container}],\n                name="isolate_host")\n            # Create ticket\n            phantom.act("create ticket",\n                parameters=[{"summary": "${name}",\n                            "priority": "${severity}",\n                            "description": f"Auto-response: {json.dumps(data[0])}"}],\n                name="create_ticket")` : ''}\n\ndef on_finish(container, summary):\n    phantom.debug("Playbook complete: ${name}")`;
+    } else if (platform === 'sentinel-la') {
+        rule = JSON.stringify({
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+            contentVersion: "1.0.0.0",
+            metadata: { title: name, description: desc, mitre: t, severity: severity },
+            resources: [{
+                type: "Microsoft.Logic/workflows",
+                apiVersion: "2017-07-01",
+                name: `[concat('${safeName}-',uniqueString(resourceGroup().id))]`,
+                location: "[resourceGroup().location]",
+                properties: {
+                    state: "Enabled",
+                    definition: {
+                        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                        triggers: { "When_Azure_Sentinel_incident_is_created": {
+                            type: "ApiConnectionWebhook",
+                            inputs: { body: { callback: "@{listCallbackUrl()}" }, host: { connection: { name: "@parameters('$connections')['azuresentinel']['connectionId']" } }, path: "/incident-creation" }
+                        }},
+                        actions: {
+                            "Get_Incident_Entities": { type: "ApiConnection", inputs: { method: "post", path: "/incidents/entities" } },
+                            "For_Each_Entity": { type: "Foreach", foreach: "@body('Get_Incident_Entities')?['Entities']",
+                                actions: actions !== 'enrich' ? {
+                                    "Enrich_Entity": { type: "ApiConnection", inputs: { method: "post", path: "/threat-intelligence/lookup" } },
+                                    "Condition_Malicious": { type: "If", expression: "@greater(body('Enrich_Entity')?['score'], 2)",
+                                        actions: {
+                                            "Disable_User_Account": { type: "ApiConnection", inputs: { method: "post", path: "/identity/disable-user" } },
+                                            "Add_Comment": { type: "ApiConnection", inputs: { method: "post", body: `Auto-response: ${name} detected. Entity blocked.` } },
+                                            "Change_Severity": { type: "ApiConnection", inputs: { method: "put", body: { severity: severity === 'critical' ? 'High' : 'Medium' } } }
+                                        }
+                                    }
+                                } : { "Enrich_Entity": { type: "ApiConnection", inputs: { method: "post", path: "/threat-intelligence/lookup" } } }
+                            }
+                        }
+                    }
+                }
+            }]
+        }, null, 2);
+    } else if (platform === 'thehive') {
+        rule = `#!/usr/bin/env python3\n"""${name} — TheHive + Cortex Responder\nMITRE: ${t} | Severity: ${severity.toUpperCase()}\nAuto-generated by Blue Team Toolkit\n"""\n\nfrom thehive4py.api import TheHiveApi\nfrom thehive4py.models import Alert, AlertArtifact, Case, CaseTask\nfrom cortex4py.api import Api as CortexApi\nimport json, datetime\n\nHIVE_URL = 'http://thehive:9000'\nHIVE_KEY = '__API_KEY__'\nCORTEX_URL = 'http://cortex:9001'\nCORTEX_KEY = '__CORTEX_KEY__'\n\ndef run_responder(event):\n    hive = TheHiveApi(HIVE_URL, HIVE_KEY)\n    cortex = CortexApi(CORTEX_URL, CORTEX_KEY)\n\n    # Step 1: Create case from alert\n    alert_data = event.get('alert', {})\n    case = Case(\n        title=f"${name} - {datetime.datetime.now().strftime('%Y%m%d-%H%M')}",\n        description=f"${desc}\\nMITRE: ${t}",\n        severity=${severity === 'critical' ? 4 : severity === 'high' ? 3 : 2},\n        tlp=3,\n        tags=["${t}", "auto-response", "${match?match.tac:'detection'}"]\n    )\n    created = hive.create_case(case)\n    case_id = created.json()['id']\n\n    # Step 2: Run Cortex analyzers on artifacts\n    for artifact in alert_data.get('artifacts', []):\n        job = cortex.analyzers.run_by_name(\n            'VirusTotal_GetReport_3_1',\n            {'data': artifact['data'], 'dataType': artifact['dataType']}\n        )\n        print(f"Analyzer job: {job.id} for {artifact['data']}")\n${actions !== 'enrich' ? `\n    # Step 3: Add containment tasks\n    tasks = [\n        CaseTask(title="Isolate affected host", status="Waiting", flag=True),\n        CaseTask(title="Block malicious indicators", status="Waiting"),\n        CaseTask(title="Collect forensic artifacts", status="Waiting"),\n        CaseTask(title="Notify stakeholders", status="Waiting"),\n        CaseTask(title="Document timeline", status="Waiting"),\n    ]\n    for task in tasks:\n        hive.create_case_task(case_id, task)\n\n    # Step 4: Auto-respond if critical\n    if ${severity === 'critical' ? 'True' : 'False'}:\n        cortex.responders.run_by_name(\n            'Velociraptor_Isolate',\n            {'data': alert_data.get('source_host', ''),\n             'dataType': 'hostname'}\n        )` : ''}\n\n    print(f"Case {case_id} created for ${name}")\n\nif __name__ == '__main__':\n    import sys\n    run_responder(json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {})`;
+    } else if (platform === 'swimlane') {
+        rule = `#!/usr/bin/env python3\n"""${name} — Swimlane Turbine Component\nMITRE: ${t} | Severity: ${severity.toUpperCase()}\n"""\n\nfrom swimlane_connector import SwimlaneConnector\n\nclass ${safeName}Response(SwimlaneConnector):\n    def execute(self, inputs):\n        alert = inputs.get('alert', {})\n        results = {'status': 'investigating', 'actions_taken': []}\n\n        # Enrich indicators\n        for ioc in alert.get('indicators', []):\n            vt = self.call_integration('virustotal', 'lookup', {'indicator': ioc})\n            results['actions_taken'].append(f"Enriched {ioc}: score={vt.get('score',0)}")\n            if vt.get('score', 0) > 5:\n                results['status'] = 'confirmed_threat'\n${actions !== 'enrich' ? `                # Auto-contain\n                self.call_integration('firewall', 'block_ip', {'ip': ioc})\n                self.call_integration('edr', 'isolate_host', {'hostname': alert.get('hostname')})\n                results['actions_taken'].append(f"BLOCKED {ioc}, isolated {alert.get('hostname')}")\n\n        # Create ticket\n        self.call_integration('servicenow', 'create_incident', {\n            'short_description': f"${name}",\n            'priority': '${severity === 'critical' ? '1' : '2'}',\n            'description': str(results)\n        })` : ''}\n\n        return results`;
+    } else if (platform === 'tines') {
+        rule = JSON.stringify({
+            name: `${name} - Auto Response`,
+            description: `${desc} | MITRE: ${t}`,
+            agents: [
+                { type: "Agents::WebhookAgent", name: "Receive Alert", options: { secret: "webhook_token", path: `/${safeName.toLowerCase()}` } },
+                { type: "Agents::HTTPRequestAgent", name: "Enrich with VirusTotal", options: { url: "https://www.virustotal.com/api/v3/search", method: "get", headers: { "x-apikey": "{{CREDENTIAL.virustotal}}" }, payload: { query: "{{receive_alert.body.indicator}}" } } },
+                ...(actions !== 'enrich' ? [
+                    { type: "Agents::TriggerAgent", name: "Check if Malicious", options: { rules: [{ type: "field==value", path: "{{enrich_with_virustotal.body.data.attributes.last_analysis_stats.malicious}}", value: "> 3" }] } },
+                    { type: "Agents::HTTPRequestAgent", name: "Block at Firewall", options: { url: "https://firewall.api/block", method: "post", payload: { ip: "{{receive_alert.body.indicator}}", reason: name } } },
+                    { type: "Agents::HTTPRequestAgent", name: "Create Jira Ticket", options: { url: "https://jira.api/issue", method: "post", payload: { summary: `[${severity.toUpperCase()}] ${name}`, priority: severity === 'critical' ? 'P1' : 'P2' } } },
+                    { type: "Agents::EmailAgent", name: "Notify SOC", options: { to: "soc@company.com", subject: `[ALERT] ${name}`, body: "Automated response triggered. Check Jira for details." } }
+                ] : [])
+            ]
+        }, null, 2);
+    } else if (platform === 'shuffle') {
+        rule = JSON.stringify({
+            name: `${name} - Shuffle Workflow`,
+            description: `${desc} | MITRE: ${t} | Severity: ${severity}`,
+            triggers: [{ name: "Webhook", type: "WEBHOOK", position: { x: 0, y: 0 } }],
+            actions: [
+                { name: "Parse Alert", app_name: "Shuffle Tools", action_name: "parse_ioc", position: { x: 200, y: 0 }, parameters: [{ name: "input", value: "$exec.body" }] },
+                { name: "VirusTotal Lookup", app_name: "VirusTotal", action_name: "get_report", position: { x: 400, y: 0 }, parameters: [{ name: "indicator", value: "$parse_alert.ioc" }] },
+                ...(actions !== 'enrich' ? [
+                    { name: "Check Threat Level", app_name: "Shuffle Tools", action_name: "filter", position: { x: 600, y: 0 }, parameters: [{ name: "condition", value: "$virustotal_lookup.positives > 3" }] },
+                    { name: "Block IP", app_name: "PaloAlto", action_name: "block_ip", position: { x: 800, y: -100 }, parameters: [{ name: "ip", value: "$parse_alert.ioc" }] },
+                    { name: "Isolate Host", app_name: "CrowdStrike", action_name: "contain_host", position: { x: 800, y: 100 }, parameters: [{ name: "hostname", value: "$exec.body.hostname" }] },
+                    { name: "Send Notification", app_name: "Email", action_name: "send", position: { x: 1000, y: 0 }, parameters: [{ name: "to", value: "soc@company.com" }, { name: "subject", value: `[${severity.toUpperCase()}] ${name}` }] }
+                ] : [])
+            ]
+        }, null, 2);
+    }
+
+    lastSOARRule = rule;
+    document.getElementById('soarRuleCode').textContent = rule;
+    document.getElementById('soarRuleOutput').classList.add('show');
+}
+
+// ==================== TOOL SCRIPT GENERATOR ====================
+let lastToolRule = '';
+function copyToolRule() { navigator.clipboard.writeText(lastToolRule); const b=document.querySelector('#toolRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearToolOutput() { document.getElementById('toolRuleOutput').classList.remove('show'); }
+function downloadToolRule() { const lang=document.getElementById('toolLang').value; const ext={python:'py',bash:'sh',powershell:'ps1'}[lang]; const n=document.getElementById('toolType').value.replace(/[^a-z0-9]/gi,'_'); const b=new Blob([lastToolRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.'+ext; a.click(); }
+function toolPreset(type, target, lang) { document.getElementById('toolType').value=type; document.getElementById('toolTarget').value=target; document.getElementById('toolLang').value=lang; generateToolScript(); }
+function generateToolScript() {
+    const type = document.getElementById('toolType').value;
+    const target = document.getElementById('toolTarget').value.trim() || '';
+    const outputFmt = document.getElementById('toolOutput').value;
+    const lang = document.getElementById('toolLang').value;
+    let rule = '';
+
+    const scripts = {
+        'ioc-scanner': {
+            python: `#!/usr/bin/env python3\n"""IOC Scanner — Threat Feed Checker\nChecks indicators against multiple threat intelligence feeds.\n"""\nimport requests, json, hashlib, sys, csv\nfrom datetime import datetime\n\nclass IOCScanner:\n    FEEDS = {\n        'feodo': 'https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt',\n        'urlhaus': 'https://urlhaus.abuse.ch/downloads/text_recent/',\n        'ssl_blacklist': 'https://sslbl.abuse.ch/blacklist/sslipblacklist.txt',\n        'tor_exit': 'https://check.torproject.org/torbulkexitlist',\n        'threatfox': 'https://threatfox.abuse.ch/export/json/recent/',\n    }\n\n    def __init__(self):\n        self.ioc_db = set()\n        self.results = []\n\n    def load_feeds(self):\n        for name, url in self.FEEDS.items():\n            try:\n                resp = requests.get(url, timeout=30)\n                for line in resp.text.splitlines():\n                    line = line.strip()\n                    if line and not line.startswith('#'):\n                        self.ioc_db.add(line)\n                print(f"[+] Loaded {name}: {len(resp.text.splitlines())} entries")\n            except Exception as e:\n                print(f"[-] Failed {name}: {e}")\n        print(f"[*] Total IOCs loaded: {len(self.ioc_db)}")\n\n    def check(self, indicator):\n        found = indicator in self.ioc_db\n        result = {'indicator': indicator, 'found': found, 'timestamp': datetime.now().isoformat()}\n        self.results.append(result)\n        return result\n\n    def scan_file(self, filepath):\n        with open(filepath) as f:\n            for line in f:\n                ioc = line.strip()\n                if ioc:\n                    r = self.check(ioc)\n                    status = "MALICIOUS" if r['found'] else "CLEAN"\n                    print(f"  [{status}] {ioc}")\n\n    def export_results(self, fmt='${outputFmt}'):\n        if fmt == 'json':\n            print(json.dumps(self.results, indent=2))\n        elif fmt == 'csv':\n            w = csv.DictWriter(sys.stdout, fieldnames=['indicator','found','timestamp'])\n            w.writeheader()\n            w.writerows(self.results)\n\nif __name__ == '__main__':\n    scanner = IOCScanner()\n    scanner.load_feeds()\n    targets = sys.argv[1:] or ['${target || "8.8.8.8"}']\n    for t in targets:\n        r = scanner.check(t)\n        print(f"{'THREAT FOUND' if r['found'] else 'CLEAN'}: {t}")\n    scanner.export_results()`,
+            bash: `#!/bin/bash\n# IOC Scanner — Bash Edition\n# Checks IPs/domains against threat feeds\n\nFEEDS=(\n  "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt"\n  "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"\n  "https://check.torproject.org/torbulkexitlist"\n)\n\nIOC_FILE=$(mktemp)\nfor feed in "\${FEEDS[@]}"; do\n  curl -sL "$feed" | grep -v '^#' >> "$IOC_FILE"\ndone\necho "[*] Loaded $(wc -l < "$IOC_FILE") IOCs"\n\ncheck_ioc() {\n  if grep -qF "$1" "$IOC_FILE"; then\n    echo "[MALICIOUS] $1"\n  else\n    echo "[CLEAN] $1"\n  fi\n}\n\nfor target in "\${@:-${target || '8.8.8.8'}}"; do\n  check_ioc "$target"\ndone\nrm -f "$IOC_FILE"`,
+            powershell: `# IOC Scanner — PowerShell Edition\nparam([string[]]$Targets = @("${target || '8.8.8.8'}"))\n\n$feeds = @(\n    "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",\n    "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"\n)\n$iocDB = @()\nforeach ($feed in $feeds) {\n    try {\n        $data = (Invoke-WebRequest -Uri $feed -UseBasicParsing).Content\n        $iocDB += $data -split "\\n" | Where-Object { $_ -and $_ -notmatch '^#' }\n        Write-Host "[+] Loaded feed: $feed"\n    } catch { Write-Warning "Failed: $feed" }\n}\nWrite-Host "[*] Total IOCs: $($iocDB.Count)"\n\nforeach ($target in $Targets) {\n    if ($iocDB -contains $target) {\n        Write-Host "[MALICIOUS] $target" -ForegroundColor Red\n    } else {\n        Write-Host "[CLEAN] $target" -ForegroundColor Green\n    }\n}`
+        },
+        'email-analyzer': {
+            python: `#!/usr/bin/env python3\n"""Email Header Analyzer\nParses email headers for SPF/DKIM/DMARC, spoofing, and phishing indicators.\n"""\nimport re, sys, json\nfrom email.parser import HeaderParser\n\nclass EmailAnalyzer:\n    SUSPICIOUS_TLDS = ['.xyz','.top','.club','.work','.buzz','.tk','.ml','.ga','.cf']\n\n    def analyze(self, headers_text):\n        parser = HeaderParser()\n        headers = parser.parsestr(headers_text)\n        results = {\n            'from': headers.get('From', ''),\n            'return_path': headers.get('Return-Path', ''),\n            'received': headers.get_all('Received', []),\n            'spf': self._check_spf(headers),\n            'dkim': self._check_dkim(headers),\n            'dmarc': self._check_dmarc(headers),\n            'spoofing_indicators': [],\n            'risk_score': 0\n        }\n        # Check for spoofing\n        from_domain = re.search(r'@([\\w.-]+)', results['from'])\n        rp_domain = re.search(r'@([\\w.-]+)', results['return_path'])\n        if from_domain and rp_domain and from_domain.group(1) != rp_domain.group(1):\n            results['spoofing_indicators'].append('FROM/RETURN-PATH domain mismatch')\n            results['risk_score'] += 30\n        if results['spf'] == 'fail': results['risk_score'] += 25\n        if results['dkim'] == 'fail': results['risk_score'] += 25\n        if any(results['from'].endswith(tld) for tld in self.SUSPICIOUS_TLDS):\n            results['spoofing_indicators'].append('Suspicious TLD')\n            results['risk_score'] += 20\n        results['verdict'] = 'PHISHING' if results['risk_score'] >= 50 else 'SUSPICIOUS' if results['risk_score'] >= 25 else 'CLEAN'\n        return results\n\n    def _check_spf(self, h):\n        ar = h.get('Authentication-Results', '')\n        if 'spf=pass' in ar: return 'pass'\n        if 'spf=fail' in ar: return 'fail'\n        return 'none'\n\n    def _check_dkim(self, h):\n        ar = h.get('Authentication-Results', '')\n        if 'dkim=pass' in ar: return 'pass'\n        if 'dkim=fail' in ar: return 'fail'\n        return 'none'\n\n    def _check_dmarc(self, h):\n        ar = h.get('Authentication-Results', '')\n        if 'dmarc=pass' in ar: return 'pass'\n        if 'dmarc=fail' in ar: return 'fail'\n        return 'none'\n\nif __name__ == '__main__':\n    analyzer = EmailAnalyzer()\n    if len(sys.argv) > 1:\n        with open(sys.argv[1]) as f:\n            result = analyzer.analyze(f.read())\n    else:\n        result = analyzer.analyze(sys.stdin.read())\n    print(json.dumps(result, indent=2))`,
+            bash: `#!/bin/bash\n# Email Header Analyzer — Quick Check\nFILE="\${1:-/dev/stdin}"\necho "=== Email Header Analysis ==="\necho "From: $(grep -i '^From:' "$FILE" | head -1)"\necho "Return-Path: $(grep -i '^Return-Path:' "$FILE" | head -1)"\necho "SPF: $(grep -i 'spf=' "$FILE" | head -1)"\necho "DKIM: $(grep -i 'dkim=' "$FILE" | head -1)"\necho "DMARC: $(grep -i 'dmarc=' "$FILE" | head -1)"\necho "Received hops: $(grep -ci '^Received:' "$FILE")"`,
+            powershell: `# Email Header Analyzer — PowerShell\nparam([string]$File)\n$content = Get-Content $File -Raw\nWrite-Host "=== Email Analysis ===" -ForegroundColor Cyan\nif ($content -match 'spf=fail') { Write-Host "[FAIL] SPF" -ForegroundColor Red } else { Write-Host "[PASS] SPF" -ForegroundColor Green }\nif ($content -match 'dkim=fail') { Write-Host "[FAIL] DKIM" -ForegroundColor Red } else { Write-Host "[PASS] DKIM" -ForegroundColor Green }\nif ($content -match 'dmarc=fail') { Write-Host "[FAIL] DMARC" -ForegroundColor Red } else { Write-Host "[PASS] DMARC" -ForegroundColor Green }`
+        },
+        'ip-reputation': {
+            python: `#!/usr/bin/env python3\n"""IP Reputation Checker\nChecks IPs against AbuseIPDB, VirusTotal, and threat feeds.\n"""\nimport requests, json, sys, socket\n\nclass IPReputation:\n    def __init__(self, abuseipdb_key='', vt_key=''):\n        self.abuse_key = abuseipdb_key\n        self.vt_key = vt_key\n\n    def check(self, ip):\n        result = {'ip': ip, 'risk_score': 0, 'sources': {}}\n        # Reverse DNS\n        try: result['hostname'] = socket.gethostbyaddr(ip)[0]\n        except: result['hostname'] = 'N/A'\n        # GeoIP (free API)\n        try:\n            geo = requests.get(f'http://ip-api.com/json/{ip}', timeout=10).json()\n            result['country'] = geo.get('country', 'Unknown')\n            result['org'] = geo.get('org', 'Unknown')\n            result['isp'] = geo.get('isp', 'Unknown')\n        except: pass\n        # AbuseIPDB\n        if self.abuse_key:\n            try:\n                r = requests.get('https://api.abuseipdb.com/api/v2/check',\n                    headers={'Key': self.abuse_key, 'Accept': 'application/json'},\n                    params={'ipAddress': ip, 'maxAgeInDays': 90}, timeout=10)\n                data = r.json().get('data', {})\n                result['sources']['abuseipdb'] = {\n                    'score': data.get('abuseConfidenceScore', 0),\n                    'reports': data.get('totalReports', 0)\n                }\n                result['risk_score'] += data.get('abuseConfidenceScore', 0)\n            except: pass\n        # VirusTotal\n        if self.vt_key:\n            try:\n                r = requests.get(f'https://www.virustotal.com/api/v3/ip_addresses/{ip}',\n                    headers={'x-apikey': self.vt_key}, timeout=10)\n                stats = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})\n                result['sources']['virustotal'] = stats\n                result['risk_score'] += stats.get('malicious', 0) * 10\n            except: pass\n        result['verdict'] = 'MALICIOUS' if result['risk_score'] > 50 else 'SUSPICIOUS' if result['risk_score'] > 20 else 'CLEAN'\n        return result\n\nif __name__ == '__main__':\n    checker = IPReputation()\n    for ip in sys.argv[1:] or ['${target || "8.8.8.8"}']:\n        print(json.dumps(checker.check(ip), indent=2))`,
+            bash: `#!/bin/bash\n# IP Reputation Quick Check\nIP="\${1:-${target || '8.8.8.8'}}"\necho "=== IP Reputation: $IP ==="\necho "Reverse DNS: $(dig +short -x $IP 2>/dev/null || echo 'N/A')"\necho "GeoIP: $(curl -s "http://ip-api.com/line/$IP?fields=country,org,isp" | tr '\\n' ' ')"\necho "Abuse check: $(curl -s "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt" | grep -c "$IP") hits in Feodo Tracker"\necho "Tor exit: $(curl -s "https://check.torproject.org/torbulkexitlist" | grep -c "$IP") hits"`,
+            powershell: `# IP Reputation — PowerShell\nparam([string]$IP = "${target || '8.8.8.8'}")\nWrite-Host "=== IP Reputation: $IP ===" -ForegroundColor Cyan\ntry { Write-Host "Hostname: $([System.Net.Dns]::GetHostEntry($IP).HostName)" } catch { Write-Host "Hostname: N/A" }\n$geo = Invoke-RestMethod "http://ip-api.com/json/$IP"\nWrite-Host "Country: $($geo.country) | Org: $($geo.org) | ISP: $($geo.isp)"`
+        },
+        'hash-checker': {
+            python: `#!/usr/bin/env python3\n"""File Hash Checker\nComputes hashes and checks VirusTotal + MalwareBazaar.\n"""\nimport hashlib, requests, json, sys, os\n\nclass HashChecker:\n    def __init__(self, vt_key=''):\n        self.vt_key = vt_key\n\n    def hash_file(self, filepath):\n        md5 = hashlib.md5(); sha1 = hashlib.sha1(); sha256 = hashlib.sha256()\n        with open(filepath, 'rb') as f:\n            for chunk in iter(lambda: f.read(8192), b''):\n                md5.update(chunk); sha1.update(chunk); sha256.update(chunk)\n        return {'file': filepath, 'md5': md5.hexdigest(), 'sha1': sha1.hexdigest(), 'sha256': sha256.hexdigest(), 'size': os.path.getsize(filepath)}\n\n    def check_hash(self, file_hash):\n        result = {'hash': file_hash, 'sources': {}}\n        # MalwareBazaar\n        try:\n            r = requests.post('https://mb-api.abuse.ch/api/v1/', data={'query': 'get_info', 'hash': file_hash}, timeout=15)\n            data = r.json()\n            if data.get('query_status') == 'hash_not_found':\n                result['sources']['malwarebazaar'] = 'NOT FOUND'\n            else:\n                result['sources']['malwarebazaar'] = {'found': True, 'signature': data.get('data',[{}])[0].get('signature',''), 'tags': data.get('data',[{}])[0].get('tags',[])}\n        except: pass\n        # VirusTotal\n        if self.vt_key:\n            try:\n                r = requests.get(f'https://www.virustotal.com/api/v3/files/{file_hash}',\n                    headers={'x-apikey': self.vt_key}, timeout=15)\n                stats = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})\n                result['sources']['virustotal'] = stats\n            except: pass\n        return result\n\nif __name__ == '__main__':\n    checker = HashChecker()\n    for arg in sys.argv[1:]:\n        if os.path.isfile(arg):\n            hashes = checker.hash_file(arg)\n            print(json.dumps(hashes, indent=2))\n            r = checker.check_hash(hashes['sha256'])\n            print(json.dumps(r, indent=2))\n        else:\n            print(json.dumps(checker.check_hash(arg), indent=2))`,
+            bash: `#!/bin/bash\n# File Hash Checker\nFILE="$1"\nif [ -f "$FILE" ]; then\n  echo "MD5:    $(md5sum "$FILE" | cut -d' ' -f1)"\n  echo "SHA1:   $(sha1sum "$FILE" | cut -d' ' -f1)"\n  SHA256=$(sha256sum "$FILE" | cut -d' ' -f1)\n  echo "SHA256: $SHA256"\n  echo "MalwareBazaar: $(curl -s -d "query=get_info&hash=$SHA256" https://mb-api.abuse.ch/api/v1/ | python3 -c 'import sys,json; print(json.load(sys.stdin).get("query_status","error"))' 2>/dev/null)"\nelse\n  echo "Checking hash: $FILE"\n  curl -s -d "query=get_info&hash=$FILE" https://mb-api.abuse.ch/api/v1/ | python3 -m json.tool 2>/dev/null\nfi`,
+            powershell: `# File Hash Checker — PowerShell\nparam([string]$Target)\nif (Test-Path $Target) {\n    $hash = Get-FileHash $Target -Algorithm SHA256\n    Write-Host "SHA256: $($hash.Hash)" -ForegroundColor Cyan\n    Write-Host "MD5: $((Get-FileHash $Target -Algorithm MD5).Hash)"\n    Write-Host "SHA1: $((Get-FileHash $Target -Algorithm SHA1).Hash)"\n} else {\n    Write-Host "Checking hash: $Target" -ForegroundColor Cyan\n}`
+        },
+        'log-analyzer': {
+            python: `#!/usr/bin/env python3\n"""Log Analyzer — Pattern Detection\nScans logs for 9 threat patterns with MITRE ATT&CK mapping.\n"""\nimport re, sys, json\nfrom collections import defaultdict\n\nclass LogAnalyzer:\n    PATTERNS = [\n        {'name': 'Brute Force', 'pattern': r'(Failed password|authentication failure|invalid user)', 'mitre': 'T1110', 'severity': 'high'},\n        {'name': 'Privilege Escalation', 'pattern': r'(sudo|su:|COMMAND=|runas)', 'mitre': 'T1548', 'severity': 'high'},\n        {'name': 'Suspicious Process', 'pattern': r'(mimikatz|procdump|psexec|cobalt|beacon)', 'mitre': 'T1003', 'severity': 'critical'},\n        {'name': 'Network Anomaly', 'pattern': r'(reverse shell|nc -e|bash -i|/dev/tcp)', 'mitre': 'T1059', 'severity': 'critical'},\n        {'name': 'File Modification', 'pattern': r'(chmod 777|chattr|rm -rf /|del /f)', 'mitre': 'T1070', 'severity': 'high'},\n        {'name': 'Persistence', 'pattern': r'(crontab|systemctl enable|at job|schtasks /create)', 'mitre': 'T1053', 'severity': 'medium'},\n        {'name': 'Data Exfiltration', 'pattern': r'(curl.*POST|wget.*--post|scp |rsync.*-e)', 'mitre': 'T1048', 'severity': 'high'},\n        {'name': 'Log Tampering', 'pattern': r'(truncate.*log|> /var/log|shred|wevtutil cl)', 'mitre': 'T1070.001', 'severity': 'critical'},\n        {'name': 'Encoded Commands', 'pattern': r'(base64|encodedcommand|frombase64string)', 'mitre': 'T1059.001', 'severity': 'high'},\n    ]\n\n    def analyze(self, filepath):\n        findings = defaultdict(list)\n        with open(filepath) as f:\n            for i, line in enumerate(f, 1):\n                for p in self.PATTERNS:\n                    if re.search(p['pattern'], line, re.I):\n                        findings[p['name']].append({'line': i, 'content': line.strip()[:200], 'mitre': p['mitre'], 'severity': p['severity']})\n        return dict(findings)\n\nif __name__ == '__main__':\n    analyzer = LogAnalyzer()\n    filepath = sys.argv[1] if len(sys.argv) > 1 else '${target || "/var/log/auth.log"}'\n    results = analyzer.analyze(filepath)\n    for category, hits in results.items():\n        print(f"\\n[{hits[0]['severity'].upper()}] {category} (MITRE: {hits[0]['mitre']}) — {len(hits)} hits")\n        for h in hits[:3]:\n            print(f"  Line {h['line']}: {h['content']}")`,
+            bash: `#!/bin/bash\n# Log Analyzer — Bash Edition\nLOG="\${1:-${target || '/var/log/auth.log'}}"\necho "=== Log Analysis: $LOG ==="\necho "[Brute Force]     $(grep -ci 'failed password\\|authentication failure' "$LOG") hits"\necho "[Priv Escalation] $(grep -ci 'sudo\\|su:' "$LOG") hits"\necho "[Suspicious Proc] $(grep -ci 'mimikatz\\|procdump\\|psexec' "$LOG") hits"\necho "[Reverse Shell]   $(grep -ci 'reverse shell\\|nc -e\\|/dev/tcp' "$LOG") hits"\necho "[Persistence]     $(grep -ci 'crontab\\|schtasks' "$LOG") hits"\necho "[Log Tampering]   $(grep -ci 'truncate.*log\\|shred\\|wevtutil' "$LOG") hits"\necho "[Encoded Cmds]    $(grep -ci 'base64\\|encodedcommand' "$LOG") hits"`,
+            powershell: `# Log Analyzer — PowerShell\nparam([string]$LogPath = "${target || 'C:\\Windows\\System32\\winevt\\Logs\\Security.evtx'}")\n$patterns = @{\n    'Brute Force' = 'failed|4625|invalid'\n    'Privilege Escalation' = '4672|4673|runas'\n    'Suspicious Process' = 'mimikatz|procdump|psexec'\n    'Persistence' = 'schtasks|sc create|reg add.*Run'\n}\nforeach ($cat in $patterns.Keys) {\n    $count = (Select-String -Path $LogPath -Pattern $patterns[$cat] -AllMatches).Count\n    Write-Host "[$cat] $count hits" -ForegroundColor $(if($count -gt 0){'Red'}else{'Green'})\n}`
+        },
+        'network-scanner': {
+            python: `#!/usr/bin/env python3\n"""Network Connection Scanner\nBaselines connections and detects anomalies.\n"""\nimport subprocess, json, sys, re\nfrom collections import defaultdict\n\nclass NetworkScanner:\n    SUSPICIOUS_PORTS = [4444,5555,6666,7777,8888,9999,1234,50050,4443,8443]\n    KNOWN_BAD = set()  # Load from threat feeds\n\n    def scan(self):\n        connections = []\n        try:\n            out = subprocess.check_output(['ss', '-tunapo'], text=True, stderr=subprocess.DEVNULL)\n        except:\n            out = subprocess.check_output(['netstat', '-tunapo'], text=True, stderr=subprocess.DEVNULL)\n        for line in out.splitlines()[1:]:\n            parts = line.split()\n            if len(parts) >= 5:\n                connections.append({\n                    'proto': parts[0], 'state': parts[1] if 'ESTAB' in line or 'LISTEN' in line else parts[-2],\n                    'local': parts[3] if len(parts) > 3 else '', 'remote': parts[4] if len(parts) > 4 else '',\n                    'process': parts[-1] if len(parts) > 5 else ''\n                })\n        return connections\n\n    def analyze(self, connections):\n        alerts = []\n        remote_counts = defaultdict(int)\n        for conn in connections:\n            remote = conn.get('remote', '')\n            if ':' in remote:\n                ip, port = remote.rsplit(':', 1)\n                try:\n                    port = int(port)\n                    if port in self.SUSPICIOUS_PORTS:\n                        alerts.append({'type': 'SUSPICIOUS_PORT', 'severity': 'HIGH', 'remote': remote, 'process': conn.get('process','')})\n                except: pass\n                remote_counts[ip] += 1\n        for ip, count in remote_counts.items():\n            if count > 20:\n                alerts.append({'type': 'HIGH_CONN_COUNT', 'severity': 'MEDIUM', 'ip': ip, 'count': count})\n        return alerts\n\nif __name__ == '__main__':\n    scanner = NetworkScanner()\n    conns = scanner.scan()\n    alerts = scanner.analyze(conns)\n    print(f"Total connections: {len(conns)}")\n    for a in alerts:\n        print(f"[{a['severity']}] {a['type']}: {json.dumps(a)}")`,
+            bash: `#!/bin/bash\n# Network Scanner — Bash\necho "=== Active Connections ==="\nss -tunapo 2>/dev/null || netstat -tunapo 2>/dev/null\necho "\\n=== Suspicious Ports (C2 common) ==="\nss -tunapo 2>/dev/null | grep -E ':(4444|5555|6666|7777|8888|9999|1234|50050)\\b'\necho "\\n=== Top Remote IPs ==="\nss -tuna 2>/dev/null | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -rn | head -20\necho "\\n=== ESTABLISHED to Public IPs ==="\nss -tuna state established 2>/dev/null | grep -vE '(127\\.0|10\\.|172\\.(1[6-9]|2|3[01])\\.|192\\.168\\.)'`,
+            powershell: `# Network Scanner — PowerShell\nWrite-Host "=== Active Connections ===" -ForegroundColor Cyan\n$conns = Get-NetTCPConnection | Where-Object State -eq 'Established'\n$conns | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess,\n    @{N='Process';E={(Get-Process -Id $_.OwningProcess -EA 0).ProcessName}} | Format-Table\n\n$suspicious = @(4444,5555,6666,7777,8888,9999,1234,50050)\n$alerts = $conns | Where-Object { $_.RemotePort -in $suspicious }\nif ($alerts) {\n    Write-Host "\\n[ALERT] Suspicious port connections:" -ForegroundColor Red\n    $alerts | Format-Table\n}`
+        },
+        'forensic-timeline': {
+            python: `#!/usr/bin/env python3\n"""Forensic Timeline Generator\nCreates chronological timeline from multiple log sources.\n"""\nimport re, sys, json, csv\nfrom datetime import datetime\n\nclass TimelineGenerator:\n    PARSERS = {\n        'syslog': r'(\\w{3}\\s+\\d+\\s+[\\d:]+)\\s+(\\S+)\\s+(\\S+?)(?:\\[\\d+\\])?:\\s+(.*)',\n        'auth': r'(\\w{3}\\s+\\d+\\s+[\\d:]+)\\s+(\\S+)\\s+(\\S+?)(?:\\[\\d+\\])?:\\s+(.*)',\n        'apache': r'(\\S+).*\\[([^]]+)\\]\\s+"(\\S+\\s+\\S+\\s+\\S+)"\\s+(\\d+)',\n        'windows': r'(\\d{4}-\\d{2}-\\d{2}T[\\d:.]+).*EventID=(\\d+).*Message=(.*)',\n    }\n\n    def __init__(self):\n        self.events = []\n\n    def parse_file(self, filepath, log_type='syslog'):\n        pattern = self.PARSERS.get(log_type, self.PARSERS['syslog'])\n        with open(filepath) as f:\n            for i, line in enumerate(f, 1):\n                m = re.search(pattern, line)\n                if m:\n                    self.events.append({\n                        'timestamp': m.group(1),\n                        'source': filepath,\n                        'line': i,\n                        'raw': line.strip()[:300],\n                        'category': self._classify(line)\n                    })\n\n    def _classify(self, line):\n        line_l = line.lower()\n        if any(w in line_l for w in ['failed','denied','error','invalid']): return 'ALERT'\n        if any(w in line_l for w in ['sudo','su:','root']): return 'PRIVILEGE'\n        if any(w in line_l for w in ['accept','success','opened']): return 'ACCESS'\n        return 'INFO'\n\n    def export(self, fmt='${outputFmt}'):\n        self.events.sort(key=lambda e: e['timestamp'])\n        if fmt == 'json': return json.dumps(self.events, indent=2)\n        if fmt == 'csv':\n            import io\n            out = io.StringIO()\n            w = csv.DictWriter(out, fieldnames=['timestamp','source','category','raw'])\n            w.writeheader(); w.writerows(self.events)\n            return out.getvalue()\n        return '\\n'.join(f"[{e['category']}] {e['timestamp']} | {e['raw']}" for e in self.events)\n\nif __name__ == '__main__':\n    gen = TimelineGenerator()\n    for f in sys.argv[1:] or ['${target || "/var/log/auth.log"}']:\n        gen.parse_file(f)\n    print(gen.export())`,
+            bash: `#!/bin/bash\n# Forensic Timeline — Bash\necho "=== Forensic Timeline ==="\nfor LOG in "\${@:-${target || '/var/log/auth.log /var/log/syslog'}}"; do\n  [ -f "$LOG" ] && awk '{print FILENAME": "$0}' "$LOG"\ndone | sort | head -500`,
+            powershell: `# Forensic Timeline — PowerShell\n$logs = Get-WinEvent -LogName Security,System -MaxEvents 500 | Sort-Object TimeCreated\n$logs | Select-Object TimeCreated, LogName, Id, Message | Format-Table -AutoSize | Out-String -Width 300`
+        },
+        'yara-scanner': {
+            python: `#!/usr/bin/env python3\n"""YARA Rule Scanner\nScans files/directories with YARA rules for malware detection.\n"""\nimport os, sys, json\ntry:\n    import yara\nexcept ImportError:\n    print("pip install yara-python")\n    sys.exit(1)\n\nclass YARAScanner:\n    BUILTIN_RULES = \"\"\"\nrule Mimikatz_Strings {\n    meta: description = "Mimikatz credential tool"\n    strings:\n        $s1 = "mimikatz" ascii wide nocase\n        $s2 = "sekurlsa" ascii wide\n        $s3 = "logonpasswords" ascii wide\n        $s4 = "kerberos::list" ascii\n    condition: 2 of them\n}\nrule Webshell_Generic {\n    meta: description = "Generic webshell indicators"\n    strings:\n        $php1 = "eval($_" ascii\n        $php2 = "base64_decode($_" ascii\n        $asp1 = "eval(Request" ascii\n        $jsp1 = "Runtime.getRuntime().exec" ascii\n    condition: any of them\n}\nrule Ransomware_Note {\n    meta: description = "Ransomware note indicators"\n    strings:\n        $s1 = "your files have been encrypted" ascii nocase\n        $s2 = "bitcoin" ascii nocase\n        $s3 = "decrypt" ascii nocase\n        $s4 = "ransom" ascii nocase\n    condition: 2 of them\n}\n\"\"\"\n\n    def __init__(self, rules_path=None):\n        if rules_path and os.path.exists(rules_path):\n            self.rules = yara.compile(filepath=rules_path)\n        else:\n            self.rules = yara.compile(source=self.BUILTIN_RULES)\n\n    def scan_file(self, filepath):\n        matches = self.rules.match(filepath)\n        return [{'rule': m.rule, 'meta': m.meta, 'strings': [(s[1], s[2].decode('utf-8','ignore')[:100]) for s in m.strings[:5]]} for m in matches]\n\n    def scan_directory(self, dirpath):\n        results = {}\n        for root, dirs, files in os.walk(dirpath):\n            for f in files:\n                fp = os.path.join(root, f)\n                try:\n                    matches = self.scan_file(fp)\n                    if matches: results[fp] = matches\n                except: pass\n        return results\n\nif __name__ == '__main__':\n    scanner = YARAScanner()\n    target = sys.argv[1] if len(sys.argv) > 1 else '${target || "."}'\n    if os.path.isfile(target):\n        print(json.dumps(scanner.scan_file(target), indent=2))\n    else:\n        results = scanner.scan_directory(target)\n        for fp, matches in results.items():\n            print(f"[MATCH] {fp}: {[m['rule'] for m in matches]}")`,
+            bash: `#!/bin/bash\n# YARA Scanner — Bash wrapper\nRULES="\${1:-rules.yar}"\nTARGET="\${2:-${target || './'}}"\nyara -r "$RULES" "$TARGET" 2>/dev/null || echo "Install yara: apt install yara"`,
+            powershell: `# YARA Scanner — PowerShell wrapper\nparam([string]$Rules = "rules.yar", [string]$Target = "${target || '.'}")\n& yara.exe -r $Rules $Target`
+        },
+        'cve-checker': {
+            python: `#!/usr/bin/env python3\n"""CVE Vulnerability Checker\nSearches NVD and CISA KEV for vulnerabilities.\n"""\nimport requests, json, sys\n\nclass CVEChecker:\n    NVD_API = 'https://services.nvd.nist.gov/rest/json/cves/2.0'\n    KEV_API = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'\n\n    def search(self, keyword):\n        try:\n            r = requests.get(self.NVD_API, params={'keywordSearch': keyword, 'resultsPerPage': 10}, timeout=30)\n            vulns = r.json().get('vulnerabilities', [])\n            results = []\n            for v in vulns:\n                cve = v['cve']\n                metrics = cve.get('metrics', {})\n                cvss = 0\n                if 'cvssMetricV31' in metrics: cvss = metrics['cvssMetricV31'][0]['cvssData']['baseScore']\n                elif 'cvssMetricV2' in metrics: cvss = metrics['cvssMetricV2'][0]['cvssData']['baseScore']\n                results.append({\n                    'id': cve['id'],\n                    'description': cve.get('descriptions',[{}])[0].get('value','')[:200],\n                    'cvss': cvss,\n                    'severity': 'CRITICAL' if cvss >= 9 else 'HIGH' if cvss >= 7 else 'MEDIUM' if cvss >= 4 else 'LOW',\n                    'published': cve.get('published','')[:10]\n                })\n            return sorted(results, key=lambda x: x['cvss'], reverse=True)\n        except Exception as e:\n            return [{'error': str(e)}]\n\n    def check_kev(self, cve_id=None):\n        try:\n            r = requests.get(self.KEV_API, timeout=30)\n            vulns = r.json().get('vulnerabilities', [])\n            if cve_id:\n                return [v for v in vulns if v.get('cveID') == cve_id]\n            return vulns[-10:]  # Latest 10\n        except: return []\n\nif __name__ == '__main__':\n    checker = CVEChecker()\n    query = ' '.join(sys.argv[1:]) or '${target || "apache log4j"}'\n    results = checker.search(query)\n    for r in results:\n        print(f"[{r.get('severity','?')}] {r['id']} (CVSS: {r.get('cvss',0)}) — {r.get('description','')[:100]}")`,
+            bash: `#!/bin/bash\n# CVE Quick Search\nQUERY="\${*:-${target || 'apache log4j'}}"\ncurl -s "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$(echo "$QUERY" | tr ' ' '+')" | python3 -c "\nimport sys,json\ndata=json.load(sys.stdin)\nfor v in data.get('vulnerabilities',[])[:10]:\n    c=v['cve']; print(f\\"{c['id']}: {c.get('descriptions',[{}])[0].get('value','')[:100]}\\")"\n2>/dev/null`,
+            powershell: `# CVE Checker — PowerShell\nparam([string]$Query = "${target || 'apache log4j'}")\n$url = "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$([uri]::EscapeDataString($Query))"\n$data = Invoke-RestMethod $url\n$data.vulnerabilities | ForEach-Object { "$($_.cve.id): $($_.cve.descriptions[0].value.Substring(0,100))" }`
+        },
+        'password-audit': {
+            python: `#!/usr/bin/env python3\n"""Password Policy Auditor\nChecks password policy compliance and common weaknesses.\n"""\nimport re, sys, json, hashlib, requests\n\nclass PasswordAuditor:\n    COMMON_PASSWORDS = ['password','123456','qwerty','admin','letmein','welcome','monkey','master','dragon','login']\n\n    def audit_policy(self, password):\n        checks = {\n            'length_8': len(password) >= 8,\n            'length_12': len(password) >= 12,\n            'uppercase': bool(re.search(r'[A-Z]', password)),\n            'lowercase': bool(re.search(r'[a-z]', password)),\n            'digit': bool(re.search(r'\\d', password)),\n            'special': bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', password)),\n            'no_common': password.lower() not in self.COMMON_PASSWORDS,\n            'no_sequential': not re.search(r'(012|123|234|345|456|567|678|789|abc|bcd)', password.lower()),\n        }\n        score = sum(checks.values()) / len(checks) * 100\n        return {'password_masked': password[:2]+'*'*(len(password)-2), 'checks': checks, 'score': score,\n                'rating': 'STRONG' if score >= 87 else 'MODERATE' if score >= 62 else 'WEAK'}\n\n    def check_breach(self, password):\n        sha1 = hashlib.sha1(password.encode()).hexdigest().upper()\n        prefix, suffix = sha1[:5], sha1[5:]\n        try:\n            r = requests.get(f'https://api.pwnedpasswords.com/range/{prefix}', timeout=10)\n            for line in r.text.splitlines():\n                h, count = line.split(':')\n                if h == suffix: return int(count)\n        except: pass\n        return 0\n\nif __name__ == '__main__':\n    auditor = PasswordAuditor()\n    pw = sys.argv[1] if len(sys.argv) > 1 else 'TestPassword123!'\n    result = auditor.audit_policy(pw)\n    breach = auditor.check_breach(pw)\n    result['breach_count'] = breach\n    print(json.dumps(result, indent=2))`,
+            bash: `#!/bin/bash\n# Password Policy Audit — Bash\necho "=== Password Policy Check ==="\necho "Min length 8: $(grep -c 'PASS_MIN_LEN' /etc/login.defs 2>/dev/null || echo 'N/A')"\necho "Max age: $(grep 'PASS_MAX_DAYS' /etc/login.defs 2>/dev/null)"\necho "Min age: $(grep 'PASS_MIN_DAYS' /etc/login.defs 2>/dev/null)"\necho "\\n=== Users with no password expiry ==="\nawk -F: '($5 == "" || $5 == 99999) {print $1}' /etc/shadow 2>/dev/null`,
+            powershell: `# Password Policy Audit — PowerShell\nWrite-Host "=== Domain Password Policy ===" -ForegroundColor Cyan\nGet-ADDefaultDomainPasswordPolicy | Format-List\nWrite-Host "\\n=== Users with password never expires ===" -ForegroundColor Yellow\nGet-ADUser -Filter {PasswordNeverExpires -eq $true} | Select-Object Name, SamAccountName`
+        }
+    };
+
+    const toolScript = scripts[type];
+    if (toolScript && toolScript[lang]) {
+        rule = toolScript[lang];
+    } else {
+        rule = `# No ${lang} script available for ${type}\n# Try Python for the most complete implementation`;
+    }
+
+    lastToolRule = rule;
+    document.getElementById('toolRuleCode').textContent = rule;
+    document.getElementById('toolRuleOutput').classList.add('show');
+}
+
+// ==================== DETECTION RULE BUILDER ====================
+let lastDetRule = '';
+function copyDetRule() { navigator.clipboard.writeText(lastDetRule); const b=document.querySelector('#detRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearDetOutput() { document.getElementById('detRuleOutput').classList.remove('show'); }
+function downloadDetRule() { const fmt=document.getElementById('detFormat').value; const ext={sigma:'yml',yara:'yar',snort:'rules',osquery:'conf',kql:'kql',spl:'spl',eql:'eql'}[fmt]||'txt'; const n=(document.getElementById('detRuleName').value||'rule').replace(/[^a-z0-9]/gi,'_').toLowerCase(); const b=new Blob([lastDetRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.'+ext; a.click(); }
+function detPreset(name, fmt, severity) { document.getElementById('detRuleName').value=name; document.getElementById('detFormat').value=fmt; document.getElementById('detSeverity').value=severity; generateDetRule(); }
+function generateDetRule() {
+    const name = document.getElementById('detRuleName').value.trim();
+    if (!name) { alert('Enter a threat description'); return; }
+    const fmt = document.getElementById('detFormat').value;
+    const severity = document.getElementById('detSeverity').value;
+    const tactic = document.getElementById('detTactic').value;
+    const os = document.getElementById('detOS').value;
+    const match = findMatch(name);
+    const now = new Date().toISOString().split('T')[0];
+    const dateSlash = now.replace(/-/g,'/');
+    let rule = '';
+
+    if (fmt === 'sigma') {
+        rule = buildSigma(name, severity, match, tactic, os === 'windows' ? 'windows' : os === 'linux' ? 'linux' : 'endpoint', dateSlash);
+    } else if (fmt === 'yara') {
+        rule = buildYara(name, severity, match, now);
+        if (rule.includes('No YARA template')) {
+            const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,6) : [name.split(' ')[0]];
+            const safeName = name.replace(/[^a-zA-Z0-9_]/g,'_');
+            rule = `rule ${safeName} {\n    meta:\n        description = "${match ? match.desc : name}"\n        author = "Blue Team Toolkit"\n        date = "${now}"\n        severity = "${severity}"\n        mitre = "${match ? match.t : 'T1078'}"\n\n    strings:\n${kws.map((k,i) => `        $s${i+1} = "${k}" ascii wide nocase`).join('\n')}\n\n    condition:\n        ${kws.length > 2 ? '2' : '1'} of them\n}`;
+        }
+    } else if (fmt === 'snort') {
+        const t = match ? match.t : 'T1078';
+        const desc = match ? match.desc : name;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,3) : [name.split(' ')[0].toLowerCase()];
+        const sid = Math.floor(Math.random()*900000)+100000;
+        if (name.toLowerCase().includes('dns') || name.toLowerCase().includes('tunnel')) {
+            rule = `# ${name} — Snort/Suricata Rule\n# MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nalert dns any any -> any any (msg:"${name}"; dns.query; content:"."; pcre:"/^[a-z0-9]{30,}\\./i"; threshold:type both, track by_src, count 50, seconds 60; classtype:bad-unknown; sid:${sid}; rev:1; metadata: mitre_technique_id ${t};)\n\nalert udp any any -> any 53 (msg:"${name} - Large DNS Query"; dsize:>512; threshold:type both, track by_src, count 10, seconds 60; classtype:bad-unknown; sid:${sid+1}; rev:1;)\n\nalert dns any any -> any any (msg:"${name} - TXT Record Exfil"; dns.query; content:"|00 10|"; content:"."; pcre:"/\\.(?:tk|ml|ga|cf|xyz|top|buzz)$/i"; sid:${sid+2}; rev:1;)`;
+        } else if (name.toLowerCase().includes('reverse') || name.toLowerCase().includes('shell')) {
+            rule = `# ${name} — Snort/Suricata Rule\n# MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nalert tcp any any -> $HOME_NET any (msg:"${name} - Netcat Reverse Shell"; flow:established; content:"/bin/sh"; content:"|2f 62 69 6e 2f|"; classtype:trojan-activity; sid:${sid}; rev:1; metadata: mitre_technique_id ${t};)\n\nalert tcp $HOME_NET any -> $EXTERNAL_NET [4444,5555,6666,7777,8888,9999,1234] (msg:"${name} - C2 Port Connection"; flow:to_server,established; classtype:trojan-activity; sid:${sid+1}; rev:1;)\n\nalert tcp any any -> $HOME_NET any (msg:"${name} - PowerShell Reverse Shell"; flow:established; content:"powershell"; nocase; content:"-e "; nocase; content:"TCPClient"; nocase; sid:${sid+2}; rev:1;)`;
+        } else {
+            rule = `# ${name} — Snort/Suricata Rule\n# MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\nalert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"${name}"; flow:to_server,established; content:"${kws[0]}"; nocase;${kws.length > 1 ? ` content:"${kws[1]}"; nocase;` : ''} classtype:trojan-activity; sid:${sid}; rev:1; metadata: mitre_technique_id ${t};)`;
+        }
+    } else if (fmt === 'osquery') {
+        const t = match ? match.t : 'T1078';
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : [name.split(' ')[0].toLowerCase()];
+        if (name.toLowerCase().includes('sched') || name.toLowerCase().includes('persist')) {
+            rule = `-- ${name} — osquery Pack\n-- MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n-- Scheduled tasks (Windows)\nSELECT name, action, path, enabled, last_run_time, next_run_time\nFROM scheduled_tasks\nWHERE enabled = 1\n  AND hidden = 0\n  AND (path LIKE '%Temp%' OR path LIKE '%AppData%' OR path LIKE '%Public%');\n\n-- Cron jobs (Linux)\nSELECT event, path, command, minute, hour\nFROM crontab\nWHERE command LIKE '%curl%' OR command LIKE '%wget%'\n  OR command LIKE '%python%' OR command LIKE '%bash -c%';\n\n-- Startup items\nSELECT name, path, source, type, status\nFROM startup_items\nWHERE path NOT LIKE 'C:\\\\Program Files%'\n  AND path NOT LIKE 'C:\\\\Windows%';`;
+        } else {
+            rule = `-- ${name} — osquery Scheduled Query\n-- MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n-- Process detection\nSELECT p.pid, p.name, p.path, p.cmdline, p.parent,\n       p.uid, u.username, p.start_time,\n       h.sha256 AS file_hash\nFROM processes p\nLEFT JOIN users u ON p.uid = u.uid\nLEFT JOIN hash h ON p.path = h.path\nWHERE (${kws.map(k => `p.cmdline LIKE '%${k}%'`).join('\n  OR ')})\n  AND p.start_time > (strftime('%s','now') - 86400);\n\n-- File events\nSELECT target_path, action, time, md5\nFROM file_events\nWHERE (${kws.map(k => `target_path LIKE '%${k}%'`).join('\n  OR ')})\n  AND time > (strftime('%s','now') - 86400);`;
+        }
+    } else if (fmt === 'kql') {
+        rule = buildDefender(name, severity, match);
+    } else if (fmt === 'spl') {
+        rule = buildSplunk(name, severity, match);
+    } else if (fmt === 'eql') {
+        rule = buildElasticEDR(name, severity, match);
+    }
+
+    lastDetRule = rule;
+    document.getElementById('detRuleCode').textContent = rule;
+    document.getElementById('detRuleOutput').classList.add('show');
+}
+
+// ==================== THREAT HUNTING QUERY BUILDER ====================
+let lastHuntRule = '';
+function copyHuntRule() { navigator.clipboard.writeText(lastHuntRule); const b=document.querySelector('#huntRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearHuntOutput() { document.getElementById('huntRuleOutput').classList.remove('show'); }
+function downloadHuntRule() { const n=(document.getElementById('huntRuleName').value||'hunt').replace(/[^a-z0-9]/gi,'_').toLowerCase(); const b=new Blob([lastHuntRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.txt'; a.click(); }
+function huntPreset(name, platform, tactic) { document.getElementById('huntRuleName').value=name; document.getElementById('huntPlatform').value=platform; document.getElementById('huntTactic').value=tactic; generateHuntQuery(); }
+function generateHuntQuery() {
+    const name = document.getElementById('huntRuleName').value.trim();
+    if (!name) { alert('Enter a hunt hypothesis'); return; }
+    const platform = document.getElementById('huntPlatform').value;
+    const tactic = document.getElementById('huntTactic').value;
+    const timeRange = document.getElementById('huntTimeRange').value;
+    const source = document.getElementById('huntSource').value;
+    const match = findMatch(name);
+    const t = match ? match.t : 'T1078';
+    const desc = match ? match.desc : name;
+    const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,5) : [name.split(' ')[0].toLowerCase()];
+    let rule = '';
+
+    const header = `// ==========================================\n// THREAT HUNT: ${name}\n// Hypothesis: ${desc}\n// MITRE ATT&CK: ${t}\n// Tactic: ${tactic !== 'auto' ? tactic : (match ? match.tac : 'unknown')}\n// Time Range: ${timeRange}\n// ==========================================\n`;
+
+    if (platform === 'splunk') {
+        if (match && match.splunk) {
+            rule = header + `\n// === PRIMARY HUNT QUERY ===\n${match.splunk}\n\n// === STATISTICAL ANALYSIS ===\nindex=* earliest=-${timeRange}\n| search ${kws.map(k=>`"${k}"`).join(' OR ')}\n| stats count dc(dest) as unique_targets dc(src) as unique_sources values(user) as users by src_ip\n| where count > 5 OR unique_targets > 3\n| sort -count\n\n// === RARE PROCESS HUNTING ===\nindex=* sourcetype=WinEventLog:Security earliest=-${timeRange}\n| stats count by process_name, user, dest\n| eventstats avg(count) as avg_count stdev(count) as stdev_count by process_name\n| where count > avg_count + 2*stdev_count\n| sort -count`;
+        } else {
+            rule = header + `\nindex=* earliest=-${timeRange}\n| search ${kws.map(k=>`"${k}"`).join(' OR ')}\n| stats count dc(dest) as unique_targets values(user) as users by src_ip, process_name\n| where count > 3 OR unique_targets > 2\n| sort -count\n| eval hunt_finding=case(count>20,"HIGH",count>10,"MEDIUM",1=1,"LOW")`;
+        }
+    } else if (platform === 'elastic') {
+        rule = header + `\n// === KQL Search ===\n${kws.map(k=>`process.command_line: "*${k}*"`).join(' OR ')}\n\n// === EQL Sequence Hunt ===\nsequence by host.name with maxspan=30m\n  [process where event.type == "start" and\n    process.args : (${kws.map(k=>`"*${k}*"`).join(', ')})]\n  [network where event.type == "start" and\n    not destination.ip : ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]\n\n// === Anomaly Detection ===\n// Use ML jobs to detect:\n// - Rare processes by host\n// - Unusual network destinations\n// - Abnormal command line lengths`;
+    } else if (platform === 'sentinel') {
+        rule = header + `\n// === Hunt Query ===\nSecurityEvent\n| where TimeGenerated > ago(${timeRange})\n| where CommandLine has_any (${kws.map(k=>`"${k}"`).join(', ')})\n| summarize Count=count(), UniqueHosts=dcount(Computer),\n    Hosts=make_set(Computer), Users=make_set(Account)\n    by ProcessName=Process, bin(TimeGenerated, 1h)\n| where Count > 3 or UniqueHosts > 2\n| extend HuntFinding = iff(Count > 20, "HIGH", iff(Count > 5, "MEDIUM", "LOW"))\n| sort by Count desc\n\n// === Rare Process Analysis ===\nSecurityEvent\n| where TimeGenerated > ago(${timeRange})\n| where EventID == 4688\n| summarize count() by NewProcessName\n| where count_ == 1\n| sort by NewProcessName`;
+    } else if (platform === 'crowdstrike') {
+        rule = header + `\n// === LogScale Hunt ===\n#event_simpleName=ProcessRollup2\n| CommandLine=/${kws.join('|')}/i\n| groupBy([ComputerName, UserName, ImageFileName, CommandLine, ParentBaseFileName])\n| count(aid, as=hits)\n| sort(hits, order=desc, limit=200)\n\n// === Rare Process Hunt ===\n#event_simpleName=ProcessRollup2\n| groupBy([ImageFileName], function=count(aid, as=total))\n| sort(total, order=asc, limit=50)\n| test(total < 5)`;
+    } else if (platform === 'carbon-black') {
+        rule = header + `\n// === CB Query ===\n(${kws.map(k=>`process_cmdline:"${k}"`).join(' OR ')})\nAND process_start_time:[${timeRange === '24h' ? 'now-1d' : timeRange === '7d' ? 'now-7d' : 'now-30d'} TO *]\n| sort last_update desc\n\n// === Rare Process Hunt ===\nprocess_name:* -process_name:(svchost.exe OR csrss.exe OR explorer.exe OR lsass.exe)\n| stats count by process_name\n| sort count asc`;
+    } else if (platform === 'velociraptor') {
+        rule = header + `\n// === VQL Hunt ===\nSELECT * FROM Artifact.Windows.System.Pslist()\nWHERE CommandLine =~ '(?i)(${kws.join('|')})'\n\n// === File Hunt ===\nSELECT FullPath, Size, Mtime, Hash\nFROM glob(globs='C:/Users/*/AppData/**')\nWHERE Name =~ '(?i)(${kws.join('|')})'\n  AND Mtime > now() - ${timeRange === '24h' ? '86400' : timeRange === '7d' ? '604800' : '2592000'}\n\n// === Registry Persistence Hunt ===\nSELECT * FROM Artifact.Windows.Registry.NTUser.Upload()\nWHERE Key =~ 'CurrentVersion.Run'\n\n// === Scheduled Tasks Hunt ===\nSELECT * FROM Artifact.Windows.System.TaskScheduler()\nWHERE Command =~ '(?i)(powershell|cmd|wscript|mshta|certutil)'`;
+    }
+
+    lastHuntRule = rule;
+    document.getElementById('huntRuleCode').textContent = rule;
+    document.getElementById('huntRuleOutput').classList.add('show');
+}
+
+// ==================== IR PLAYBOOK GENERATOR ====================
+let lastPBRule = '';
+function copyPBRule() { navigator.clipboard.writeText(lastPBRule); const b=document.querySelector('#pbRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearPBOutput() { document.getElementById('pbRuleOutput').classList.remove('show'); }
+function downloadPBRule() { const fmt=document.getElementById('pbFormat').value; const ext={markdown:'md',yaml:'yml',checklist:'md',runbook:'sh'}[fmt]; const n=document.getElementById('pbIncident').value; const b=new Blob([lastPBRule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`ir_${n}.${ext}`; a.click(); }
+function pbPreset(incident, fmt, severity) { document.getElementById('pbIncident').value=incident; document.getElementById('pbFormat').value=fmt; document.getElementById('pbSeverity').value=severity; generatePlaybook(); }
+function generatePlaybook() {
+    const incident = document.getElementById('pbIncident').value;
+    const fmt = document.getElementById('pbFormat').value;
+    const severity = document.getElementById('pbSeverity').value;
+    const custom = document.getElementById('pbCustom').value.trim();
+    const now = new Date().toISOString().split('T')[0];
+    const sevLabel = {critical:'P1 — CRITICAL',high:'P2 — HIGH',medium:'P3 — MEDIUM',low:'P4 — LOW'}[severity];
+    let rule = '';
+
+    const playbooks = {
+        ransomware: {
+            title: 'Ransomware Incident Response',
+            mitre: 'T1486, T1490, T1059',
+            phases: {
+                identification: ['Confirm ransomware variant (check ransom note, encrypted file extensions)','Identify patient zero and initial infection vector','Determine scope: count of affected hosts, file shares, backup status','Check for data exfiltration before encryption (double extortion)','Collect IOCs: file hashes, C2 IPs, ransom note content','Check threat intel for decryptor availability'],
+                containment: ['IMMEDIATELY isolate affected hosts from network (pull network cable/disable NIC)','Block C2 IP addresses and domains at firewall/proxy','Disable compromised accounts','Isolate affected network segments/VLANs','Preserve forensic evidence (memory dump, disk image) BEFORE cleanup','Disable SMB, RDP, WinRM between segments to prevent spread'],
+                eradication: ['Remove ransomware binary and persistence mechanisms','Clean registry run keys, scheduled tasks, services','Scan all hosts with updated AV/EDR signatures','Reset all passwords for affected domain/accounts','Patch the vulnerability used for initial access','Verify no backdoors remain (check for webshells, RATs)'],
+                recovery: ['Restore from clean, verified backups (test backup integrity first)','Rebuild systems from golden images if backups unavailable','Restore data in priority order: critical systems first','Verify restored systems are clean before reconnecting','Monitor restored systems closely for 72 hours','Re-enable network connectivity in phases'],
+                lessons: ['Document full timeline from initial access to containment','Calculate total impact (downtime, data loss, cost)','Update detection rules for this ransomware variant','Improve backup strategy (air-gapped, tested restores)','Conduct tabletop exercise based on this incident','Update IR playbook with lessons learned']
+            },
+            commands: ['# Isolate host via EDR\npython scripts/isolate_host.py --hostname INFECTED-PC','# Check shadow copies\nvssadmin list shadows','# Scan for IOCs\nyara -r rules/ransomware.yar /','# Block C2 at firewall\niptables -A OUTPUT -d MALICIOUS_IP -j DROP','# Check for persistence\nautorunsc -a * -c -h -s -v -vt','# Memory dump for forensics\nwinpmem_mini.exe memdump.raw']
+        },
+        phishing: {
+            title: 'Phishing / BEC Incident Response',
+            mitre: 'T1566.001, T1566.002, T1534',
+            phases: {
+                identification: ['Analyze email headers (SPF/DKIM/DMARC results)','Extract and detonate URLs in sandbox','Check attachments in malware sandbox (Any.Run, Joe Sandbox)','Identify all recipients who received the phishing email','Determine who clicked links / opened attachments','Check for credential harvesting (review authentication logs)'],
+                containment: ['Block sender domain/IP at email gateway','Remove phishing emails from all mailboxes (search & purge)','Reset passwords for users who clicked/submitted credentials','Revoke active sessions and OAuth tokens','Block malicious URLs at proxy/DNS','Enable MFA for affected accounts immediately'],
+                eradication: ['Check for mail forwarding rules added by attacker','Review inbox rules for auto-forwarding to external addresses','Scan endpoints of affected users for malware','Check for OAuth app consent attacks','Remove any persistence (mail rules, delegated access)','Update email gateway rules to block similar campaigns'],
+                recovery: ['Restore any modified mailbox settings','Re-enable accounts after password reset + MFA','Monitor affected accounts for 30 days','Send awareness notification to all recipients','Update phishing simulation training','Verify no data was exfiltrated during compromise'],
+                lessons: ['Categorize phishing type (credential harvest, malware, BEC)','Assess email gateway effectiveness','Update email filtering rules','Schedule targeted security awareness training','Review DMARC policy enforcement','Document and share IOCs with industry ISACs']
+            },
+            commands: ['# Analyze email headers\npython scripts/email_analyzer.py -f phishing_headers.txt','# Search and purge from mailboxes (Exchange)\nGet-Mailbox -ResultSize Unlimited | Search-Mailbox -SearchQuery "Subject:PHISHING_SUBJECT" -DeleteContent','# Check for mail rules\nGet-InboxRule -Mailbox user@domain.com | Where {$_.ForwardTo -or $_.RedirectTo}','# Block sender at gateway\nNew-TransportRule -Name "Block Phishing" -SenderDomainIs "evil.com" -DeleteMessage $true']
+        },
+        malware: {
+            title: 'Malware Infection Response',
+            mitre: 'T1059, T1055, T1071, T1105',
+            phases: {
+                identification: ['Identify malware family via AV/EDR alert or YARA scan','Collect file hashes (MD5, SHA256) and check VirusTotal','Capture network IOCs (C2 servers, DNS queries)','Identify infection vector (email, drive-by, USB, supply chain)','Determine scope: scan all endpoints for IOCs','Check for lateral movement indicators'],
+                containment: ['Isolate infected hosts via EDR (network containment)','Block C2 domains and IPs at firewall and DNS','Quarantine malware samples for analysis','Disable compromised service accounts','Segment network to prevent spread','Capture memory dump and disk image for forensics'],
+                eradication: ['Remove malware files, registry keys, scheduled tasks','Kill malicious processes and services','Clean browser extensions and plugins if applicable','Reset all credentials used on infected systems','Patch exploited vulnerability','Run full AV scan with updated signatures on all endpoints'],
+                recovery: ['Reimage severely compromised systems','Restore data from known-good backups','Verify system integrity before reconnecting to network','Monitor recovered systems for 48-72 hours','Re-enable disabled accounts after credential reset','Validate security controls are functioning'],
+                lessons: ['Analyze malware in sandbox for TTP documentation','Update YARA/Sigma rules for this malware family','Share IOCs with threat intel community','Review endpoint protection effectiveness','Update vulnerability management priorities','Conduct post-incident review within 5 business days']
+            },
+            commands: ['# Hash suspicious file\nsha256sum suspicious_file','# Check hash reputation\npython scripts/hash_checker.py SUSPICIOUS_HASH','# YARA scan\nyara -r rules/ /suspect/directory/','# Memory analysis\nvolatility -f memdump.raw --profile=Win10x64 pslist','# Network IOC check\npython scripts/ip_reputation.py C2_IP_ADDRESS','# Kill malicious process\ntaskkill /F /PID MALICIOUS_PID']
+        },
+        'account-compromise': {
+            title: 'Account Compromise Response',
+            mitre: 'T1078, T1110, T1558',
+            phases: {
+                identification: ['Review authentication logs for anomalous logins','Check for impossible travel (logins from multiple geos)','Identify affected accounts and access scope','Review MFA bypass attempts','Check for privilege escalation activities','Look for new OAuth app consents or API keys created'],
+                containment: ['Disable compromised accounts immediately','Revoke all active sessions and tokens','Block source IPs at firewall','Disable any API keys/service principals created by attacker','Remove unauthorized MFA devices','Lock affected mailboxes'],
+                eradication: ['Reset passwords with strong complexity requirements','Enable MFA on all affected accounts','Remove unauthorized access grants and delegations','Audit and remove suspicious OAuth applications','Review and clean inbox/forwarding rules','Rotate any secrets/keys the account had access to'],
+                recovery: ['Re-enable accounts with new credentials + MFA','Restore any modified settings or permissions','Implement conditional access policies','Monitor account activity for 30 days post-recovery','Review access permissions (least privilege)','Enable enhanced audit logging'],
+                lessons: ['Determine initial compromise method (phishing, stuffing, spray)','Assess credential hygiene across organization','Implement password breach detection','Review MFA coverage and enforcement','Update account lockout policies','Evaluate PAM solution deployment']
+            },
+            commands: ['# Check Azure AD sign-in logs\nGet-AzureADAuditSignInLogs -Filter "userPrincipalName eq \'user@domain.com\'"','# Revoke sessions\nRevoke-AzureADUserAllRefreshToken -ObjectId USER_ID','# Check for suspicious OAuth apps\nGet-AzureADServicePrincipal | Where {$_.ReplyUrls -notlike "*microsoft*"}','# Review inbox rules\nGet-InboxRule -Mailbox user@domain.com']
+        },
+        'data-exfil': {
+            title: 'Data Exfiltration / Data Breach Response',
+            mitre: 'T1048, T1041, T1567',
+            phases: {
+                identification: ['Identify exfiltration method (DNS, HTTPS, email, USB, cloud)','Quantify data volume exfiltrated','Classify data types (PII, PCI, PHI, IP, credentials)','Identify source systems and accounts involved','Determine timeline of exfiltration activity','Check DLP alerts and proxy logs for upload activity'],
+                containment: ['Block exfiltration destination IPs/domains','Disable accounts performing exfiltration','Restrict USB/removable media access','Block cloud storage uploads (Dropbox, GDrive, etc.)','Enable enhanced DLP monitoring','Isolate source systems'],
+                eradication: ['Remove data staging tools and scripts','Clean exfiltration channels (DNS tunnels, covert channels)','Revoke access to sensitive data repositories','Rotate encryption keys for affected data','Remove unauthorized cloud sync clients','Patch data access controls'],
+                recovery: ['Assess full scope of data exposure','Engage legal counsel for breach notification requirements','Prepare breach notification (GDPR 72hr, state laws)','Implement additional DLP controls','Enhance data classification and labeling','Review and restrict data access permissions'],
+                lessons: ['Document data classification failures','Implement data loss prevention improvements','Review network segmentation for sensitive data','Enhance monitoring for large data transfers','Evaluate insider threat program','Update data handling policies and training']
+            },
+            commands: ['# Check DNS query volume (DNS tunneling)\nindex=dns | stats sum(bytes_out) as total_bytes by src_ip, query | where total_bytes > 1000000','# Check large file uploads\nindex=proxy action=allowed bytes_out>10000000 | stats sum(bytes_out) by src_ip, url','# USB device audit\nGet-WinEvent -LogName Security -FilterXPath "*[System[EventID=6416]]" | Select TimeCreated, Message']
+        }
+    };
+
+    // Use specific playbook or generate generic one
+    const pb = playbooks[incident] || {
+        title: `${incident.replace(/-/g,' ').replace(/\b\w/g,l=>l.toUpperCase())} Response`,
+        mitre: 'T1078',
+        phases: {
+            identification: ['Review alerts and confirm incident','Determine scope and affected assets','Collect initial IOCs','Assess business impact','Assign incident severity and owner'],
+            containment: ['Isolate affected systems','Block malicious indicators','Disable compromised accounts','Preserve forensic evidence','Notify stakeholders'],
+            eradication: ['Remove threat artifacts','Patch vulnerabilities','Reset credentials','Verify clean state','Update detection rules'],
+            recovery: ['Restore from backups','Rebuild if necessary','Monitor for recurrence','Re-enable services gradually','Validate security controls'],
+            lessons: ['Document timeline','Conduct post-incident review','Update playbooks','Implement improvements','Share findings with team']
+        },
+        commands: ['# Collect forensic evidence\ndd if=/dev/sda of=disk_image.dd bs=4M','# Check running processes\nps auxf | grep -i suspicious','# Network connections\nss -tunapo | grep ESTAB']
+    };
+
+    if (fmt === 'markdown') {
+        rule = `# ${pb.title}\n\n**Severity:** ${sevLabel}  \n**MITRE ATT&CK:** ${pb.mitre}  \n**Created:** ${now}  \n**Author:** Blue Team Toolkit  \n${custom ? `**Context:** ${custom}  \n` : ''}\n---\n\n## Phase 1: Identification\n${pb.phases.identification.map((s,i) => `${i+1}. ${s}`).join('\n')}\n\n## Phase 2: Containment\n${pb.phases.containment.map((s,i) => `${i+1}. ${s}`).join('\n')}\n\n## Phase 3: Eradication\n${pb.phases.eradication.map((s,i) => `${i+1}. ${s}`).join('\n')}\n\n## Phase 4: Recovery\n${pb.phases.recovery.map((s,i) => `${i+1}. ${s}`).join('\n')}\n\n## Phase 5: Lessons Learned\n${pb.phases.lessons.map((s,i) => `${i+1}. ${s}`).join('\n')}\n\n## Key Commands\n\`\`\`bash\n${(pb.commands||[]).join('\n\n')}\n\`\`\`\n\n---\n*Generated by Blue Team Toolkit — ${now}*`;
+    } else if (fmt === 'yaml') {
+        rule = `# ${pb.title}\nplaybook:\n  id: IR-${incident.toUpperCase().replace(/-/g,'')}\n  title: "${pb.title}"\n  severity: ${severity}\n  mitre_attack: "${pb.mitre}"\n  created: ${now}\n  author: Blue Team Toolkit\n${custom ? `  context: "${custom}"\n` : ''}\n  phases:\n    identification:\n${pb.phases.identification.map(s => `      - "${s}"`).join('\n')}\n\n    containment:\n${pb.phases.containment.map(s => `      - "${s}"`).join('\n')}\n\n    eradication:\n${pb.phases.eradication.map(s => `      - "${s}"`).join('\n')}\n\n    recovery:\n${pb.phases.recovery.map(s => `      - "${s}"`).join('\n')}\n\n    lessons_learned:\n${pb.phases.lessons.map(s => `      - "${s}"`).join('\n')}\n\n  commands:\n${(pb.commands||[]).map(c => `    - |${c.split('\n').map(l => `\n      ${l}`).join('')}`).join('\n')}`;
+    } else if (fmt === 'checklist') {
+        rule = `# ${pb.title} — Quick Checklist\n**${sevLabel}** | ${pb.mitre} | ${now}\n\n## IDENTIFICATION\n${pb.phases.identification.map(s => `- [ ] ${s}`).join('\n')}\n\n## CONTAINMENT\n${pb.phases.containment.map(s => `- [ ] ${s}`).join('\n')}\n\n## ERADICATION\n${pb.phases.eradication.map(s => `- [ ] ${s}`).join('\n')}\n\n## RECOVERY\n${pb.phases.recovery.map(s => `- [ ] ${s}`).join('\n')}\n\n## LESSONS LEARNED\n${pb.phases.lessons.map(s => `- [ ] ${s}`).join('\n')}`;
+    } else if (fmt === 'runbook') {
+        rule = `#!/bin/bash\n# ==========================================\n# ${pb.title} — Automated Runbook\n# Severity: ${sevLabel}\n# MITRE: ${pb.mitre}\n# Date: ${now}\n# ==========================================\n\nset -euo pipefail\n\necho "========================================"\necho " ${pb.title}"\necho " Severity: ${sevLabel}"\necho "========================================"\n\n# --- PHASE 1: IDENTIFICATION ---\necho "\\n[PHASE 1] IDENTIFICATION"\n${(pb.commands||[]).filter(c=>c.includes('#')).slice(0,3).map(c=>c.split('\n').filter(l=>!l.startsWith('#')||l.startsWith('#')).join('\n')).join('\n')}\n\n# --- PHASE 2: CONTAINMENT ---\necho "\\n[PHASE 2] CONTAINMENT"\necho "Actions required:"\n${pb.phases.containment.map(s => `echo "  - ${s}"`).join('\n')}\n\n# --- PHASE 3: ERADICATION ---\necho "\\n[PHASE 3] ERADICATION"\n${pb.phases.eradication.map(s => `echo "  - ${s}"`).join('\n')}\n\n# --- PHASE 4: RECOVERY ---\necho "\\n[PHASE 4] RECOVERY"\n${pb.phases.recovery.map(s => `echo "  - ${s}"`).join('\n')}\n\necho "\\n[COMPLETE] Incident response runbook executed."`;
+    }
+
+    lastPBRule = rule;
+    document.getElementById('pbRuleCode').textContent = rule;
+    document.getElementById('pbRuleOutput').classList.add('show');
+}
+
+// ==================== MITRE ATT&CK BUNDLE GENERATOR ====================
+let lastMITRERule = '';
+function copyMITRERule() { navigator.clipboard.writeText(lastMITRERule); const b=document.querySelector('#mitreRuleOutput .copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); }
+function clearMITREOutput() { document.getElementById('mitreRuleOutput').classList.remove('show'); }
+function downloadMITRERule() { const t=document.getElementById('mitreTechnique').value; const b=new Blob([lastMITRERule],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`mitre_${t}.txt`; a.click(); }
+function mitrePreset(technique, output, severity) { document.getElementById('mitreTechnique').value=technique; document.getElementById('mitreOutput').value=output; document.getElementById('mitreSeverity').value=severity; generateMITREBundle(); }
+function generateMITREBundle() {
+    const technique = document.getElementById('mitreTechnique').value;
+    const output = document.getElementById('mitreOutput').value;
+    const severity = document.getElementById('mitreSeverity').value;
+    const siem = document.getElementById('mitreSiem').value;
+    const now = new Date().toISOString().split('T')[0];
+    const dateSlash = now.replace(/-/g,'/');
+
+    // Map technique to a known threat name for reuse of existing builders
+    const techMap = {
+        'T1003.001': 'mimikatz', 'T1059.001': 'powershell download', 'T1059.005': 'powershell',
+        'T1053.005': 'scheduled task', 'T1547.001': 'scheduled task', 'T1543.003': 'scheduled task',
+        'T1110.001': 'brute force', 'T1110.003': 'brute force', 'T1558.003': 'kerberoast',
+        'T1021.001': 'rdp', 'T1021.002': 'psexec', 'T1570': 'psexec', 'T1047': 'psexec',
+        'T1486': 'ransomware', 'T1048': 'dns tunnel', 'T1071.001': 'cobalt strike',
+        'T1071.004': 'dns tunnel', 'T1055': 'uac bypass', 'T1070.001': 'log clear',
+        'T1036': 'reverse shell', 'T1548.002': 'uac bypass', 'T1134': 'uac bypass',
+        'T1566.001': 'phishing', 'T1566.002': 'phishing', 'T1078': 'brute force',
+        'T1190': 'webshell'
+    };
+
+    const threatName = techMap[technique] || 'brute force';
+    const match = findMatch(threatName);
+    const techDesc = document.getElementById('mitreTechnique').selectedOptions[0].text;
+    let rule = '';
+
+    const header = `# ============================================================\n# MITRE ATT&CK Detection Bundle: ${technique}\n# ${techDesc}\n# Severity: ${severity.toUpperCase()} | Generated: ${now}\n# ============================================================\n`;
+
+    if (output === 'sigma-only') {
+        rule = buildSigma(techDesc, severity, match, 'auto', 'windows', dateSlash);
+    } else if (output === 'hunt-only') {
+        // Generate hunt query for selected SIEM
+        document.getElementById('huntRuleName').value = threatName;
+        document.getElementById('huntPlatform').value = siem === 'sentinel' ? 'sentinel' : siem;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,5) : [threatName];
+        if (siem === 'splunk' && match && match.splunk) rule = header + match.splunk;
+        else rule = header + `// Hunt query for ${technique}\n// Use the Hunt Builder tab for full platform-specific queries`;
+    } else if (output === 'response-only') {
+        const t = match ? match.t : technique;
+        rule = header + `\n# RESPONSE ACTIONS for ${technique}\n\n## Immediate (0-15 minutes)\n1. Confirm alert is true positive\n2. Isolate affected endpoint via EDR\n3. Block associated IOCs at firewall/proxy\n4. Disable compromised accounts\n\n## Short-term (15-60 minutes)\n5. Collect memory dump from affected host\n6. Capture disk image for forensics\n7. Search for lateral movement indicators\n8. Notify incident commander and stakeholders\n\n## Investigation\n9. Determine initial access vector\n10. Map full scope of compromise\n11. Check for data exfiltration\n12. Identify persistence mechanisms\n\n## Remediation\n13. Remove malware and persistence\n14. Reset compromised credentials\n15. Patch exploited vulnerability\n16. Restore from clean backups if needed\n\n## Post-Incident\n17. Update detection rules for ${technique}\n18. Conduct lessons learned review\n19. Update IR playbook\n20. Share IOCs with threat intel community`;
+    } else if (output === 'multi-siem') {
+        rule = header;
+        rule += `\n# ==================== SPLUNK SPL ====================\n`;
+        rule += match && match.splunk ? match.splunk : `index=* earliest=-24h | search "${threatName}" | stats count by src_ip, dest, user | sort -count`;
+        rule += `\n\n# ==================== ELASTIC KQL ====================\n`;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : [threatName];
+        rule += kws.map(k=>`process.command_line: "*${k}*"`).join(' OR ');
+        rule += `\n\n# ==================== MICROSOFT SENTINEL (KQL) ====================\n`;
+        rule += `SecurityEvent\n| where TimeGenerated > ago(24h)\n| where CommandLine has_any (${kws.map(k=>`"${k}"`).join(', ')})\n| project TimeGenerated, Computer, Account, CommandLine\n| sort by TimeGenerated desc`;
+        rule += `\n\n# ==================== CROWDSTRIKE LOGSCALE ====================\n`;
+        rule += `#event_simpleName=ProcessRollup2\n| CommandLine=/${kws.join('|')}/i\n| groupBy([ComputerName, UserName, CommandLine])\n| count(aid, as=hits)\n| sort(hits, order=desc)`;
+    } else {
+        // Full bundle
+        rule = header;
+        rule += `\n# ==================== 1. SIGMA RULE ====================\n`;
+        rule += buildSigma(techDesc, severity, match, 'auto', 'windows', dateSlash);
+        rule += `\n\n# ==================== 2. SPLUNK QUERY ====================\n`;
+        rule += match && match.splunk ? match.splunk : `index=* earliest=-24h | search "${threatName}"`;
+        rule += `\n\n# ==================== 3. ELASTIC EQL ====================\n`;
+        rule += buildElasticEDR(techDesc, severity, match);
+        rule += `\n\n# ==================== 4. DEFENDER KQL ====================\n`;
+        rule += buildDefender(techDesc, severity, match);
+        rule += `\n\n# ==================== 5. CROWDSTRIKE ====================\n`;
+        rule += buildCrowdStrike(techDesc, severity, match);
+        rule += `\n\n# ==================== 6. RESPONSE ACTIONS ====================\n`;
+        rule += `# Immediate: Isolate host, block IOCs, disable accounts\n# Investigate: Memory dump, disk image, lateral movement check\n# Remediate: Remove persistence, patch vuln, reset creds\n# Recover: Restore, monitor, validate controls`;
+    }
+
+    lastMITRERule = rule;
+    document.getElementById('mitreRuleCode').textContent = rule;
+    document.getElementById('mitreRuleOutput').classList.add('show');
 }
 </script>
 
