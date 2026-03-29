@@ -185,8 +185,8 @@
 <div class="nav-tabs">
     <div class="nav-tab active" onclick="showTab('rule-gen')">&#9889; Rule Generator</div>
     <div class="nav-tab" onclick="showTab('siem')">&#128202; SIEM</div>
-    <div class="nav-tab" onclick="showTab('edr')">&#128737; EDR</div>
-    <div class="nav-tab" onclick="showTab('xdr')">&#127760; XDR</div>
+    <div class="nav-tab" onclick="showTab('edr')">&#128737; EDR Builder</div>
+    <div class="nav-tab" onclick="showTab('xdr')">&#127760; XDR Builder</div>
     <div class="nav-tab" onclick="showTab('soar')">&#9881; SOAR</div>
     <div class="nav-tab" onclick="showTab('tools')">&#128736; Tools</div>
     <div class="nav-tab" onclick="showTab('rules')">&#128680; Detection Rules</div>
@@ -915,8 +915,114 @@ sort(desc)</div></div>
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128737;</div>
-        <h3>EDR Platform Queries &amp; Hunts</h3>
+        <h3>EDR Rule &amp; Policy Builder</h3>
     </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate detection rules, IOA rules, IOC policies, prevention policies, and firewall rules for any EDR platform. Select your platform and threat type, then generate ready-to-deploy configurations.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Threat / Rule Description</label>
+                <input type="text" id="edrRuleName" placeholder="e.g. Mimikatz Credential Dump, Ransomware Encryption, PowerShell Download..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:160px">
+                <label>EDR Platform</label>
+                <select id="edrPlatform">
+                    <option value="defender">Microsoft Defender for Endpoint</option>
+                    <option value="crowdstrike">CrowdStrike Falcon Query</option>
+                    <option value="cs-ioa">CrowdStrike IOA Rule</option>
+                    <option value="cs-ioc">CrowdStrike IOC Policy</option>
+                    <option value="cs-prevention">CrowdStrike Prevention Policy</option>
+                    <option value="cs-firewall">CrowdStrike Firewall Rule</option>
+                    <option value="cs-realtime">CrowdStrike RTR Script</option>
+                    <option value="sentinelone">SentinelOne Deep Visibility</option>
+                    <option value="carbonblack">VMware Carbon Black</option>
+                    <option value="elastic-edr">Elastic EDR (EQL)</option>
+                    <option value="trellix">Trellix EDR</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="edrSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>OS Platform</label>
+                <select id="edrOS">
+                    <option value="windows" selected>Windows</option>
+                    <option value="linux">Linux</option>
+                    <option value="macos">macOS</option>
+                    <option value="all">All Platforms</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:140px">
+                <label>MITRE Tactic</label>
+                <select id="edrTactic">
+                    <option value="auto">Auto-Detect</option>
+                    <option value="initial-access">Initial Access</option>
+                    <option value="execution">Execution</option>
+                    <option value="persistence">Persistence</option>
+                    <option value="privilege-escalation">Privilege Escalation</option>
+                    <option value="defense-evasion">Defense Evasion</option>
+                    <option value="credential-access">Credential Access</option>
+                    <option value="discovery">Discovery</option>
+                    <option value="lateral-movement">Lateral Movement</option>
+                    <option value="collection">Collection</option>
+                    <option value="exfiltration">Exfiltration</option>
+                    <option value="command-and-control">Command &amp; Control</option>
+                    <option value="impact">Impact</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateEDRRule()">Generate EDR Rule</button>
+                <button class="btn btn-secondary" onclick="clearEDROutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edrRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyEDRRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadEDRRule()">Download</button>
+        </div>
+        <code id="edrRuleCode"></code>
+    </div>
+
+    <!-- EDR Quick Generate Presets -->
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate — Detection Rules:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('Mimikatz Credential Dump','defender','critical')">Defender: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('Ransomware File Encryption','crowdstrike','critical')">Falcon: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('PowerShell Download Cradle','sentinelone','high')">S1: PowerShell</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('Lateral Movement via PsExec','carbonblack','high')">CB: PsExec</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('Cobalt Strike Beacon','elastic-edr','critical')">Elastic: Cobalt Strike</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none" onclick="edrPreset('DNS Tunneling Exfiltration','trellix','high')">Trellix: DNS Tunnel</button>
+        </div>
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin:.75rem 0">Quick Generate — CrowdStrike Policies:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('Mimikatz Credential Dump','cs-ioa','critical')">IOA: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('Ransomware File Encryption','cs-ioa','critical')">IOA: Ransomware</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('Cobalt Strike Beacon','cs-ioc','critical')">IOC: Cobalt Strike</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('Ransomware File Encryption','cs-prevention','critical')">Prevention Policy</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('DNS Tunneling Exfiltration','cs-firewall','critical')">Firewall Rule</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="edrPreset('Mimikatz Credential Dump','cs-realtime','critical')">RTR Script</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(239,68,68,.15)">&#128270;</div>
+            <h3>EDR Platform Query Reference</h3>
+        </div>
+    </div>
+
     <div class="siem-tabs">
         <div class="siem-tab active" onclick="showSiem('edr-defender')">Microsoft Defender</div>
         <div class="siem-tab" onclick="showSiem('edr-crowdstrike')">CrowdStrike Falcon</div>
@@ -1224,8 +1330,92 @@ AND (Processes cmdline contains "EncodedCommand"
 <div class="sec">
     <div class="sec-hdr">
         <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#127760;</div>
-        <h3>XDR Platform Queries &amp; Correlation</h3>
+        <h3>XDR Correlation Rule Builder</h3>
     </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Generate cross-source correlation rules that detect multi-stage attacks across endpoint, network, identity, email, and cloud data sources. Select your XDR platform and attack scenario to generate production-ready correlation queries.</p>
+
+    <div class="gen-box">
+        <div class="gen-row">
+            <div class="gen-field" style="flex:2">
+                <label>Attack Scenario / Rule Description</label>
+                <input type="text" id="xdrRuleName" placeholder="e.g. Phishing to Lateral Movement, Credential Theft Kill Chain, Ransomware Attack Chain..." autocomplete="off">
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:160px">
+                <label>XDR Platform</label>
+                <select id="xdrPlatform">
+                    <option value="cortex-xdr">Palo Alto Cortex XDR (XQL)</option>
+                    <option value="m365-xdr">Microsoft 365 Defender (KQL)</option>
+                    <option value="trendmicro-xdr">Trend Micro Vision One</option>
+                    <option value="sentinelone-xdr">SentinelOne Singularity XDR</option>
+                </select>
+            </div>
+        </div>
+        <div class="gen-row">
+            <div class="gen-field" style="flex:0.5;min-width:120px">
+                <label>Severity</label>
+                <select id="xdrSeverity">
+                    <option value="critical">Critical</option>
+                    <option value="high" selected>High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:160px">
+                <label>Data Sources</label>
+                <select id="xdrSources">
+                    <option value="all" selected>All Sources (Endpoint + Network + Identity)</option>
+                    <option value="endpoint-network">Endpoint + Network</option>
+                    <option value="endpoint-identity">Endpoint + Identity</option>
+                    <option value="email-endpoint">Email + Endpoint</option>
+                    <option value="cloud-endpoint">Cloud + Endpoint</option>
+                </select>
+            </div>
+            <div class="gen-field" style="flex:0.5;min-width:130px">
+                <label>Time Window</label>
+                <select id="xdrTimeWindow">
+                    <option value="1h">1 Hour</option>
+                    <option value="4h">4 Hours</option>
+                    <option value="24h" selected>24 Hours</option>
+                    <option value="7d">7 Days</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                <button class="btn btn-primary" onclick="generateXDRRule()">Generate XDR Rule</button>
+                <button class="btn btn-secondary" onclick="clearXDROutput()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="xdrRuleOutput" class="output-box">
+        <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+            <button class="copy-btn" onclick="copyXDRRule()">Copy</button>
+            <button class="copy-btn" onclick="downloadXDRRule()">Download</button>
+        </div>
+        <code id="xdrRuleCode"></code>
+    </div>
+
+    <!-- XDR Quick Generate Presets -->
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+        <p style="color:var(--dim);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.75rem">Quick Generate — Correlation Rules:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Credential Theft Kill Chain','cortex-xdr','critical')">Cortex: Credential Theft</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Phishing to Lateral Movement','m365-xdr','critical')">M365: Phishing Chain</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Ransomware Attack Chain','cortex-xdr','critical')">Cortex: Ransomware Chain</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Cobalt Strike Beacon C2','sentinelone-xdr','critical')">S1 XDR: C2 Detection</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Supply Chain Attack Detection','trendmicro-xdr','critical')">Trend: Supply Chain</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('PowerShell Download and Execute','m365-xdr','high')">M365: PS Download</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('DNS Tunneling Exfiltration','cortex-xdr','high')">Cortex: DNS Exfil</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#7c3aed;color:#a78bfa" onclick="xdrPreset('Lateral Movement via RDP','sentinelone-xdr','high')">S1 XDR: Lateral Movement</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1rem">
+        <div class="sec-hdr">
+            <div class="sec-ic" style="background:rgba(124,58,237,.15)">&#128270;</div>
+            <h3>XDR Platform Query Reference</h3>
+        </div>
+    </div>
+
     <div class="siem-tabs">
         <div class="siem-tab active" onclick="showSiem('xdr-cortex')">Palo Alto Cortex XDR</div>
         <div class="siem-tab" onclick="showSiem('xdr-m365')">Microsoft 365 Defender</div>
@@ -3919,6 +4109,606 @@ Get-ScheduledTask | Where-Object State -eq 'Ready' | Select-Object TaskName, @{N
 # (Add specific remediation commands based on investigation findings)`;
     }
     return script;
+}
+
+// ==================== EDR BUILDER ====================
+let lastEDRRule = '';
+function copyEDRRule() {
+    navigator.clipboard.writeText(lastEDRRule);
+    const btn = document.querySelector('#edrRuleOutput .copy-btn');
+    btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1500);
+}
+function clearEDROutput() { document.getElementById('edrRuleOutput').classList.remove('show'); }
+function downloadEDRRule() {
+    const name = document.getElementById('edrRuleName').value.trim().replace(/[^a-z0-9]/gi,'_').toLowerCase();
+    const fmt = document.getElementById('edrPlatform').value;
+    const ext = fmt.startsWith('cs-') && fmt!=='cs-realtime' ? 'json' : fmt==='cs-realtime' ? 'ps1' : 'txt';
+    const blob = new Blob([lastEDRRule], {type:'text/plain'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name||'edr_rule'}.${ext}`; a.click();
+}
+function edrPreset(name, platform, severity) {
+    document.getElementById('edrRuleName').value=name;
+    document.getElementById('edrPlatform').value=platform;
+    document.getElementById('edrSeverity').value=severity;
+    generateEDRRule();
+}
+function generateEDRRule() {
+    const name = document.getElementById('edrRuleName').value.trim();
+    if (!name) { alert('Enter a threat description or rule name'); return; }
+    const platform = document.getElementById('edrPlatform').value;
+    const severity = document.getElementById('edrSeverity').value;
+    const match = findMatch(name);
+    const now = new Date().toISOString().split('T')[0];
+    let rule = '';
+
+    if (platform === 'defender') rule = buildDefender(name, severity, match);
+    else if (platform === 'crowdstrike') rule = buildCrowdStrike(name, severity, match);
+    else if (platform === 'cs-ioa') rule = buildCSIOA(name, severity, match, now);
+    else if (platform === 'cs-ioc') rule = buildCSIOC(name, severity, match, now);
+    else if (platform === 'cs-prevention') rule = buildCSPrevention(name, severity, match, now);
+    else if (platform === 'cs-firewall') rule = buildCSFirewall(name, severity, match, now);
+    else if (platform === 'cs-realtime') rule = buildCSRTR(name, severity, match);
+    else if (platform === 'sentinelone') rule = buildSentinelOne(name, severity, match);
+    else if (platform === 'carbonblack') rule = buildCarbonBlack(name, severity, match);
+    else if (platform === 'elastic-edr') rule = buildElasticEDR(name, severity, match);
+    else if (platform === 'trellix') rule = buildTrellixEDR(name, severity, match);
+
+    lastEDRRule = rule;
+    document.getElementById('edrRuleCode').textContent = rule;
+    document.getElementById('edrRuleOutput').classList.add('show');
+}
+
+function buildElasticEDR(name, severity, m) {
+    if (!m) return `// No template for "${name}" — try: Mimikatz, Ransomware, PowerShell, Cobalt Strike, PsExec, etc.`;
+    const t = m.t;
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) return `// ${name} — Elastic EDR (EQL)
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+// Deploy via: Kibana > Security > Rules > Create new rule > Event Correlation (EQL)
+
+process where event.type == "start" and event.action == "access" and
+  Target.process.name == "lsass.exe" and
+  not process.executable :
+    ("?:\\\\Windows\\\\System32\\\\csrss.exe",
+     "?:\\\\Windows\\\\System32\\\\svchost.exe",
+     "?:\\\\Windows\\\\System32\\\\wininit.exe",
+     "?:\\\\ProgramData\\\\Microsoft\\\\Windows Defender\\\\*\\\\MsMpEng.exe")
+
+/* Alternative — match known tools */
+process where event.type == "start" and
+  (process.name : ("mimikatz.exe", "mimi.exe", "procdump.exe") or
+   process.args : ("*sekurlsa*", "*logonpasswords*", "*lsadump*"))`;
+    if (m.key.includes('powershell')) return `// ${name} — Elastic EDR (EQL)
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+process where event.type == "start" and
+  process.name : ("powershell.exe", "pwsh.exe") and
+  process.args : ("-enc*", "-EncodedCommand*", "-ec *", "*DownloadString*",
+                   "*IEX*", "*Invoke-Expression*", "*bypass*", "*WebClient*",
+                   "*Invoke-WebRequest*", "*FromBase64String*") and
+  not process.parent.executable : ("?:\\\\Windows\\\\System32\\\\svchost.exe",
+                                    "?:\\\\Program Files\\\\*")`;
+    if (m.key.includes('ransom')) return `// ${name} — Elastic EDR (EQL)
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+sequence by host.name with maxspan=5m
+  [process where event.type == "start" and
+    process.name : ("vssadmin.exe", "wmic.exe", "bcdedit.exe") and
+    process.args : ("*delete*shadows*", "*shadowcopy*delete*", "*recoveryenabled*no*")]
+  [file where event.type == "rename" and
+    file.extension : ("encrypted", "locked", "crypted", "crypt", "enc")]`;
+    if (m.key.includes('cobalt') || m.key.includes('beacon')) return `// ${name} — Elastic EDR (EQL)
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+sequence by host.name with maxspan=30m
+  [process where event.type == "start" and
+    process.name : ("rundll32.exe", "regsvr32.exe", "mshta.exe") and
+    process.args : ("*http*", "*javascript*")]
+  [network where destination.port in (4444, 5555, 8888, 50050, 443, 8443) and
+    not destination.ip : ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]`;
+    // Generic
+    const kws = m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword'];
+    return `// ${name} — Elastic EDR (EQL)
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+// ${m.desc}
+
+process where event.type == "start" and
+  process.args : (${kws.map(k=>`"*${k}*"`).join(', ')})`;
+}
+
+function buildTrellixEDR(name, severity, m) {
+    if (!m) return `// No template for "${name}" — try: Mimikatz, Ransomware, PowerShell, DNS Tunnel, etc.`;
+    const t = m.t;
+    if (m.key.includes('mimikatz') || m.key.includes('credential')) return `// ${name} — Trellix EDR Real-Time Search
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+// Navigate: Trellix ePO > EDR > Real-Time Search
+
+Processes where Processes name equals "mimikatz.exe"
+  or Processes name equals "procdump.exe"
+  or Processes cmdline contains "sekurlsa"
+  or Processes cmdline contains "logonpasswords"
+  or Processes cmdline contains "lsadump"
+  or (Processes name equals "lsass.exe"
+      and Processes parentname not-in ["csrss.exe","svchost.exe","wininit.exe","services.exe"])`;
+    if (m.key.includes('powershell')) return `// ${name} — Trellix EDR Real-Time Search
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+Processes where Processes name equals "powershell.exe"
+  or Processes name equals "pwsh.exe"
+  and (Processes cmdline contains "EncodedCommand"
+    or Processes cmdline contains "DownloadString"
+    or Processes cmdline contains "IEX"
+    or Processes cmdline contains "Invoke-Expression"
+    or Processes cmdline contains "bypass"
+    or Processes cmdline contains "WebClient"
+    or Processes cmdline contains "FromBase64String")`;
+    if (m.key.includes('ransom')) return `// ${name} — Trellix EDR Real-Time Search
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+Processes where Processes cmdline contains "delete shadows"
+  or Processes cmdline contains "shadowcopy delete"
+  or Processes cmdline contains "recoveryenabled no"
+  or Processes name equals "vssadmin.exe"
+  or Processes name equals "bcdedit.exe"`;
+    if (m.key.includes('dns') || m.key.includes('tunnel') || m.key.includes('exfil')) return `// ${name} — Trellix EDR Real-Time Search
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+
+NetworkFlow where NetworkFlow dstport equals 53
+  and NetworkFlow bytessent greater-than 5000
+  or (Processes name equals "nslookup.exe"
+      and Processes cmdline contains "txt")
+  or (Processes name equals "powershell.exe"
+      and Processes cmdline contains "Resolve-DnsName")`;
+    // Generic
+    const kws = m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,3):['keyword'];
+    return `// ${name} — Trellix EDR Real-Time Search
+// MITRE: ${t} | Severity: ${severity.toUpperCase()}
+// ${m.desc}
+
+Processes where ${kws.map(k=>`Processes cmdline contains "${k}"`).join('\n  or ')}`;
+}
+
+// ==================== XDR BUILDER ====================
+let lastXDRRule = '';
+function copyXDRRule() {
+    navigator.clipboard.writeText(lastXDRRule);
+    const btn = document.querySelector('#xdrRuleOutput .copy-btn');
+    btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1500);
+}
+function clearXDROutput() { document.getElementById('xdrRuleOutput').classList.remove('show'); }
+function downloadXDRRule() {
+    const name = document.getElementById('xdrRuleName').value.trim().replace(/[^a-z0-9]/gi,'_').toLowerCase();
+    const blob = new Blob([lastXDRRule], {type:'text/plain'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${name||'xdr_rule'}.txt`; a.click();
+}
+function xdrPreset(name, platform, severity) {
+    document.getElementById('xdrRuleName').value=name;
+    document.getElementById('xdrPlatform').value=platform;
+    document.getElementById('xdrSeverity').value=severity;
+    generateXDRRule();
+}
+function generateXDRRule() {
+    const name = document.getElementById('xdrRuleName').value.trim();
+    if (!name) { alert('Enter an attack scenario or rule description'); return; }
+    const platform = document.getElementById('xdrPlatform').value;
+    const severity = document.getElementById('xdrSeverity').value;
+    const timeWindow = document.getElementById('xdrTimeWindow').value;
+    const sources = document.getElementById('xdrSources').value;
+    const match = findMatch(name);
+    let rule = '';
+
+    if (platform === 'cortex-xdr') rule = buildCortexXDRCorrelation(name, severity, match, timeWindow, sources);
+    else if (platform === 'm365-xdr') rule = buildM365XDR(name, severity, match, timeWindow, sources);
+    else if (platform === 'trendmicro-xdr') rule = buildTrendMicroXDR(name, severity, match, timeWindow, sources);
+    else if (platform === 'sentinelone-xdr') rule = buildSentinelOneXDR(name, severity, match, timeWindow, sources);
+
+    lastXDRRule = rule;
+    document.getElementById('xdrRuleCode').textContent = rule;
+    document.getElementById('xdrRuleOutput').classList.add('show');
+}
+
+function buildCortexXDRCorrelation(name, severity, m, tw, sources) {
+    const t = m ? m.t : 'T1078';
+    const desc = m ? m.desc : name;
+    if (m && (m.key.includes('mimikatz') || m.key.includes('credential'))) return `// ${name} — Palo Alto Cortex XDR (XQL) — Cross-Source Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// Deploy: Cortex XDR > Analytics > BIOC Rules > Create Rule
+
+// Stage 1: Detect credential dumping on endpoint
+dataset = xdr_data
+| filter event_type = PROCESS and
+    _time > ago(${tw}) and
+    (action_process_image_name in ("mimikatz.exe","procdump.exe","procdump64.exe") or
+     action_process_command_line contains "sekurlsa" or
+     action_process_command_line contains "logonpasswords" or
+     action_process_command_line contains "lsadump")
+| alter stage = "credential_theft", risk = 95
+| fields _time, agent_hostname, actor_effective_username, action_process_image_name,
+    action_process_command_line, stage, risk
+
+// Stage 2: Correlate with subsequent lateral movement
+| join type=inner (
+    dataset = xdr_data
+    | filter event_type = NETWORK and _time > ago(${tw})
+    | filter action_remote_port in (445, 3389, 5985, 5986, 135)
+    | alter stage = "lateral_movement"
+    | fields _time, agent_hostname, actor_effective_username, action_remote_ip,
+        action_remote_port, stage
+) as lateral on actor_effective_username = lateral.actor_effective_username
+| comp count() as total_events, values(stage) as attack_stages,
+    values(action_remote_ip) as lateral_targets
+    by agent_hostname, actor_effective_username
+| sort desc total_events`;
+    if (m && m.key.includes('ransom')) return `// ${name} — Palo Alto Cortex XDR (XQL) — Kill Chain Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Full ransomware kill chain: initial access → execution → defense evasion → impact
+dataset = xdr_data
+| filter _time > ago(${tw}) and
+    event_type in (PROCESS, FILE, NETWORK)
+| alter attack_phase = if(
+    action_process_command_line contains "powershell" and
+      action_process_command_line contains_any("DownloadString","IEX","WebClient"), "initial_delivery",
+    action_process_command_line contains_any("delete shadows","shadowcopy delete","recoveryenabled no"), "defense_evasion",
+    action_file_extension in ("encrypted","locked","crypted","crypt"), "encryption",
+    action_process_image_name in ("vssadmin.exe","bcdedit.exe","wbadmin.exe"), "backup_deletion",
+    action_remote_port in (4444,5555,8888,443) and event_type = NETWORK, "c2_communication",
+    null)
+| filter attack_phase != null
+| comp count() as events, values(attack_phase) as phases,
+    min(_time) as first_seen, max(_time) as last_seen
+    by agent_hostname, actor_effective_username
+| filter array_length(phases) >= 2
+| alter severity = if(array_length(phases) >= 3, "CRITICAL", "HIGH")
+| sort desc events`;
+    if (m && (m.key.includes('dns') || m.key.includes('tunnel') || m.key.includes('exfil'))) return `// ${name} — Palo Alto Cortex XDR (XQL) — Network + Endpoint Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+dataset = xdr_data
+| filter _time > ago(${tw}) and event_type in (NETWORK, PROCESS)
+| alter exfil_indicator = if(
+    action_remote_port = 53 and action_bytes_sent > 5000, "large_dns_query",
+    action_process_command_line contains "Resolve-DnsName" and action_process_command_line contains "txt", "dns_txt_lookup",
+    action_process_image_name = "nslookup.exe" and action_process_command_line contains "type=txt", "nslookup_txt",
+    action_remote_port = 443 and action_bytes_sent > 50000000, "large_https_upload",
+    null)
+| filter exfil_indicator != null
+| comp count() as total, sum(action_bytes_sent) as bytes_out,
+    values(exfil_indicator) as methods
+    by agent_hostname, actor_effective_username, bin(_time, 1h)
+| filter total > 10 or bytes_out > 10000000
+| sort desc bytes_out`;
+    // Generic
+    const kws = m ? (m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword']) : ['keyword'];
+    return `// ${name} — Palo Alto Cortex XDR (XQL) — Cross-Source Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// ${desc}
+
+dataset = xdr_data
+| filter _time > ago(${tw}) and
+    event_type in (PROCESS, NETWORK, FILE) and
+    event_sub_type in (PROCESS_START, NETWORK_CONNECTION, FILE_CREATE_NEW)
+| alter risk = if(
+    ${kws.map(k=>`action_process_command_line contains "${k}"`).join(' or\n    ')}, 80, 10)
+| filter risk > 50
+| comp count() as events, max(risk) as max_risk,
+    values(event_type) as data_sources
+    by agent_hostname, actor_effective_username, bin(_time, 15m)
+| sort desc max_risk`;
+}
+
+function buildM365XDR(name, severity, m, tw, sources) {
+    const t = m ? m.t : 'T1078';
+    const desc = m ? m.desc : name;
+    if (m && (m.key.includes('mimikatz') || m.key.includes('credential'))) return `// ${name} — Microsoft 365 Defender (KQL) — Cross-Workload Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// Deploy: Microsoft 365 Defender > Hunting > Custom detection rules
+
+// Correlate credential theft with lateral movement and identity events
+let credTheft = DeviceProcessEvents
+| where Timestamp > ago(${tw})
+| where FileName in~ ("mimikatz.exe","procdump.exe","procdump64.exe")
+    or ProcessCommandLine has_any ("sekurlsa","logonpasswords","lsadump","kerberos::list")
+| project CredTime=Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine;
+let lateralMove = DeviceLogonEvents
+| where Timestamp > ago(${tw})
+| where LogonType in ("RemoteInteractive","Network","NewCredentials")
+| where ActionType == "LogonSuccess"
+| project LateralTime=Timestamp, TargetDevice=DeviceName, AccountName, RemoteIP, LogonType;
+let identityAlerts = IdentityLogonEvents
+| where Timestamp > ago(${tw})
+| where Application != "Active Directory"
+| where ActionType == "LogonSuccess"
+| project IdentityTime=Timestamp, AccountUpn=AccountName, Application, Location=Location;
+credTheft
+| join kind=inner lateralMove on AccountName
+| where LateralTime between (CredTime .. (CredTime + 4h))
+| summarize CredEvents=count(), LateralTargets=dcount(TargetDevice),
+    TargetList=make_set(TargetDevice), RemoteIPs=make_set(RemoteIP)
+    by AccountName, DeviceName
+| where LateralTargets > 1
+| extend AlertSeverity = iff(LateralTargets > 3, "Critical", "High"),
+    AttackNarrative = strcat("Credential theft on ", DeviceName,
+        " followed by lateral movement to ", LateralTargets, " hosts")`;
+    if (m && (m.key.includes('phish') || m.key.includes('initial'))) return `// ${name} — Microsoft 365 Defender (KQL) — Email → Endpoint Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Stage 1: Suspicious email with attachment/URL
+let suspiciousEmails = EmailEvents
+| where Timestamp > ago(${tw})
+| where EmailDirection == "Inbound"
+| join kind=inner EmailAttachmentInfo on NetworkMessageId
+| where FileType in ("docm","xlsm","pptm","exe","dll","hta","js","vbs","ps1","bat","iso","img","vhd")
+| project EmailTime=Timestamp, RecipientEmailAddress, SenderFromAddress,
+    Subject, FileName=FileName1, FileType, NetworkMessageId;
+// Stage 2: User clicked URL or opened attachment, process spawned
+let endpointActivity = DeviceProcessEvents
+| where Timestamp > ago(${tw})
+| where InitiatingProcessFileName in~ ("outlook.exe","winword.exe","excel.exe","powerpnt.exe","msedge.exe","chrome.exe")
+| where FileName in~ ("cmd.exe","powershell.exe","wscript.exe","cscript.exe","mshta.exe","rundll32.exe","certutil.exe")
+| project ProcTime=Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName;
+suspiciousEmails
+| join kind=inner (
+    DeviceEvents
+    | where ActionType == "BrowserLaunchedToOpenUrl" or ActionType == "EmailUrlClicked"
+    | project ClickTime=Timestamp, DeviceName, AccountName=InitiatingProcessAccountName
+) on $left.RecipientEmailAddress == $right.AccountName
+| join kind=inner endpointActivity on DeviceName
+| where ProcTime between (EmailTime .. (EmailTime + 1h))
+| project-reorder EmailTime, RecipientEmailAddress, Subject, FileName,
+    ProcTime, DeviceName, endpointActivity.FileName, ProcessCommandLine
+| extend AlertSeverity = "Critical", KillChainStage = "Initial Access → Execution"`;
+    if (m && m.key.includes('ransom')) return `// ${name} — Microsoft 365 Defender (KQL) — Ransomware Kill Chain
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Detect full ransomware attack chain across M365 Defender
+let shadowDelete = DeviceProcessEvents
+| where Timestamp > ago(${tw})
+| where ProcessCommandLine has_any ("delete shadows","shadowcopy delete","recoveryenabled no")
+| project DeleteTime=Timestamp, DeviceName, AccountName, ProcessCommandLine;
+let encryption = DeviceFileEvents
+| where Timestamp > ago(${tw})
+| where ActionType == "FileRenamed"
+| where FileName endswith_cs ".encrypted" or FileName endswith_cs ".locked" or FileName endswith_cs ".crypted"
+| summarize FileCount=count() by DeviceName, bin(Timestamp, 5m)
+| where FileCount > 20
+| project EncryptTime=Timestamp, DeviceName, FileCount;
+let networkC2 = DeviceNetworkEvents
+| where Timestamp > ago(${tw})
+| where RemotePort in (4444,5555,8888,1234,443,8443)
+| where RemoteIPType == "Public"
+| summarize Connections=count() by DeviceName, RemoteIP, RemotePort
+| where Connections > 5;
+shadowDelete
+| join kind=inner encryption on DeviceName
+| join kind=leftouter networkC2 on DeviceName
+| extend Alert = "CRITICAL: Active Ransomware — Shadow deletion + file encryption detected",
+    Severity = "Critical"
+| project-reorder DeleteTime, DeviceName, AccountName, FileCount, RemoteIP`;
+    if (m && m.key.includes('powershell')) return `// ${name} — Microsoft 365 Defender (KQL) — Execution Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+DeviceProcessEvents
+| where Timestamp > ago(${tw})
+| where FileName in~ ("powershell.exe","pwsh.exe")
+| where ProcessCommandLine has_any ("EncodedCommand","DownloadString","IEX",
+    "Invoke-Expression","bypass","WebClient","FromBase64String")
+| extend RiskScore = case(
+    ProcessCommandLine has "EncodedCommand" and ProcessCommandLine has "bypass", 95,
+    ProcessCommandLine has "EncodedCommand", 85,
+    ProcessCommandLine has "DownloadString", 80, 65)
+// Correlate with network activity from same host
+| join kind=leftouter (
+    DeviceNetworkEvents
+    | where Timestamp > ago(${tw})
+    | where RemoteIPType == "Public"
+    | summarize OutboundConns=count(), RemoteIPs=make_set(RemoteIP, 5)
+        by DeviceName, bin(Timestamp, 15m)
+) on DeviceName
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine,
+    RiskScore, OutboundConns, RemoteIPs
+| sort by RiskScore desc`;
+    // Generic
+    const kws = m ? (m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword']) : ['keyword'];
+    return `// ${name} — Microsoft 365 Defender (KQL) — Cross-Workload Hunt
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// ${desc}
+
+// Endpoint detection
+let endpointHits = DeviceProcessEvents
+| where Timestamp > ago(${tw})
+| where ProcessCommandLine has_any (${kws.map(k=>`"${k}"`).join(', ')})
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine;
+// Network correlation
+let networkHits = DeviceNetworkEvents
+| where Timestamp > ago(${tw})
+| where RemoteIPType == "Public"
+| summarize OutboundConns=count(), Destinations=make_set(RemoteIP, 10)
+    by DeviceName, bin(Timestamp, 15m)
+| where OutboundConns > 5;
+endpointHits
+| join kind=leftouter networkHits on DeviceName
+| extend AlertSeverity = "${severity.charAt(0).toUpperCase()+severity.slice(1)}"
+| sort by Timestamp desc`;
+}
+
+function buildTrendMicroXDR(name, severity, m, tw, sources) {
+    const t = m ? m.t : 'T1078';
+    const desc = m ? m.desc : name;
+    const twMin = tw === '1h' ? 60 : tw === '4h' ? 240 : tw === '24h' ? 1440 : 10080;
+    if (m && (m.key.includes('mimikatz') || m.key.includes('credential'))) return `// ${name} — Trend Micro Vision One (XDR) — Cross-Layer Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// Deploy: Vision One > Search > Detection Model > Create Custom Model
+
+// Endpoint layer: credential theft detection
+endpointActivityData
+| where eventTimeDT > ago(${twMin}m)
+| where processFilePath endswith "mimikatz.exe"
+    or processFilePath endswith "procdump.exe"
+    or processCmd regex "(?i)(sekurlsa|logonpasswords|lsadump|kerberos::list)"
+| select eventTimeDT, endpointHostName, logonUser, processFilePath, processCmd,
+    parentFilePath as parentProcess
+| assign riskLevel = "critical", attackPhase = "credential_theft"
+
+// Network layer: detect subsequent C2/exfil communication
+| correlate with (
+    networkActivityData
+    | where eventTimeDT > ago(${twMin}m)
+    | where dst_port in [4444, 5555, 8888, 443, 8443]
+    | where direction = "outbound"
+    | select eventTimeDT, endpointHostName, dst, dst_port, dataTransferSize
+) on endpointHostName within ${tw}
+| assign overallRisk = "CRITICAL: Credential Theft + Suspicious Network Activity"`;
+    if (m && (m.key.includes('supply') || m.key.includes('webshell'))) return `// ${name} — Trend Micro Vision One (XDR) — Cross-Layer Detection
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Layer 1: Detect suspicious web server child processes
+endpointActivityData
+| where eventTimeDT > ago(${twMin}m)
+| where parentFilePath regex "(?i)(w3wp|httpd|nginx|tomcat|java)"
+| where processFilePath regex "(?i)(cmd\\.exe|powershell\\.exe|bash|sh|python|certutil)"
+| select eventTimeDT, endpointHostName, logonUser, processCmd, parentFilePath
+| assign attackPhase = "webshell_execution"
+
+// Layer 2: Correlate with file creation events
+| correlate with (
+    endpointActivityData
+    | where eventTimeDT > ago(${twMin}m)
+    | where eventSubId = 201  // file creation
+    | where objectFilePath regex "(?i)\\\\(inetpub|wwwroot|htdocs|webapps).*\\.(aspx|jsp|php|ashx)"
+    | select eventTimeDT, endpointHostName, objectFilePath, processFilePath
+) on endpointHostName within 1h
+| assign overallRisk = "CRITICAL: Possible Web Shell / Supply Chain Compromise"`;
+    // Generic
+    const kws = m ? (m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword']) : ['keyword'];
+    return `// ${name} — Trend Micro Vision One (XDR) — Cross-Layer Detection
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// ${desc}
+
+endpointActivityData
+| where eventTimeDT > ago(${twMin}m)
+| where processCmd regex "(?i)(${kws.join('|')})"
+| select eventTimeDT, endpointHostName, logonUser, processFilePath, processCmd
+| assign riskLevel = "${severity}", attackPhase = "detection"
+
+// Correlate with network layer
+| correlate with (
+    networkActivityData
+    | where eventTimeDT > ago(${twMin}m)
+    | where direction = "outbound"
+    | where dst_port not in [80, 443, 53]
+    | select eventTimeDT, endpointHostName, dst, dst_port, dataTransferSize
+) on endpointHostName within ${tw}
+| assign overallRisk = "${severity.toUpperCase()}: ${name} — Multi-Layer Detection"`;
+}
+
+function buildSentinelOneXDR(name, severity, m, tw, sources) {
+    const t = m ? m.t : 'T1078';
+    const desc = m ? m.desc : name;
+    if (m && (m.key.includes('mimikatz') || m.key.includes('credential'))) return `// ${name} — SentinelOne Singularity XDR — Storyline Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// Deploy: Singularity > Visibility > Deep Visibility > Create Custom Rule
+
+// Stage 1: Detect credential theft via process storyline
+EventType = "Process Creation" AND
+(TgtProcName = "mimikatz.exe" OR TgtProcName = "procdump.exe" OR
+ TgtProcCmdLine ContainsCIS "sekurlsa" OR TgtProcCmdLine ContainsCIS "logonpasswords" OR
+ (TgtProcName = "lsass.exe" AND SrcProcName NOT IN ("csrss.exe","svchost.exe","wininit.exe","services.exe")))
+
+// Stage 2: Follow storyline for lateral movement indicators
+// Link via StorylineId to find related activity
+| OR (EventType = "IP Connect" AND
+      DstPort IN (445, 3389, 5985, 5986, 135) AND
+      NetConnStatus = "SUCCESS")
+
+// Stage 3: Check for data staging/exfiltration in same storyline
+| OR (EventType = "File Creation" AND
+      TgtFilePath ContainsCIS "\\\\Temp\\\\" AND
+      TgtFileSize > 1048576)
+
+| columns EndpointName, UserName, TgtProcName, TgtProcCmdLine,
+    SrcProcName, DstIp, DstPort, StorylineId, EventTime
+| sort -EventTime | limit 500`;
+    if (m && (m.key.includes('cobalt') || m.key.includes('beacon') || m.key.includes('c2'))) return `// ${name} — SentinelOne Singularity XDR — C2 Detection
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Detect C2 beacon pattern via network + process correlation
+EventType = "IP Connect" AND
+NetConnStatus = "SUCCESS" AND
+DstPort IN (443, 8443, 4444, 5555, 50050, 8080) AND
+NOT DstIp IN SUBNET ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+
+// Correlate with suspicious parent process
+| AND SrcProcName IN ("rundll32.exe", "regsvr32.exe", "mshta.exe",
+    "powershell.exe", "dllhost.exe", "svchost.exe")
+
+// Look for beaconing pattern (regular intervals)
+| columns EndpointName, SrcProcName, SrcProcCmdLine, DstIp, DstPort,
+    NetConnCount, StorylineId, EventTime
+| sort EventTime
+| limit 500
+
+// Follow-up: Check storyline for full attack chain
+// Use StorylineId to trace: initial access → execution → persistence → C2`;
+    if (m && m.key.includes('ransom')) return `// ${name} — SentinelOne Singularity XDR — Kill Chain Detection
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+// Multi-stage ransomware detection via storyline correlation
+(EventType = "Process Creation" AND
+ (TgtProcCmdLine ContainsCIS "delete shadows" OR
+  TgtProcCmdLine ContainsCIS "shadowcopy delete" OR
+  TgtProcCmdLine ContainsCIS "recoveryenabled no" OR
+  TgtProcName IN ("vssadmin.exe", "bcdedit.exe", "wbadmin.exe")))
+
+| OR (EventType = "File Modification" AND
+      (TgtFilePath ContainsCIS ".encrypted" OR
+       TgtFilePath ContainsCIS ".locked" OR
+       TgtFilePath ContainsCIS ".crypted"))
+
+| OR (EventType = "IP Connect" AND
+      NetConnStatus = "SUCCESS" AND
+      DstPort IN (443, 4444, 8443) AND
+      NOT DstIp IN SUBNET ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+
+| columns EndpointName, UserName, EventType, TgtProcName,
+    TgtProcCmdLine, TgtFilePath, DstIp, DstPort, StorylineId, EventTime
+| sort -EventTime`;
+    if (m && m.key.includes('rdp')) return `// ${name} — SentinelOne Singularity XDR — Lateral Movement Detection
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+
+EventType = "IP Connect" AND
+DstPort = 3389 AND NetConnStatus = "SUCCESS"
+
+// Correlate with logon events
+| OR (EventType = "Login" AND
+      LoginType = "REMOTE_INTERACTIVE")
+
+// Check for follow-up suspicious activity on target
+| OR (EventType = "Process Creation" AND
+      SrcProcName IN ("mstsc.exe", "tscon.exe") AND
+      TgtProcName IN ("cmd.exe", "powershell.exe", "net.exe", "whoami.exe"))
+
+| columns EndpointName, UserName, EventType, SrcProcName, TgtProcName,
+    TgtProcCmdLine, DstIp, DstPort, StorylineId, EventTime
+| sort -EventTime | limit 500`;
+    // Generic
+    const kws = m ? (m.sigma?Object.values(m.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4):['keyword']) : ['keyword'];
+    return `// ${name} — SentinelOne Singularity XDR — Storyline Correlation
+// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${tw}
+// ${desc}
+
+// Process detection
+EventType = "Process Creation" AND
+(${kws.map(k=>`TgtProcCmdLine ContainsCIS "${k}"`).join(' OR\n ')})
+
+// Correlate with network activity in same storyline
+| OR (EventType = "IP Connect" AND
+      NetConnStatus = "SUCCESS" AND
+      NOT DstIp IN SUBNET ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+
+| columns EndpointName, UserName, EventType, TgtProcName, TgtProcCmdLine,
+    DstIp, DstPort, StorylineId, EventTime
+| sort -EventTime | limit 500`;
 }
 </script>
 
