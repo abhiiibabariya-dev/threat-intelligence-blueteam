@@ -173,12 +173,12 @@
 
 <!-- Stats -->
 <div class="stats">
-    <div class="stat"><span class="stat-n">10</span><div class="stat-l">Python Tools</div></div>
+    <div class="stat"><span class="stat-n">15</span><div class="stat-l">Security Tools</div></div>
     <div class="stat"><span class="stat-n">14</span><div class="stat-l">SIEM Platforms</div></div>
-    <div class="stat"><span class="stat-n">7</span><div class="stat-l">EDR Platforms</div></div>
-    <div class="stat"><span class="stat-n">4</span><div class="stat-l">XDR Platforms</div></div>
+    <div class="stat"><span class="stat-n">9</span><div class="stat-l">EDR Platforms</div></div>
+    <div class="stat"><span class="stat-n">6</span><div class="stat-l">XDR Platforms</div></div>
     <div class="stat"><span class="stat-n">7</span><div class="stat-l">SOAR Platforms</div></div>
-    <div class="stat"><span class="stat-n">29</span><div class="stat-l">Detection Rules</div></div>
+    <div class="stat"><span class="stat-n">34</span><div class="stat-l">Threat Templates</div></div>
 </div>
 
 <!-- Nav Tabs -->
@@ -1036,6 +1036,8 @@ sort(desc)</div></div>
                     <option value="carbonblack">VMware Carbon Black</option>
                     <option value="elastic-edr">Elastic EDR (EQL)</option>
                     <option value="trellix">Trellix EDR</option>
+                    <option value="cybereason">Cybereason EDR</option>
+                    <option value="fortiedr">Fortinet FortiEDR</option>
                 </select>
             </div>
         </div>
@@ -1444,6 +1446,8 @@ AND (Processes cmdline contains "EncodedCommand"
                     <option value="m365-xdr">Microsoft 365 Defender (KQL)</option>
                     <option value="trendmicro-xdr">Trend Micro Vision One</option>
                     <option value="sentinelone-xdr">SentinelOne Singularity XDR</option>
+                    <option value="crowdstrike-xdr">CrowdStrike Falcon XDR</option>
+                    <option value="cisco-xdr">Cisco XDR (SecureX)</option>
                 </select>
             </div>
         </div>
@@ -2326,6 +2330,11 @@ def phishing_triage(sw_context):
                     <option value="yara-scanner">YARA Rule Scanner</option>
                     <option value="cve-checker">CVE / Vulnerability Checker</option>
                     <option value="password-audit">Password Policy Auditor</option>
+                    <option value="ad-auditor">Active Directory Auditor</option>
+                    <option value="dns-analyzer">DNS Traffic Analyzer</option>
+                    <option value="cloud-posture">Cloud Security Posture Checker</option>
+                    <option value="evtx-parser">Windows Event Log (EVTX) Parser</option>
+                    <option value="threat-enrichment">Threat Intel Enrichment Pipeline</option>
                 </select>
             </div>
             <div class="gen-field" style="flex:1;min-width:200px">
@@ -2428,6 +2437,8 @@ def phishing_triage(sw_context):
                     <option value="kql">KQL (Microsoft)</option>
                     <option value="spl">Splunk SPL</option>
                     <option value="eql">Elastic EQL</option>
+                    <option value="zeek">Zeek (Network Monitoring)</option>
+                    <option value="stix">STIX 2.1 (Threat Intel)</option>
                 </select>
             </div>
         </div>
@@ -2538,6 +2549,7 @@ def phishing_triage(sw_context):
                     <option value="crowdstrike">CrowdStrike LogScale</option>
                     <option value="carbon-black">Carbon Black</option>
                     <option value="velociraptor">Velociraptor (VQL)</option>
+                    <option value="zeek-hunt">Zeek (Network Hunt)</option>
                 </select>
             </div>
         </div>
@@ -2655,6 +2667,10 @@ def phishing_triage(sw_context):
                     <option value="zero-day">Zero-Day Exploitation</option>
                     <option value="lateral-movement">Active Lateral Movement</option>
                     <option value="cryptominer">Cryptominer / Cryptojacking</option>
+                    <option value="bec-fraud">Business Email Compromise (BEC)</option>
+                    <option value="credential-leak">Credential Leak / Exposed Secrets</option>
+                    <option value="api-compromise">API Key / Token Compromise</option>
+                    <option value="web-app-compromise">Web Application Compromise</option>
                     <option value="custom">Custom (Describe Below)</option>
                 </select>
             </div>
@@ -2769,6 +2785,24 @@ def phishing_triage(sw_context):
                     <option value="T1566.002">T1566.002 - Spearphishing Link</option>
                     <option value="T1078">T1078 - Valid Accounts</option>
                     <option value="T1190">T1190 - Exploit Public-Facing Application</option>
+                    <option value="T1003.003">T1003.003 - NTDS.dit (AD Database Dump)</option>
+                    <option value="T1003.006">T1003.006 - DCSync (Directory Replication)</option>
+                    <option value="T1550.002">T1550.002 - Pass-the-Hash</option>
+                    <option value="T1558.001">T1558.001 - Golden Ticket</option>
+                    <option value="T1218.010">T1218.010 - Regsvr32 (Signed Binary Proxy)</option>
+                    <option value="T1218.011">T1218.011 - Rundll32 (Signed Binary Proxy)</option>
+                    <option value="T1218.005">T1218.005 - Mshta (Signed Binary Proxy)</option>
+                    <option value="T1574.002">T1574.002 - DLL Side-Loading</option>
+                    <option value="T1546.003">T1546.003 - WMI Event Subscription</option>
+                    <option value="T1021.006">T1021.006 - WinRM Lateral Movement</option>
+                    <option value="T1098">T1098 - Account Manipulation</option>
+                    <option value="T1562.001">T1562.001 - Disable Security Tools</option>
+                    <option value="T1140">T1140 - Deobfuscate/Decode Files</option>
+                    <option value="T1552.001">T1552.001 - Credentials in Files</option>
+                    <option value="T1557">T1557 - Adversary-in-the-Middle (AiTM)</option>
+                    <option value="T1534">T1534 - Internal Spearphishing (BEC)</option>
+                    <option value="T1110.004">T1110.004 - Credential Stuffing</option>
+                    <option value="T1134.001">T1134.001 - Token Impersonation</option>
                 </select>
             </div>
             <div class="gen-field" style="flex:0.5;min-width:160px">
@@ -3019,15 +3053,15 @@ def phishing_triage(sw_context):
         </div>
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem">
             <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">14</div><div style="font-size:.75rem;color:var(--dim)">SIEM Platforms</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">11</div><div style="font-size:.75rem;color:var(--dim)">EDR Formats</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">4</div><div style="font-size:.75rem;color:var(--dim)">XDR Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">13</div><div style="font-size:.75rem;color:var(--dim)">EDR Formats</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">6</div><div style="font-size:.75rem;color:var(--dim)">XDR Platforms</div></div>
             <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#10b981">7</div><div style="font-size:.75rem;color:var(--dim)">SOAR Platforms</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">10</div><div style="font-size:.75rem;color:var(--dim)">Security Tools</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#f59e0b">7</div><div style="font-size:.75rem;color:var(--dim)">Rule Formats</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">6</div><div style="font-size:.75rem;color:var(--dim)">Hunt Platforms</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">12</div><div style="font-size:.75rem;color:var(--dim)">IR Playbook Types</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#10b981">26</div><div style="font-size:.75rem;color:var(--dim)">MITRE Techniques</div></div>
-            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">21</div><div style="font-size:.75rem;color:var(--dim)">Threat Templates</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">15</div><div style="font-size:.75rem;color:var(--dim)">Security Tools</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#f59e0b">9</div><div style="font-size:.75rem;color:var(--dim)">Rule Formats</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#ef4444">7</div><div style="font-size:.75rem;color:var(--dim)">Hunt Platforms</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#7c3aed">17</div><div style="font-size:.75rem;color:var(--dim)">IR Playbook Types</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:#10b981">44</div><div style="font-size:.75rem;color:var(--dim)">MITRE Techniques</div></div>
+            <div class="card" style="text-align:center;padding:1rem"><div style="font-size:2rem;font-weight:700;color:var(--cyan)">34</div><div style="font-size:.75rem;color:var(--dim)">Threat Templates</div></div>
         </div>
     </div>
 
@@ -3844,6 +3878,110 @@ const DB = {
       query:`event.code: "4624" AND winlog.event_data.LogonType: "10" AND NOT source.ip: (10.0.0.0/8 OR 172.16.0.0/12 OR 192.168.0.0/16)`,
       threshold:{field:'source.ip',value:3,cardinality:[{field:'host.name',value:2}]},
       risk_score:70,severity:'high',tags:['attack.lateral_movement','attack.t1021.001']},
+    yara: null
+  },
+  'dcsync': {
+    t:'T1003.006', tac:'credential-access',
+    desc:'DCSync attack using directory replication to extract password hashes from domain controller',
+    sigma:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:[4662],Properties:{contains:['1131f6aa-9c07-11d1-f79f-00c04fc2dcd2','1131f6ad-9c07-11d1-f79f-00c04fc2dcd2','89e95b76-444d-4c62-991a-0facbeda640c']}},filter:{SubjectUserName:{endswith:'$'}},condition:'selection and not filter'}},
+    splunk:`index=wineventlog EventCode=4662\n| search Properties="*1131f6aa-9c07-11d1-f79f-00c04fc2dcd2*" OR Properties="*1131f6ad-9c07-11d1-f79f-00c04fc2dcd2*"\n| where NOT match(Account_Name,"\\$$")\n| stats count by Account_Name, src_ip, ComputerName\n| eval alert="CRITICAL: Possible DCSync Attack"`,
+    elastic:{name:'DCSync Attack Detected',type:'query',language:'kuery',query:'event.code: "4662" AND winlog.event_data.Properties: (*1131f6aa* OR *1131f6ad*) AND NOT user.name: *$',risk_score:95,severity:'critical',tags:['attack.credential_access','attack.t1003.006']},
+    yara: null
+  },
+  'golden ticket': {
+    t:'T1558.001', tac:'credential-access',
+    desc:'Golden Ticket attack using forged Kerberos TGT for persistent domain access',
+    sigma:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:[4768,4769],TicketEncryptionType:'0x17',TicketOptions:'0x40810010'},condition:'selection'}},
+    splunk:`index=wineventlog (EventCode=4768 OR EventCode=4769)\n| where TicketEncryptionType="0x17" AND ServiceName!="krbtgt"\n| stats count by Account_Name, Client_Address, ServiceName\n| where count > 3\n| eval alert="CRITICAL: Possible Golden Ticket Usage"`,
+    elastic:{name:'Golden Ticket Attack',type:'query',language:'kuery',query:'event.code: ("4768" OR "4769") AND winlog.event_data.TicketEncryptionType: "0x17"',risk_score:95,severity:'critical',tags:['attack.credential_access','attack.t1558.001']},
+    yara: null
+  },
+  'pass the hash': {
+    t:'T1550.002', tac:'lateral-movement',
+    desc:'Pass-the-Hash attack using stolen NTLM hashes for lateral movement without plaintext passwords',
+    sigma:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:4624,LogonType:3,LogonProcessName:'NtLmSsp',KeyLength:0},filter:{AccountName:{endswith:'$'}},condition:'selection and not filter'}},
+    splunk:`index=wineventlog EventCode=4624 Logon_Type=3 Logon_Process=NtLmSsp Key_Length=0\n| where NOT match(Account_Name,"\\$$")\n| stats count dc(ComputerName) as unique_hosts by Account_Name, Source_Network_Address\n| where unique_hosts > 2\n| eval alert="HIGH: Possible Pass-the-Hash Lateral Movement"`,
+    elastic:{name:'Pass-the-Hash Detection',type:'query',language:'kuery',query:'event.code: "4624" AND winlog.event_data.LogonType: "3" AND winlog.event_data.LogonProcessName: "NtLmSsp" AND winlog.event_data.KeyLength: "0"',risk_score:85,severity:'high',tags:['attack.lateral_movement','attack.t1550.002']},
+    yara: null
+  },
+  'lolbas': {
+    t:'T1218', tac:'defense-evasion',
+    desc:'Living Off the Land Binaries (LOLBAS) abuse — certutil, mshta, rundll32, regsvr32, wmic, bitsadmin for evasion',
+    sigma:{logsource:{product:'windows',category:'process_creation'},detection:{selection:{Image:{endswith:['\\certutil.exe','\\mshta.exe','\\rundll32.exe','\\regsvr32.exe','\\wmic.exe','\\bitsadmin.exe','\\cmstp.exe','\\msiexec.exe']},CommandLine:{contains:['http','ftp','urlcache','split','javascript','vbscript','scrobj','transfer','/i:http','advpack']}},condition:'selection'}},
+    splunk:`index=* (process_name=certutil.exe OR process_name=mshta.exe OR process_name=rundll32.exe OR process_name=regsvr32.exe OR process_name=wmic.exe OR process_name=bitsadmin.exe)\n| where match(CommandLine,"(?i)(http|urlcache|split|javascript|scrobj|transfer|advpack)")\n| stats count by process_name, CommandLine, user, dest\n| eval alert=case(count>3,"CRITICAL",count>1,"HIGH",1=1,"MEDIUM")\n| sort -count`,
+    elastic:{name:'LOLBAS Binary Abuse',type:'query',language:'kuery',query:'process.name: (certutil.exe OR mshta.exe OR rundll32.exe OR regsvr32.exe OR wmic.exe OR bitsadmin.exe) AND process.command_line: (*http* OR *urlcache* OR *javascript* OR *scrobj* OR *transfer*)',risk_score:80,severity:'high',tags:['attack.defense_evasion','attack.t1218']},
+    yara: null
+  },
+  'dll sideload': {
+    t:'T1574.002', tac:'persistence',
+    desc:'DLL sideloading/hijacking — loading malicious DLLs via legitimate application search order abuse',
+    sigma:{logsource:{product:'windows',category:'image_load'},detection:{selection:{ImageLoaded:{contains:['\\Temp\\','\\AppData\\','\\Downloads\\','\\Public\\','\\ProgramData\\']},Image:{endswith:['.exe']}},filter:{ImageLoaded:{contains:['\\Windows\\','\\Program Files']}},condition:'selection and not filter'}},
+    splunk:`index=sysmon EventCode=7\n| where NOT match(ImageLoaded,"(?i)(Windows|Program Files)")\n| where match(ImageLoaded,"(?i)(Temp|AppData|Downloads|Public|ProgramData)")\n| stats count by Image, ImageLoaded, Hashes, dest\n| sort -count`,
+    elastic:{name:'DLL Sideloading Detection',type:'query',language:'kuery',query:'event.code: "7" AND NOT dll.path: (*Windows* OR *Program?Files*) AND dll.path: (*Temp* OR *AppData* OR *Downloads*)',risk_score:75,severity:'high',tags:['attack.persistence','attack.t1574.002']},
+    yara: null
+  },
+  'wmi persist': {
+    t:'T1546.003', tac:'persistence',
+    desc:'WMI event subscription persistence — using __EventFilter, __EventConsumer, __FilterToConsumerBinding',
+    sigma:{logsource:{product:'windows',service:'sysmon'},detection:{selection:{EventID:[19,20,21]},condition:'selection'}},
+    splunk:`index=sysmon (EventCode=19 OR EventCode=20 OR EventCode=21)\n| stats count values(Operation) as ops values(Consumer) as consumer values(Query) as query by dest, User\n| eval alert="HIGH: WMI Persistence Detected - " + mvjoin(ops,", ")\n| sort -count`,
+    elastic:{name:'WMI Event Subscription Persistence',type:'query',language:'kuery',query:'event.code: ("19" OR "20" OR "21")',risk_score:80,severity:'high',tags:['attack.persistence','attack.t1546.003']},
+    yara: null
+  },
+  'winrm': {
+    t:'T1021.006', tac:'lateral-movement',
+    desc:'Lateral movement via Windows Remote Management (WinRM/PSRemoting) on ports 5985/5986',
+    sigma:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:4624,LogonType:3},network:{DestinationPort:[5985,5986]},condition:'selection or network'}},
+    splunk:`index=* (dest_port=5985 OR dest_port=5986)\n| stats count dc(dest) as unique_targets values(dest) as targets by src_ip, user\n| where unique_targets > 2\n| eval alert="HIGH: WinRM Lateral Movement - " + tostring(unique_targets) + " hosts accessed"`,
+    elastic:{name:'WinRM Lateral Movement',type:'query',language:'kuery',query:'destination.port: (5985 OR 5986) AND event.action: "connection_attempted"',risk_score:75,severity:'high',tags:['attack.lateral_movement','attack.t1021.006']},
+    yara: null
+  },
+  'bec': {
+    t:'T1534', tac:'initial-access',
+    desc:'Business Email Compromise — inbox rule manipulation, payment redirect, executive impersonation, vendor fraud',
+    sigma:{logsource:{product:'microsoft365',service:'exchange'},detection:{selection_rules:{Operation:{contains:['New-InboxRule','Set-InboxRule']}},selection_forward:{Parameters:{contains:['ForwardTo','RedirectTo','ForwardAsAttachmentTo']}},condition:'selection_rules and selection_forward'}},
+    splunk:`index=o365 Operation IN ("New-InboxRule","Set-InboxRule")\n| where match(Parameters,"(?i)(ForwardTo|RedirectTo|ForwardAsAttachmentTo|DeleteMessage|MoveToFolder)")\n| stats count values(Parameters) as rules by UserId, ClientIP, Operation\n| eval alert="CRITICAL: BEC - Inbox Rule Manipulation Detected"`,
+    elastic:{name:'BEC Inbox Rule Manipulation',type:'query',language:'kuery',query:'event.action: ("New-InboxRule" OR "Set-InboxRule") AND o365.audit.Parameters: (*ForwardTo* OR *RedirectTo* OR *DeleteMessage*)',risk_score:90,severity:'critical',tags:['attack.initial_access','attack.t1534']},
+    yara: null
+  },
+  'aitm phish': {
+    t:'T1557', tac:'credential-access',
+    desc:'Adversary-in-the-Middle phishing — EvilGinx2, Modlishka style token theft bypassing MFA via session hijack',
+    sigma:{logsource:{product:'azure',service:'signinlogs'},detection:{selection:{ResultType:0},suspicious:{TokenIssuerType:'AzureAD',AuthenticationRequirement:'singleFactorAuthentication'},anomaly:{Location:{contains:['proxy','vpn','hosting']}},condition:'selection and suspicious'}},
+    splunk:`index=azure sourcetype="azure:signinlogs"\n| where ResultType=0 AND IsInteractive="true"\n| eval time_diff=now()-_time\n| transaction UserPrincipalName maxspan=30m\n| where mvcount(IPAddress) > 1 AND mvcount(Location) > 1\n| eval alert="CRITICAL: AiTM Phishing - Multiple IPs/Locations in session"`,
+    elastic:{name:'AiTM Phishing Session Hijack',type:'query',language:'kuery',query:'event.outcome: "success" AND azure.signinlogs.properties.is_interactive: true',risk_score:90,severity:'critical',tags:['attack.credential_access','attack.t1557']},
+    yara: null
+  },
+  'ntds': {
+    t:'T1003.003', tac:'credential-access',
+    desc:'NTDS.dit extraction — dumping Active Directory database for offline credential extraction',
+    sigma:{logsource:{product:'windows',category:'process_creation'},detection:{selection:{CommandLine:{contains:['ntds','ntdsutil','vssadmin create shadow','copy \\\\?\\GLOBALROOT','esentutl','secretsdump']}},condition:'selection'}},
+    splunk:`index=* (CommandLine="*ntds*" OR CommandLine="*ntdsutil*" OR CommandLine="*GLOBALROOT*SMB*ntds*" OR CommandLine="*secretsdump*" OR (CommandLine="*vssadmin*create*shadow*" process_name!="backup*"))\n| stats count by CommandLine, user, dest\n| eval alert="CRITICAL: NTDS.dit Extraction Attempt"`,
+    elastic:{name:'NTDS.dit Extraction',type:'query',language:'kuery',query:'process.command_line: (*ntds* OR *ntdsutil* OR *GLOBALROOT* OR *secretsdump* OR *esentutl*)',risk_score:95,severity:'critical',tags:['attack.credential_access','attack.t1003.003']},
+    yara: null
+  },
+  'credential stuff': {
+    t:'T1110.004', tac:'credential-access',
+    desc:'Credential stuffing — automated login attempts using breached username/password pairs from data leaks',
+    sigma:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:4625},timeframe:'5m',condition:'selection | count(TargetUserName) by IpAddress > 10'}},
+    splunk:`index=* (EventCode=4625 OR action=failure)\n| bin _time span=5m\n| stats dc(user) as unique_users count as attempts by src_ip, _time\n| where unique_users > 10 AND attempts > 20\n| eval alert="CRITICAL: Credential Stuffing - " + tostring(unique_users) + " unique accounts from " + src_ip`,
+    elastic:{name:'Credential Stuffing Attack',type:'threshold',language:'kuery',query:'event.code: "4625" OR event.outcome: "failure"',threshold:{field:'source.ip',value:20,cardinality:[{field:'user.name',value:10}]},risk_score:85,severity:'high',tags:['attack.credential_access','attack.t1110.004']},
+    yara: null
+  },
+  'token theft': {
+    t:'T1134.001', tac:'privilege-escalation',
+    desc:'Access token manipulation and impersonation — stealing tokens for privilege escalation',
+    sigma:{logsource:{product:'windows',category:'process_creation'},detection:{selection:{CommandLine:{contains:['token::elevate','token::duplicate','incognito','ImpersonateLoggedOnUser','DuplicateTokenEx','SetThreadToken']}},condition:'selection'}},
+    splunk:`index=* (CommandLine="*token::elevate*" OR CommandLine="*incognito*" OR CommandLine="*ImpersonateLoggedOnUser*" OR CommandLine="*DuplicateTokenEx*")\n| stats count by CommandLine, user, dest, parent_process_name\n| eval alert="HIGH: Token Impersonation/Theft Detected"`,
+    elastic:{name:'Token Impersonation',type:'query',language:'kuery',query:'process.command_line: (*token?elevate* OR *incognito* OR *ImpersonateLoggedOnUser* OR *DuplicateTokenEx*)',risk_score:80,severity:'high',tags:['attack.privilege_escalation','attack.t1134.001']},
+    yara: null
+  },
+  'disable security': {
+    t:'T1562.001', tac:'defense-evasion',
+    desc:'Disabling security tools — stopping AV/EDR services, uninstalling agents, tampering with Windows Defender',
+    sigma:{logsource:{product:'windows',category:'process_creation'},detection:{selection:{CommandLine:{contains:['Set-MpPreference -DisableRealtimeMonitoring','sc stop WinDefend','net stop','Uninstall-WindowsFeature','Remove-MpPreference','sc delete','taskkill /f /im MsMpEng','DisableAntiSpyware']}},condition:'selection'}},
+    splunk:`index=* (CommandLine="*DisableRealtimeMonitoring*" OR CommandLine="*sc stop WinDefend*" OR CommandLine="*sc delete*Defender*" OR CommandLine="*taskkill*MsMpEng*" OR CommandLine="*DisableAntiSpyware*" OR CommandLine="*Uninstall*security*")\n| stats count by CommandLine, user, dest\n| eval alert="CRITICAL: Security Tool Tampering Detected"`,
+    elastic:{name:'Security Tool Disabled',type:'query',language:'kuery',query:'process.command_line: (*DisableRealtimeMonitoring* OR *stop?WinDefend* OR *taskkill*MsMpEng* OR *DisableAntiSpyware*)',risk_score:90,severity:'critical',tags:['attack.defense_evasion','attack.t1562.001']},
     yara: null
   }
 };
@@ -4952,6 +5090,16 @@ function generateEDRRule() {
     else if (platform === 'carbonblack') rule = buildCarbonBlack(name, severity, match);
     else if (platform === 'elastic-edr') rule = buildElasticEDR(name, severity, match);
     else if (platform === 'trellix') rule = buildTrellixEDR(name, severity, match);
+    else if (platform === 'cybereason') {
+        const t = match ? match.t : 'T1078';
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : ['keyword'];
+        rule = `// ${name} — Cybereason EDR (MalOp Hunt)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n// Navigate: Cybereason Console > Hunting > New Query\n\n// Process Hunt Query:\n{\n  "queryPath": [\n    {\n      "requestedType": "Process",\n      "filters": [\n        {"facetName": "commandLine", "filterType": "ContainsIgnoreCase",\n         "values": [${kws.map(k=>`"${k}"`).join(',')}]},\n        {"facetName": "creationTime", "filterType": "GreaterThan",\n         "values": [${Date.now() - 86400000}]}\n      ],\n      "isResult": true\n    }\n  ],\n  "customFields": ["elementDisplayName","commandLine","ownerMachine",\n    "calculatedUser","parentProcess","creationTime","imageFile.sha1String"]\n}\n\n// MalOp Detection Rule:\n// Severity: ${severity.toUpperCase()}\n// Auto-isolate: ${severity === 'critical' ? 'Yes' : 'No'}\n// Alert: SOC Team`;
+    }
+    else if (platform === 'fortiedr') {
+        const t = match ? match.t : 'T1078';
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : ['keyword'];
+        rule = `// ${name} — Fortinet FortiEDR\n// MITRE: ${t} | Severity: ${severity.toUpperCase()}\n// Navigate: FortiEDR Console > Threat Hunting > New Query\n\n// Threat Hunting Query:\nProcess.CommandLine CONTAINS_ANY(${kws.map(k=>`"${k}"`).join(', ')})\nAND Process.CreationTime > NOW(-24h)\n\n// Security Policy Rule:\n{\n  "rule_name": "${name}",\n  "description": "${match ? match.desc : name}",\n  "severity": "${severity}",\n  "mitre_technique": "${t}",\n  "conditions": [\n    {"field": "process.command_line", "operator": "contains_any",\n     "values": [${kws.map(k=>`"${k}"`).join(', ')}]}\n  ],\n  "actions": [\n    {"type": "${severity === 'critical' ? 'block_and_isolate' : 'alert'}",\n     "notify": true}\n  ],\n  "enabled": true\n}`;
+    }
 
     lastEDRRule = rule;
     document.getElementById('edrRuleCode').textContent = rule;
@@ -5100,6 +5248,18 @@ function generateXDRRule() {
     else if (platform === 'm365-xdr') rule = buildM365XDR(name, severity, match, timeWindow, sources);
     else if (platform === 'trendmicro-xdr') rule = buildTrendMicroXDR(name, severity, match, timeWindow, sources);
     else if (platform === 'sentinelone-xdr') rule = buildSentinelOneXDR(name, severity, match, timeWindow, sources);
+    else if (platform === 'crowdstrike-xdr') {
+        const t = match ? match.t : 'T1078';
+        const desc = match ? match.desc : name;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : ['keyword'];
+        rule = `// ${name} — CrowdStrike Falcon XDR (Cross-Domain Correlation)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${timeWindow}\n// Deploy: Falcon Console > Investigate > Custom Dashboard > XDR Query\n\n// Stage 1: Endpoint Detection\n#event_simpleName IN (ProcessRollup2, SyntheticProcessRollup2, NetworkConnectIP4, DnsRequest)\n| CommandLine=/${kws.join('|')}/i\n| groupBy([ComputerName, UserName, ImageFileName, CommandLine], function=[\n    count(aid, as=events),\n    collect([RemoteAddressIP4, DomainName, ContextProcessId])\n  ])\n| sort(events, order=desc)\n\n// Stage 2: Identity Correlation\n| join type=inner (\n    #event_simpleName=UserLogon\n    | LogonType IN (3, 10)\n    | groupBy([UserName, RemoteAddressIP4, ComputerName], function=count(aid, as=logons))\n    | logons > 1\n) on UserName\n\n// Stage 3: Network Correlation\n| join type=inner (\n    #event_simpleName=NetworkConnectIP4\n    | RemotePort IN (4444, 5555, 8888, 443, 8443)\n    | NOT RemoteAddressIP4 = /^(10\\.|172\\.(1[6-9]|2\\d|3[01])\\.|192\\.168\\.)/\n    | groupBy([ComputerName, RemoteAddressIP4, RemotePort], function=count(aid, as=net_events))\n) on ComputerName\n\n// Alert\n| eval severity="${severity.toUpperCase()}"\n| eval narrative=format("XDR: %s on %s by %s — %d events, network to %s:%s",\n    "${name}", ComputerName, UserName, events, RemoteAddressIP4, RemotePort)`;
+    }
+    else if (platform === 'cisco-xdr') {
+        const t = match ? match.t : 'T1078';
+        const desc = match ? match.desc : name;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : ['keyword'];
+        rule = `// ${name} — Cisco XDR (formerly SecureX)\n// MITRE: ${t} | Severity: ${severity.toUpperCase()} | Window: ${timeWindow}\n// Deploy: Cisco XDR > Automate > Workflows > New Workflow\n\n// === Secure Endpoint (AMP) Query ===\n// Search for threat indicators across endpoints\nGET /v1/computers/activity?q=${kws[0]}\n// Filter: connector_guid, hostname, file_sha256, parent_sha256\n\n// === Umbrella DNS Query ===\n// Check DNS requests for suspicious domains\nGET /investigate/v2/search/dns?query=${kws[0]}&limit=100\n// Correlate: domain categorization, security categories, risk score\n\n// === SecureX Threat Response Investigation ===\n{\n  "module": "AMP for Endpoints",\n  "module_type_id": "amp_endpoint",\n  "observable": {\n    "type": "${match && match.tac && match.tac.includes('credential') ? 'sha256' : 'domain'}",\n    "value": "__OBSERVABLE_VALUE__"\n  },\n  "actions": [\n    {"type": "investigate", "source": ["AMP","Umbrella","Talos Intelligence"]},\n    ${severity === 'critical' ? `{"type": "respond", "action": "isolate_host"},` : ''}\n    {"type": "notify", "target": "soc-team@company.com"}\n  ]\n}\n\n// === Correlation Rule ===\n// Trigger: ${name}\n// Sources: Secure Endpoint + Umbrella + Email Security + Duo\n// Action: ${severity === 'critical' ? 'Auto-isolate + Create Incident' : 'Alert + Create Incident'}\n// Severity: ${severity.toUpperCase()}`;
+    }
 
     lastXDRRule = rule;
     document.getElementById('xdrRuleCode').textContent = rule;
@@ -5716,6 +5876,31 @@ function generateToolScript() {
             python: `#!/usr/bin/env python3\n"""Password Policy Auditor\nChecks password policy compliance and common weaknesses.\n"""\nimport re, sys, json, hashlib, requests\n\nclass PasswordAuditor:\n    COMMON_PASSWORDS = ['password','123456','qwerty','admin','letmein','welcome','monkey','master','dragon','login']\n\n    def audit_policy(self, password):\n        checks = {\n            'length_8': len(password) >= 8,\n            'length_12': len(password) >= 12,\n            'uppercase': bool(re.search(r'[A-Z]', password)),\n            'lowercase': bool(re.search(r'[a-z]', password)),\n            'digit': bool(re.search(r'\\d', password)),\n            'special': bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', password)),\n            'no_common': password.lower() not in self.COMMON_PASSWORDS,\n            'no_sequential': not re.search(r'(012|123|234|345|456|567|678|789|abc|bcd)', password.lower()),\n        }\n        score = sum(checks.values()) / len(checks) * 100\n        return {'password_masked': password[:2]+'*'*(len(password)-2), 'checks': checks, 'score': score,\n                'rating': 'STRONG' if score >= 87 else 'MODERATE' if score >= 62 else 'WEAK'}\n\n    def check_breach(self, password):\n        sha1 = hashlib.sha1(password.encode()).hexdigest().upper()\n        prefix, suffix = sha1[:5], sha1[5:]\n        try:\n            r = requests.get(f'https://api.pwnedpasswords.com/range/{prefix}', timeout=10)\n            for line in r.text.splitlines():\n                h, count = line.split(':')\n                if h == suffix: return int(count)\n        except: pass\n        return 0\n\nif __name__ == '__main__':\n    auditor = PasswordAuditor()\n    pw = sys.argv[1] if len(sys.argv) > 1 else 'TestPassword123!'\n    result = auditor.audit_policy(pw)\n    breach = auditor.check_breach(pw)\n    result['breach_count'] = breach\n    print(json.dumps(result, indent=2))`,
             bash: `#!/bin/bash\n# Password Policy Audit — Bash\necho "=== Password Policy Check ==="\necho "Min length 8: $(grep -c 'PASS_MIN_LEN' /etc/login.defs 2>/dev/null || echo 'N/A')"\necho "Max age: $(grep 'PASS_MAX_DAYS' /etc/login.defs 2>/dev/null)"\necho "Min age: $(grep 'PASS_MIN_DAYS' /etc/login.defs 2>/dev/null)"\necho "\\n=== Users with no password expiry ==="\nawk -F: '($5 == "" || $5 == 99999) {print $1}' /etc/shadow 2>/dev/null`,
             powershell: `# Password Policy Audit — PowerShell\nWrite-Host "=== Domain Password Policy ===" -ForegroundColor Cyan\nGet-ADDefaultDomainPasswordPolicy | Format-List\nWrite-Host "\\n=== Users with password never expires ===" -ForegroundColor Yellow\nGet-ADUser -Filter {PasswordNeverExpires -eq $true} | Select-Object Name, SamAccountName`
+        },
+        'ad-auditor': {
+            python: `#!/usr/bin/env python3\n"""Active Directory Security Auditor\nAudits AD for misconfigurations, stale accounts, excessive privileges,\nand common attack paths.\n"""\nimport subprocess, json, sys, re\nfrom datetime import datetime, timedelta\n\nclass ADAuditor:\n    def __init__(self):\n        self.findings = []\n\n    def run_checks(self):\n        self.check_stale_accounts()\n        self.check_privileged_groups()\n        self.check_delegation()\n        self.check_password_policy()\n        self.check_service_accounts()\n        return self.findings\n\n    def check_stale_accounts(self, days=90):\n        """Find accounts not logged in for 90+ days"""\n        try:\n            cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')\n            out = subprocess.check_output(['powershell', '-Command',\n                f'Get-ADUser -Filter {{LastLogonDate -lt "{cutoff}" -and Enabled -eq $true}} '\n                '-Properties LastLogonDate,PasswordLastSet | '\n                'Select Name,SamAccountName,LastLogonDate,PasswordLastSet | ConvertTo-Json'],\n                text=True, timeout=60)\n            users = json.loads(out) if out.strip() else []\n            if users:\n                self.findings.append({{'severity':'HIGH','category':'Stale Accounts',\n                    'finding':f'{len(users)} enabled accounts inactive {days}+ days',\n                    'remediation':'Disable or delete stale accounts','details':users[:10]}})\n        except Exception as e:\n            self.findings.append({{'severity':'INFO','category':'Stale Accounts','finding':f'Check skipped: {e}'}})\n\n    def check_privileged_groups(self):\n        """Audit membership of sensitive groups"""\n        groups = ['Domain Admins','Enterprise Admins','Schema Admins',\n                  'Account Operators','Backup Operators','Server Operators']\n        for group in groups:\n            try:\n                out = subprocess.check_output(['powershell', '-Command',\n                    f'(Get-ADGroupMember "{group}" -ErrorAction SilentlyContinue).Count'], text=True, timeout=30)\n                count = int(out.strip()) if out.strip().isdigit() else 0\n                if count > 5:\n                    self.findings.append({{'severity':'HIGH','category':'Excessive Privileges',\n                        'finding':f'{group} has {count} members (recommended: <5)',\n                        'remediation':f'Review and reduce {group} membership'}})\n            except: pass\n\n    def check_delegation(self):\n        """Find unconstrained delegation"""\n        try:\n            out = subprocess.check_output(['powershell', '-Command',\n                'Get-ADComputer -Filter {TrustedForDelegation -eq $true} '\n                '-Properties TrustedForDelegation | Select Name | ConvertTo-Json'],\n                text=True, timeout=30)\n            hosts = json.loads(out) if out.strip() else []\n            if hosts:\n                self.findings.append({{'severity':'CRITICAL','category':'Unconstrained Delegation',\n                    'finding':f'{len(hosts)} hosts with unconstrained delegation',\n                    'remediation':'Switch to constrained or resource-based delegation',\n                    'details':hosts}})\n        except: pass\n\n    def check_password_policy(self):\n        """Check domain password policy"""\n        try:\n            out = subprocess.check_output(['powershell', '-Command',\n                'Get-ADDefaultDomainPasswordPolicy | Select MinPasswordLength,'\n                'MaxPasswordAge,PasswordHistoryCount,ComplexityEnabled | ConvertTo-Json'],\n                text=True, timeout=30)\n            policy = json.loads(out) if out.strip() else {{}}\n            if policy.get('MinPasswordLength', 0) < 12:\n                self.findings.append({{'severity':'MEDIUM','category':'Password Policy',\n                    'finding':f'Min password length is {policy.get(\"MinPasswordLength\",\"N/A\")} (recommended: 12+)',\n                    'remediation':'Increase minimum password length to 12+'}})\n        except: pass\n\n    def check_service_accounts(self):\n        """Find service accounts with no password rotation"""\n        try:\n            out = subprocess.check_output(['powershell', '-Command',\n                'Get-ADUser -Filter {ServicePrincipalName -like \"*\"} '\n                '-Properties PasswordLastSet,ServicePrincipalName | '\n                'Where {$_.PasswordLastSet -lt (Get-Date).AddDays(-365)} | '\n                'Select Name,PasswordLastSet | ConvertTo-Json'], text=True, timeout=30)\n            accounts = json.loads(out) if out.strip() else []\n            if accounts:\n                self.findings.append({{'severity':'HIGH','category':'Service Accounts',\n                    'finding':f'{len(accounts)} service accounts with passwords older than 1 year',\n                    'remediation':'Implement gMSA or rotate service account passwords'}})\n        except: pass\n\nif __name__ == '__main__':\n    auditor = ADAuditor()\n    results = auditor.run_checks()\n    print(json.dumps(results, indent=2))\n    critical = sum(1 for r in results if r.get('severity') == 'CRITICAL')\n    high = sum(1 for r in results if r.get('severity') == 'HIGH')\n    print(f"\\nSummary: {critical} CRITICAL, {high} HIGH findings")`,
+            bash: `#!/bin/bash\n# AD Security Audit — Bash (requires ldapsearch)\necho "=== Active Directory Security Audit ==="\necho "\\n[1] Domain Admins:"\nldapsearch -x -H ldap://DC_IP -b "CN=Domain Admins,CN=Users,DC=domain,DC=com" member 2>/dev/null | grep "member:" | wc -l\necho "\\n[2] Unconstrained Delegation:"\nldapsearch -x -H ldap://DC_IP -b "DC=domain,DC=com" "(userAccountControl:1.2.840.113556.1.4.803:=524288)" dn 2>/dev/null\necho "\\n[3] Kerberoastable Accounts:"\nldapsearch -x -H ldap://DC_IP -b "DC=domain,DC=com" "(servicePrincipalName=*)" sAMAccountName 2>/dev/null | grep "sAMAccountName:" | wc -l\necho "\\n[4] Password Policy:"\nldapsearch -x -H ldap://DC_IP -b "DC=domain,DC=com" -s base minPwdLength maxPwdAge lockoutThreshold 2>/dev/null`,
+            powershell: `# Active Directory Security Audit — PowerShell\nImport-Module ActiveDirectory\nWrite-Host "=== AD Security Audit ===" -ForegroundColor Cyan\n\nWrite-Host "\\n[1] Privileged Group Membership:" -ForegroundColor Yellow\n@('Domain Admins','Enterprise Admins','Schema Admins','Account Operators') | ForEach-Object {\n    $count = (Get-ADGroupMember $_ -ErrorAction SilentlyContinue).Count\n    $color = if($count -gt 5){'Red'}elseif($count -gt 2){'Yellow'}else{'Green'}\n    Write-Host "  $_ : $count members" -ForegroundColor $color\n}\n\nWrite-Host "\\n[2] Stale Accounts (90+ days):" -ForegroundColor Yellow\n$stale = Get-ADUser -Filter {LastLogonDate -lt (Get-Date).AddDays(-90) -and Enabled -eq $true} -Properties LastLogonDate\nWrite-Host "  $($stale.Count) stale enabled accounts" -ForegroundColor $(if($stale.Count -gt 20){'Red'}else{'Yellow'})\n\nWrite-Host "\\n[3] Unconstrained Delegation:" -ForegroundColor Yellow\n$deleg = Get-ADComputer -Filter {TrustedForDelegation -eq $true}\nWrite-Host "  $($deleg.Count) hosts" -ForegroundColor $(if($deleg.Count -gt 0){'Red'}else{'Green'})\n\nWrite-Host "\\n[4] Kerberoastable Accounts:" -ForegroundColor Yellow\n$spn = Get-ADUser -Filter {ServicePrincipalName -like "*"} -Properties ServicePrincipalName\nWrite-Host "  $($spn.Count) accounts with SPNs" -ForegroundColor $(if($spn.Count -gt 5){'Red'}else{'Yellow'})\n\nWrite-Host "\\n[5] Password Never Expires:" -ForegroundColor Yellow\n$neverExpires = Get-ADUser -Filter {PasswordNeverExpires -eq $true -and Enabled -eq $true}\nWrite-Host "  $($neverExpires.Count) accounts" -ForegroundColor $(if($neverExpires.Count -gt 10){'Red'}else{'Yellow'})\n\nWrite-Host "\\n[6] AdminSDHolder Protected:" -ForegroundColor Yellow\nGet-ADUser -Filter {AdminCount -eq 1} | Select Name, SamAccountName | Format-Table`
+        },
+        'dns-analyzer': {
+            python: `#!/usr/bin/env python3\n"""DNS Traffic Analyzer\nDetects DNS tunneling, DGA domains, beaconing, and suspicious queries.\n"""\nimport re, sys, json, math\nfrom collections import defaultdict, Counter\n\nclass DNSAnalyzer:\n    SUSPICIOUS_TLDS = ['.xyz','.top','.club','.work','.buzz','.tk','.ml','.ga','.cf','.pw','.cc']\n    KNOWN_DGA_PATTERNS = [r'^[a-z]{15,}\\.',r'^[a-z0-9]{20,}\\.',r'^[bcdfghjklmnpqrstvwxz]{5,}\\.']\n\n    def __init__(self):\n        self.alerts = []\n        self.stats = defaultdict(int)\n\n    def entropy(self, s):\n        p = [s.count(c)/len(s) for c in set(s)]\n        return -sum(pi*math.log2(pi) for pi in p if pi > 0)\n\n    def check_dga(self, domain):\n        subdomain = domain.split('.')[0]\n        if len(subdomain) > 15 and self.entropy(subdomain) > 3.5:\n            return True\n        return any(re.match(p, domain) for p in self.KNOWN_DGA_PATTERNS)\n\n    def check_tunneling(self, queries_by_domain):\n        for domain, queries in queries_by_domain.items():\n            total_len = sum(len(q) for q in queries)\n            if total_len > 10000 or len(queries) > 100:\n                self.alerts.append({'type':'DNS_TUNNELING','severity':'CRITICAL',\n                    'domain':domain,'query_count':len(queries),'total_bytes':total_len,\n                    'mitre':'T1071.004'})\n\n    def analyze_file(self, filepath):\n        queries_by_domain = defaultdict(list)\n        with open(filepath) as f:\n            for line in f:\n                # Parse common DNS log formats\n                m = re.search(r'query:\\s+(\\S+)', line) or re.search(r'name:\\s+(\\S+)', line)\n                if m:\n                    domain = m.group(1).rstrip('.')\n                    parts = domain.split('.')\n                    if len(parts) >= 2:\n                        base = '.'.join(parts[-2:])\n                        queries_by_domain[base].append(domain)\n                        self.stats['total_queries'] += 1\n                        # Check for DGA\n                        if self.check_dga(domain):\n                            self.alerts.append({'type':'DGA_DOMAIN','severity':'HIGH',\n                                'domain':domain,'entropy':round(self.entropy(parts[0]),2),\n                                'mitre':'T1568.002'})\n                        # Check suspicious TLD\n                        if any(domain.endswith(tld) for tld in self.SUSPICIOUS_TLDS):\n                            self.alerts.append({'type':'SUSPICIOUS_TLD','severity':'MEDIUM',\n                                'domain':domain,'mitre':'T1071.004'})\n        # Check for tunneling\n        self.check_tunneling(queries_by_domain)\n        # Check for beaconing (regular intervals)\n        self.stats['unique_domains'] = len(queries_by_domain)\n        self.stats['alerts'] = len(self.alerts)\n        return {'stats': dict(self.stats), 'alerts': self.alerts[:50]}\n\nif __name__ == '__main__':\n    analyzer = DNSAnalyzer()\n    filepath = sys.argv[1] if len(sys.argv) > 1 else '${target || "/var/log/dns.log"}'\n    results = analyzer.analyze_file(filepath)\n    print(json.dumps(results, indent=2))`,
+            bash: `#!/bin/bash\n# DNS Traffic Analyzer — Bash\nLOG="\${1:-/var/log/dns.log}"\necho "=== DNS Traffic Analysis ==="\necho "Total queries: $(wc -l < "$LOG")"\necho "\\n[Top 20 Queried Domains]"\ngrep -oP 'query:\\s+\\K\\S+' "$LOG" 2>/dev/null | rev | cut -d. -f1,2 | rev | sort | uniq -c | sort -rn | head -20\necho "\\n[Suspicious TLDs (.xyz, .top, .tk, .ml)]"\ngrep -oP 'query:\\s+\\K\\S+' "$LOG" 2>/dev/null | grep -E '\\.(xyz|top|tk|ml|ga|cf|pw|cc)$' | sort | uniq -c | sort -rn\necho "\\n[Long Subdomain Queries (possible tunneling)]"\ngrep -oP 'query:\\s+\\K\\S+' "$LOG" 2>/dev/null | awk -F. '{if(length($1)>30) print}' | head -20\necho "\\n[TXT Record Queries (possible exfil)]"\ngrep -i 'type.*TXT\\|qtype.*16' "$LOG" 2>/dev/null | head -20`,
+            powershell: `# DNS Traffic Analyzer — PowerShell\nparam([string]$LogPath = "${target || 'C:\\Windows\\System32\\dns\\dns.log'}")\nWrite-Host "=== DNS Traffic Analysis ===" -ForegroundColor Cyan\n$events = Get-DnsServerQueryStatistics -ErrorAction SilentlyContinue\nWrite-Host "\\n[Top Queried Domains]"\nGet-WinEvent -LogName 'Microsoft-Windows-DNS-Client/Operational' -MaxEvents 5000 |\n    Group-Object {$_.Properties[0].Value} | Sort-Object Count -Descending | Select-Object Count, Name -First 20\nWrite-Host "\\n[Suspicious High-Entropy Domains]"\nGet-WinEvent -LogName 'Microsoft-Windows-DNS-Client/Operational' -MaxEvents 5000 |\n    Where-Object { $_.Properties[0].Value.Length -gt 40 } | Select-Object TimeCreated, @{N='Query';E={$_.Properties[0].Value}} -First 20`
+        },
+        'cloud-posture': {
+            python: `#!/usr/bin/env python3\n"""Cloud Security Posture Checker\nAudits AWS/Azure/GCP for common misconfigurations.\n"""\nimport subprocess, json, sys\n\nclass CloudPostureChecker:\n    def __init__(self, cloud='aws'):\n        self.cloud = cloud\n        self.findings = []\n\n    def check_aws(self):\n        checks = [\n            self._aws_public_s3,\n            self._aws_root_access_keys,\n            self._aws_mfa_check,\n            self._aws_security_groups,\n            self._aws_cloudtrail,\n        ]\n        for check in checks:\n            try: check()\n            except Exception as e: self.findings.append({'severity':'INFO','check':check.__name__,'error':str(e)})\n        return self.findings\n\n    def _aws_public_s3(self):\n        out = subprocess.check_output(['aws','s3api','list-buckets','--output','json'], text=True, timeout=30)\n        buckets = json.loads(out).get('Buckets',[])\n        for b in buckets:\n            try:\n                acl = subprocess.check_output(['aws','s3api','get-bucket-acl','--bucket',b['Name'],'--output','json'], text=True, timeout=10)\n                grants = json.loads(acl).get('Grants',[])\n                for g in grants:\n                    if g.get('Grantee',{}).get('URI','') == 'http://acs.amazonaws.com/groups/global/AllUsers':\n                        self.findings.append({'severity':'CRITICAL','category':'S3 Public Access',\n                            'finding':f'Bucket {b[\"Name\"]} is publicly accessible','remediation':'Remove public ACL or enable Block Public Access'})\n            except: pass\n\n    def _aws_root_access_keys(self):\n        out = subprocess.check_output(['aws','iam','get-account-summary','--output','json'], text=True, timeout=30)\n        summary = json.loads(out).get('SummaryMap',{})\n        if summary.get('AccountAccessKeysPresent', 0) > 0:\n            self.findings.append({'severity':'CRITICAL','category':'Root Access Keys',\n                'finding':'Root account has active access keys','remediation':'Delete root access keys and use IAM users instead'})\n\n    def _aws_mfa_check(self):\n        out = subprocess.check_output(['aws','iam','list-users','--output','json'], text=True, timeout=30)\n        users = json.loads(out).get('Users',[])\n        for u in users:\n            try:\n                mfa = subprocess.check_output(['aws','iam','list-mfa-devices','--user-name',u['UserName'],'--output','json'], text=True, timeout=10)\n                if not json.loads(mfa).get('MFADevices'):\n                    self.findings.append({'severity':'HIGH','category':'MFA Missing',\n                        'finding':f'User {u[\"UserName\"]} has no MFA enabled','remediation':'Enable MFA for all IAM users'})\n            except: pass\n\n    def _aws_security_groups(self):\n        out = subprocess.check_output(['aws','ec2','describe-security-groups','--filters','Name=ip-permission.cidr,Values=0.0.0.0/0','--output','json'], text=True, timeout=30)\n        sgs = json.loads(out).get('SecurityGroups',[])\n        for sg in sgs:\n            for perm in sg.get('IpPermissions',[]):\n                port = perm.get('FromPort','all')\n                if port in [22,3389,3306,5432,27017,6379]:\n                    self.findings.append({'severity':'CRITICAL','category':'Open Security Group',\n                        'finding':f'SG {sg[\"GroupId\"]} exposes port {port} to 0.0.0.0/0',\n                        'remediation':f'Restrict port {port} to specific IPs'})\n\n    def _aws_cloudtrail(self):\n        out = subprocess.check_output(['aws','cloudtrail','get-trail-status','--name','default','--output','json'], text=True, timeout=30)\n        status = json.loads(out)\n        if not status.get('IsLogging'):\n            self.findings.append({'severity':'CRITICAL','category':'CloudTrail Disabled',\n                'finding':'CloudTrail logging is disabled','remediation':'Enable CloudTrail in all regions'})\n\nif __name__ == '__main__':\n    cloud = sys.argv[1] if len(sys.argv) > 1 else 'aws'\n    checker = CloudPostureChecker(cloud)\n    results = checker.check_aws()\n    print(json.dumps(results, indent=2))\n    print(f"\\nFindings: {len(results)} ({sum(1 for r in results if r.get('severity')=='CRITICAL')} CRITICAL)")`,
+            bash: `#!/bin/bash\n# Cloud Security Posture — AWS Quick Check\necho "=== AWS Security Posture Check ==="\necho "\\n[1] Public S3 Buckets:"\naws s3api list-buckets --query 'Buckets[].Name' --output text | tr '\\t' '\\n' | while read bucket; do\n  acl=$(aws s3api get-bucket-acl --bucket "$bucket" --output json 2>/dev/null)\n  echo "$acl" | grep -q "AllUsers" && echo "  [CRITICAL] $bucket is PUBLIC"\ndone\necho "\\n[2] Root Access Keys:"\naws iam get-account-summary --query 'SummaryMap.AccountAccessKeysPresent' --output text\necho "\\n[3] Users without MFA:"\naws iam list-users --query 'Users[].UserName' --output text | tr '\\t' '\\n' | while read user; do\n  mfa=$(aws iam list-mfa-devices --user-name "$user" --query 'MFADevices' --output text 2>/dev/null)\n  [ -z "$mfa" ] && echo "  [HIGH] $user — no MFA"\ndone\necho "\\n[4] Open Security Groups (0.0.0.0/0):"\naws ec2 describe-security-groups --filters Name=ip-permission.cidr,Values=0.0.0.0/0 --query 'SecurityGroups[].{ID:GroupId,Name:GroupName}' --output table`,
+            powershell: `# Cloud Security Posture — Azure Quick Check\nWrite-Host "=== Azure Security Posture ===" -ForegroundColor Cyan\n\nWrite-Host "\\n[1] Storage Accounts with Public Access:" -ForegroundColor Yellow\nGet-AzStorageAccount | Where-Object {$_.AllowBlobPublicAccess -eq $true} | Select StorageAccountName, ResourceGroupName\n\nWrite-Host "\\n[2] NSG Rules allowing 0.0.0.0/0:" -ForegroundColor Yellow\nGet-AzNetworkSecurityGroup | Get-AzNetworkSecurityRuleConfig | Where-Object {\n    $_.SourceAddressPrefix -eq '*' -and $_.Access -eq 'Allow' -and $_.Direction -eq 'Inbound'\n} | Select Name, DestinationPortRange, Protocol\n\nWrite-Host "\\n[3] Users without MFA:" -ForegroundColor Yellow\nGet-MgUser -All | Where-Object {$_.StrongAuthenticationMethods.Count -eq 0} | Select DisplayName, UserPrincipalName\n\nWrite-Host "\\n[4] Key Vaults with soft delete disabled:" -ForegroundColor Yellow\nGet-AzKeyVault | Where-Object {$_.EnableSoftDelete -ne $true} | Select VaultName`
+        },
+        'evtx-parser': {
+            python: `#!/usr/bin/env python3\n"""Windows Event Log (EVTX) Parser\nParses EVTX files for security-relevant events with MITRE ATT&CK mapping.\n"""\nimport json, sys, os\ntry:\n    from Evtx.Evtx import FileHeader\n    from Evtx.Views import evtx_file_xml_view\n    import xml.etree.ElementTree as ET\nexcept ImportError:\n    print("pip install python-evtx")\n    sys.exit(1)\n\nclass EVTXParser:\n    SECURITY_EVENTS = {\n        4624: {'name':'Logon Success','mitre':'T1078','severity':'INFO'},\n        4625: {'name':'Logon Failure','mitre':'T1110','severity':'MEDIUM'},\n        4648: {'name':'Explicit Credential Logon','mitre':'T1078','severity':'MEDIUM'},\n        4662: {'name':'Directory Service Access','mitre':'T1003.006','severity':'HIGH'},\n        4672: {'name':'Special Privileges Assigned','mitre':'T1134','severity':'MEDIUM'},\n        4688: {'name':'Process Created','mitre':'T1059','severity':'INFO'},\n        4697: {'name':'Service Installed','mitre':'T1543.003','severity':'HIGH'},\n        4698: {'name':'Scheduled Task Created','mitre':'T1053.005','severity':'HIGH'},\n        4720: {'name':'User Account Created','mitre':'T1136','severity':'MEDIUM'},\n        4728: {'name':'Member Added to Global Group','mitre':'T1098','severity':'HIGH'},\n        4732: {'name':'Member Added to Local Group','mitre':'T1098','severity':'HIGH'},\n        4768: {'name':'Kerberos TGT Requested','mitre':'T1558.001','severity':'INFO'},\n        4769: {'name':'Kerberos Service Ticket','mitre':'T1558.003','severity':'INFO'},\n        4771: {'name':'Kerberos Pre-Auth Failed','mitre':'T1110','severity':'MEDIUM'},\n        4776: {'name':'NTLM Authentication','mitre':'T1550.002','severity':'INFO'},\n        1102: {'name':'Audit Log Cleared','mitre':'T1070.001','severity':'CRITICAL'},\n        7045: {'name':'New Service Installed','mitre':'T1543.003','severity':'HIGH'},\n    }\n\n    def parse(self, filepath):\n        events = []\n        with open(filepath, 'rb') as f:\n            fh = FileHeader(f.read())\n            for xml_str, record in evtx_file_xml_view(fh):\n                try:\n                    root = ET.fromstring(xml_str)\n                    ns = {'ns': 'http://schemas.microsoft.com/win/2004/08/events/event'}\n                    event_id = int(root.find('.//ns:EventID', ns).text)\n                    if event_id in self.SECURITY_EVENTS:\n                        info = self.SECURITY_EVENTS[event_id]\n                        time_created = root.find('.//ns:TimeCreated', ns).get('SystemTime', '')\n                        computer = root.find('.//ns:Computer', ns).text\n                        events.append({\n                            'timestamp': time_created,\n                            'event_id': event_id,\n                            'name': info['name'],\n                            'mitre': info['mitre'],\n                            'severity': info['severity'],\n                            'computer': computer\n                        })\n                except: pass\n        return sorted(events, key=lambda e: e['timestamp'])\n\nif __name__ == '__main__':\n    parser = EVTXParser()\n    filepath = sys.argv[1] if len(sys.argv) > 1 else '${target || "Security.evtx"}'\n    events = parser.parse(filepath)\n    for e in events:\n        print(f"[{e['severity']}] {e['timestamp']} | {e['event_id']} | {e['name']} | {e['mitre']} | {e['computer']}")\n    print(f"\\nTotal: {len(events)} security events")`,
+            bash: `#!/bin/bash\n# Windows Event Log Parser — Bash (using evtx_dump)\nFILE="\${1:-Security.evtx}"\nif command -v evtx_dump &>/dev/null; then\n  echo "=== EVTX Security Events ==="\n  echo "\\n[Logon Failures (4625)]"\n  evtx_dump "$FILE" 2>/dev/null | grep -c 'EventID.*4625'\n  echo "\\n[New Services (7045)]"\n  evtx_dump "$FILE" 2>/dev/null | grep -c 'EventID.*7045'\n  echo "\\n[Audit Log Cleared (1102)]"\n  evtx_dump "$FILE" 2>/dev/null | grep -c 'EventID.*1102'\nelse\n  echo "Install: cargo install evtx OR pip install python-evtx"\nfi`,
+            powershell: `# Windows Event Log Parser — PowerShell\nparam([string]$LogPath = "${target || 'Security'}", [int]$Hours = 24)\nWrite-Host "=== Security Event Analysis (Last $Hours hours) ===" -ForegroundColor Cyan\n$start = (Get-Date).AddHours(-$Hours)\n$critical = @(1102,4697,7045)\n$high = @(4662,4698,4728,4732)\n$medium = @(4625,4648,4720,4771)\n\nforeach ($id in ($critical + $high + $medium)) {\n    $count = (Get-WinEvent -FilterHashtable @{LogName=$LogPath;ID=$id;StartTime=$start} -EA 0).Count\n    $sev = if($id -in $critical){'CRITICAL'}elseif($id -in $high){'HIGH'}else{'MEDIUM'}\n    $color = if($sev -eq 'CRITICAL'){'Red'}elseif($sev -eq 'HIGH'){'Yellow'}else{'White'}\n    if ($count -gt 0) { Write-Host "[$sev] Event $id : $count occurrences" -ForegroundColor $color }\n}\n\nWrite-Host "\\n[Failed Logons by Source IP]" -ForegroundColor Yellow\nGet-WinEvent -FilterHashtable @{LogName=$LogPath;ID=4625;StartTime=$start} -EA 0 |\n    Group-Object {$_.Properties[19].Value} | Sort Count -Desc | Select Count, Name -First 10`
+        },
+        'threat-enrichment': {
+            python: `#!/usr/bin/env python3\n"""Threat Intel Enrichment Pipeline\nUnified IOC enrichment: takes any indicator and queries all available sources.\n"""\nimport requests, json, sys, re, hashlib, socket\n\nclass ThreatEnrichment:\n    def __init__(self, vt_key='', abuse_key=''):\n        self.vt_key = vt_key\n        self.abuse_key = abuse_key\n\n    def detect_type(self, indicator):\n        if re.match(r'^[a-fA-F0-9]{32}$', indicator): return 'md5'\n        if re.match(r'^[a-fA-F0-9]{40}$', indicator): return 'sha1'\n        if re.match(r'^[a-fA-F0-9]{64}$', indicator): return 'sha256'\n        if re.match(r'^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$', indicator): return 'ipv4'\n        if re.match(r'^https?://', indicator): return 'url'\n        if re.match(r'^[\\w.-]+\\.[a-z]{2,}$', indicator): return 'domain'\n        if re.match(r'^[\\w.+-]+@[\\w-]+\\.[a-z]{2,}$', indicator): return 'email'\n        return 'unknown'\n\n    def enrich(self, indicator):\n        ioc_type = self.detect_type(indicator)\n        result = {'indicator': indicator, 'type': ioc_type, 'sources': {}, 'risk_score': 0, 'tags': []}\n\n        if ioc_type == 'ipv4':\n            result['sources']['geoip'] = self._geoip(indicator)\n            result['sources']['abuseipdb'] = self._abuseipdb(indicator)\n            result['sources']['virustotal'] = self._vt_ip(indicator)\n            result['sources']['threatfox'] = self._threatfox(indicator, 'ip')\n            try: result['reverse_dns'] = socket.gethostbyaddr(indicator)[0]\n            except: result['reverse_dns'] = 'N/A'\n\n        elif ioc_type in ('md5','sha1','sha256'):\n            result['sources']['virustotal'] = self._vt_hash(indicator)\n            result['sources']['malwarebazaar'] = self._malwarebazaar(indicator)\n            result['sources']['threatfox'] = self._threatfox(indicator, 'hash')\n\n        elif ioc_type == 'domain':\n            result['sources']['virustotal'] = self._vt_domain(indicator)\n            result['sources']['threatfox'] = self._threatfox(indicator, 'domain')\n            try: result['resolved_ips'] = [r[4][0] for r in socket.getaddrinfo(indicator, None)][:3]\n            except: result['resolved_ips'] = []\n\n        elif ioc_type == 'url':\n            result['sources']['virustotal'] = self._vt_url(indicator)\n            result['sources']['urlhaus'] = self._urlhaus(indicator)\n\n        # Calculate overall risk\n        for src, data in result['sources'].items():\n            if isinstance(data, dict):\n                result['risk_score'] += data.get('score', 0)\n                result['tags'].extend(data.get('tags', []))\n\n        result['verdict'] = 'MALICIOUS' if result['risk_score'] > 50 else 'SUSPICIOUS' if result['risk_score'] > 20 else 'CLEAN'\n        return result\n\n    def _geoip(self, ip):\n        try:\n            r = requests.get(f'http://ip-api.com/json/{ip}', timeout=10).json()\n            return {'country': r.get('country'), 'org': r.get('org'), 'isp': r.get('isp')}\n        except: return {}\n\n    def _abuseipdb(self, ip):\n        if not self.abuse_key: return {'note':'No API key - set ABUSEIPDB_KEY'}\n        try:\n            r = requests.get('https://api.abuseipdb.com/api/v2/check',\n                headers={'Key':self.abuse_key,'Accept':'application/json'},\n                params={'ipAddress':ip,'maxAgeInDays':90}, timeout=10)\n            d = r.json().get('data',{})\n            return {'score':d.get('abuseConfidenceScore',0),'reports':d.get('totalReports',0)}\n        except: return {}\n\n    def _vt_ip(self, ip):\n        if not self.vt_key: return {'note':'No API key - set VT_KEY'}\n        try:\n            r = requests.get(f'https://www.virustotal.com/api/v3/ip_addresses/{ip}',\n                headers={'x-apikey':self.vt_key}, timeout=15)\n            s = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})\n            return {'score':s.get('malicious',0)*10,'malicious':s.get('malicious',0),'suspicious':s.get('suspicious',0)}\n        except: return {}\n\n    def _vt_hash(self, h):\n        if not self.vt_key: return {'note':'No API key'}\n        try:\n            r = requests.get(f'https://www.virustotal.com/api/v3/files/{h}',\n                headers={'x-apikey':self.vt_key}, timeout=15)\n            s = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})\n            return {'score':s.get('malicious',0)*5,'malicious':s.get('malicious',0)}\n        except: return {}\n\n    def _vt_domain(self, d):\n        if not self.vt_key: return {'note':'No API key'}\n        try:\n            r = requests.get(f'https://www.virustotal.com/api/v3/domains/{d}',\n                headers={'x-apikey':self.vt_key}, timeout=15)\n            s = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})\n            return {'score':s.get('malicious',0)*10,'malicious':s.get('malicious',0)}\n        except: return {}\n\n    def _vt_url(self, url):\n        return self._vt_domain(url.split('/')[2]) if '/' in url else {}\n\n    def _malwarebazaar(self, h):\n        try:\n            r = requests.post('https://mb-api.abuse.ch/api/v1/',\n                data={'query':'get_info','hash':h}, timeout=15)\n            d = r.json()\n            if d.get('query_status') == 'hash_not_found': return {'score':0,'found':False}\n            info = d.get('data',[{}])[0]\n            return {'score':50,'found':True,'signature':info.get('signature',''),\n                    'tags':info.get('tags',[]),'file_type':info.get('file_type','')}\n        except: return {}\n\n    def _threatfox(self, ioc, ioc_type):\n        try:\n            r = requests.post('https://threatfox-api.abuse.ch/api/v1/',\n                json={'query':'search_ioc','search_term':ioc}, timeout=15)\n            d = r.json()\n            if d.get('data'):\n                return {'score':40,'found':True,'malware':d['data'][0].get('malware',''),\n                        'tags':d['data'][0].get('tags',[])}\n            return {'score':0,'found':False}\n        except: return {}\n\n    def _urlhaus(self, url):\n        try:\n            r = requests.post('https://urlhaus-api.abuse.ch/v1/url/',\n                data={'url':url}, timeout=15)\n            d = r.json()\n            if d.get('query_status') == 'no_results': return {'score':0,'found':False}\n            return {'score':50,'found':True,'threat':d.get('threat',''),'tags':d.get('tags',[])}\n        except: return {}\n\nif __name__ == '__main__':\n    import os\n    enricher = ThreatEnrichment(\n        vt_key=os.environ.get('VT_KEY',''),\n        abuse_key=os.environ.get('ABUSEIPDB_KEY','')\n    )\n    for ioc in sys.argv[1:] or ['${target || "8.8.8.8"}']:\n        result = enricher.enrich(ioc)\n        print(json.dumps(result, indent=2))`,
+            bash: `#!/bin/bash\n# Threat Intel Enrichment — Bash Quick Check\nIOC="\${1:-${target || '8.8.8.8'}}"\necho "=== Threat Intel Enrichment: $IOC ==="\necho "\\n[GeoIP]"\ncurl -s "http://ip-api.com/json/$IOC" | python3 -m json.tool 2>/dev/null\necho "\\n[ThreatFox]"\ncurl -s -d '{\"query\":\"search_ioc\",\"search_term\":\"'$IOC'\"}' https://threatfox-api.abuse.ch/api/v1/ | python3 -c 'import sys,json;d=json.load(sys.stdin);print("Found!" if d.get("data") else "Clean")' 2>/dev/null\necho "\\n[MalwareBazaar]"\ncurl -s -d "query=get_info&hash=$IOC" https://mb-api.abuse.ch/api/v1/ | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("query_status","N/A"))' 2>/dev/null`,
+            powershell: `# Threat Intel Enrichment — PowerShell\nparam([string]$IOC = "${target || '8.8.8.8'}")\nWrite-Host "=== Enriching: $IOC ===" -ForegroundColor Cyan\nWrite-Host "\\n[GeoIP]"\n(Invoke-RestMethod "http://ip-api.com/json/$IOC") | Format-List country, org, isp\nWrite-Host "[ThreatFox]"\n$body = @{query='search_ioc';search_term=$IOC} | ConvertTo-Json\n$tf = Invoke-RestMethod -Uri 'https://threatfox-api.abuse.ch/api/v1/' -Method Post -Body $body -ContentType 'application/json'\nif ($tf.data) { Write-Host "FOUND: $($tf.data[0].malware)" -ForegroundColor Red } else { Write-Host "Clean" -ForegroundColor Green }`
         }
     };
 
@@ -5784,6 +5969,52 @@ function generateDetRule() {
         rule = buildSplunk(name, severity, match);
     } else if (fmt === 'eql') {
         rule = buildElasticEDR(name, severity, match);
+    } else if (fmt === 'zeek') {
+        const t = match ? match.t : 'T1078';
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : [name.split(' ')[0].toLowerCase()];
+        if (name.toLowerCase().includes('dns') || name.toLowerCase().includes('tunnel')) {
+            rule = `# ${name} — Zeek Script\n# MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n@load base/frameworks/notice\n\nmodule DNSTunnel;\n\nexport {\n    redef enum Notice::Type += { DNS_Tunnel_Detected };\n    const query_len_threshold = 50 &redef;\n    const query_count_threshold = 100 &redef;\n    const monitoring_interval = 5min &redef;\n}\n\nglobal dns_counts: table[addr] of count &default=0 &create_expire=5min;\nglobal dns_bytes: table[addr] of count &default=0 &create_expire=5min;\n\nevent dns_request(c: connection, msg: dns_msg, query: string, qtype: count, qclass: count) {\n    if (|query| > query_len_threshold) {\n        NOTICE([$note=DNS_Tunnel_Detected,\n                $msg=fmt("Long DNS query from %s: %s (%d chars)", c$id$orig_h, query, |query|),\n                $conn=c,\n                $identifier=cat(c$id$orig_h)]);\n    }\n    ++dns_counts[c$id$orig_h];\n    dns_bytes[c$id$orig_h] += |query|;\n    if (dns_counts[c$id$orig_h] > query_count_threshold) {\n        NOTICE([$note=DNS_Tunnel_Detected,\n                $msg=fmt("High DNS query volume from %s: %d queries", c$id$orig_h, dns_counts[c$id$orig_h]),\n                $conn=c]);\n    }\n}`;
+        } else {
+            rule = `# ${name} — Zeek Script\n# MITRE: ${t} | Severity: ${severity.toUpperCase()}\n\n@load base/frameworks/notice\n\nmodule ThreatDetect;\n\nexport {\n    redef enum Notice::Type += { Suspicious_Activity };\n}\n\nevent connection_established(c: connection) {\n    # Detect connections to suspicious ports\n    if (c$id$resp_p in set(4444/tcp, 5555/tcp, 6666/tcp, 8888/tcp, 9999/tcp, 1234/tcp)) {\n        NOTICE([$note=Suspicious_Activity,\n                $msg=fmt("Connection to suspicious port %s:%s from %s",\n                         c$id$resp_h, c$id$resp_p, c$id$orig_h),\n                $conn=c,\n                $identifier=cat(c$id$orig_h, c$id$resp_h)]);\n    }\n}\n\nevent http_request(c: connection, method: string, original_URI: string, unescaped_URI: string, version: string) {\n    # Detect suspicious HTTP patterns\n    if (/${kws.join('|')}/i in original_URI) {\n        NOTICE([$note=Suspicious_Activity,\n                $msg=fmt("Suspicious HTTP request: %s %s from %s", method, original_URI, c$id$orig_h),\n                $conn=c]);\n    }\n}`;
+        }
+    } else if (fmt === 'stix') {
+        const t = match ? match.t : 'T1078';
+        const desc = match ? match.desc : name;
+        const kws = match && match.sigma ? Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,4) : [name.split(' ')[0].toLowerCase()];
+        const uuid1 = crypto.randomUUID ? crypto.randomUUID() : 'indicator--'+Date.now();
+        const uuid2 = crypto.randomUUID ? crypto.randomUUID() : 'attack-pattern--'+Date.now();
+        rule = JSON.stringify({
+            type: "bundle",
+            id: `bundle--${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
+            spec_version: "2.1",
+            objects: [
+                {
+                    type: "indicator",
+                    id: uuid1,
+                    created: new Date().toISOString(),
+                    modified: new Date().toISOString(),
+                    name: name,
+                    description: desc,
+                    indicator_types: ["malicious-activity"],
+                    pattern: `[process:command_line LIKE '%${kws[0]}%'${kws.length > 1 ? ` OR process:command_line LIKE '%${kws[1]}%'` : ''}]`,
+                    pattern_type: "stix",
+                    valid_from: new Date().toISOString(),
+                    kill_chain_phases: [{kill_chain_name: "mitre-attack", phase_name: match ? match.tac : "execution"}],
+                    labels: [t, severity],
+                    confidence: severity === 'critical' ? 95 : severity === 'high' ? 80 : 60,
+                    external_references: [{source_name: "mitre-attack", external_id: t, url: `https://attack.mitre.org/techniques/${t.replace('.','/')}/`}]
+                },
+                {
+                    type: "attack-pattern",
+                    id: uuid2,
+                    created: new Date().toISOString(),
+                    modified: new Date().toISOString(),
+                    name: desc,
+                    external_references: [{source_name: "mitre-attack", external_id: t}],
+                    kill_chain_phases: [{kill_chain_name: "mitre-attack", phase_name: match ? match.tac : "execution"}]
+                }
+            ]
+        }, null, 2);
     }
 
     lastDetRule = rule;
@@ -5828,6 +6059,8 @@ function generateHuntQuery() {
         rule = header + `\n// === CB Query ===\n(${kws.map(k=>`process_cmdline:"${k}"`).join(' OR ')})\nAND process_start_time:[${timeRange === '24h' ? 'now-1d' : timeRange === '7d' ? 'now-7d' : 'now-30d'} TO *]\n| sort last_update desc\n\n// === Rare Process Hunt ===\nprocess_name:* -process_name:(svchost.exe OR csrss.exe OR explorer.exe OR lsass.exe)\n| stats count by process_name\n| sort count asc`;
     } else if (platform === 'velociraptor') {
         rule = header + `\n// === VQL Hunt ===\nSELECT * FROM Artifact.Windows.System.Pslist()\nWHERE CommandLine =~ '(?i)(${kws.join('|')})'\n\n// === File Hunt ===\nSELECT FullPath, Size, Mtime, Hash\nFROM glob(globs='C:/Users/*/AppData/**')\nWHERE Name =~ '(?i)(${kws.join('|')})'\n  AND Mtime > now() - ${timeRange === '24h' ? '86400' : timeRange === '7d' ? '604800' : '2592000'}\n\n// === Registry Persistence Hunt ===\nSELECT * FROM Artifact.Windows.Registry.NTUser.Upload()\nWHERE Key =~ 'CurrentVersion.Run'\n\n// === Scheduled Tasks Hunt ===\nSELECT * FROM Artifact.Windows.System.TaskScheduler()\nWHERE Command =~ '(?i)(powershell|cmd|wscript|mshta|certutil)'`;
+    } else if (platform === 'zeek-hunt') {
+        rule = header + `\n# === Zeek Log Hunt ===\n# Search Zeek logs for indicators of: ${name}\n\n# Connection logs (conn.log)\ncat conn.log | zeek-cut ts uid id.orig_h id.orig_p id.resp_h id.resp_p proto service duration orig_bytes resp_bytes | \\\n  awk -F'\\t' '$7 == "tcp" && ($6 == 4444 || $6 == 5555 || $6 == 8888 || $6 == 9999)'\n\n# DNS query hunt (dns.log)\ncat dns.log | zeek-cut ts uid id.orig_h query qtype answers | \\\n  awk -F'\\t' 'length($4) > 50'  # Long queries = possible tunneling\n\n# DNS DGA detection\ncat dns.log | zeek-cut query | sort | uniq -c | sort -rn | head -50\n\n# HTTP suspicious requests (http.log)\ncat http.log | zeek-cut ts uid id.orig_h method host uri status_code | \\\n  grep -iE '${kws.join('|')}'\n\n# SSL/TLS certificate hunt (ssl.log)\ncat ssl.log | zeek-cut ts uid id.orig_h id.resp_h server_name subject issuer | \\\n  grep -v 'CN=.*\\(microsoft\\|google\\|amazon\\|cloudflare\\)'\n\n# File extraction hunt (files.log)\ncat files.log | zeek-cut ts uid fuid source mime_type filename md5 sha1 | \\\n  grep -iE 'application/(x-dosexec|x-executable|x-mach-binary|javascript|x-sh)'\n\n# Beaconing detection (statistical analysis)\ncat conn.log | zeek-cut ts id.orig_h id.resp_h id.resp_p duration | \\\n  awk -F'\\t' '{print $2, $3, $4}' | sort | uniq -c | sort -rn | \\\n  awk '$1 > 50 {print "BEACONING:", $0}'`;
     }
 
     lastHuntRule = rule;
@@ -5910,6 +6143,54 @@ function generatePlaybook() {
                 lessons: ['Document data classification failures','Implement data loss prevention improvements','Review network segmentation for sensitive data','Enhance monitoring for large data transfers','Evaluate insider threat program','Update data handling policies and training']
             },
             commands: ['# Check DNS query volume (DNS tunneling)\nindex=dns | stats sum(bytes_out) as total_bytes by src_ip, query | where total_bytes > 1000000','# Check large file uploads\nindex=proxy action=allowed bytes_out>10000000 | stats sum(bytes_out) by src_ip, url','# USB device audit\nGet-WinEvent -LogName Security -FilterXPath "*[System[EventID=6416]]" | Select TimeCreated, Message']
+        },
+        'bec-fraud': {
+            title: 'Business Email Compromise (BEC) Response',
+            mitre: 'T1534, T1566.002, T1078',
+            phases: {
+                identification: ['Identify BEC type: CEO fraud, vendor impersonation, payroll redirect, or invoice fraud','Check email headers for spoofing indicators (SPF/DKIM/DMARC failures)','Review inbox rules for auto-forwarding or deletion rules','Identify all affected recipients and who responded','Check for wire transfers or payment changes initiated','Analyze email thread for social engineering indicators','Search for similar phishing emails across the organization'],
+                containment: ['Block sender address/domain at email gateway immediately','Delete phishing emails from all mailboxes (Search & Purge)','Disable compromised email accounts','Contact bank to freeze/reverse fraudulent wire transfers (time-critical!)','Block any external forwarding rules','Notify finance/AP team to halt pending payments','Enable litigation hold on affected mailboxes'],
+                eradication: ['Remove all inbox rules created by attacker (forwarding, deletion)','Revoke OAuth app permissions granted during compromise','Reset passwords and enforce MFA on affected accounts','Remove any delegated mailbox access','Check for and remove mail flow/transport rules','Scan endpoints of affected users for malware/keyloggers'],
+                recovery: ['Implement anti-spoofing controls (DMARC reject policy)','Enable mailbox audit logging','Add payment verification procedures (verbal confirmation for changes)','Deploy email banner for external senders','Restore any deleted legitimate emails','Review and update vendor verification processes'],
+                lessons: ['Calculate financial losses and recovery rate','Report to FBI IC3 (ic3.gov) and law enforcement','Review email gateway effectiveness','Implement executive email protection','Conduct targeted BEC awareness training for finance team','Evaluate email authentication (DMARC/DKIM/SPF) coverage','Add domain monitoring for look-alike domains']
+            },
+            commands: ['# Search for inbox rules\nGet-InboxRule -Mailbox victim@company.com | Where {$_.ForwardTo -or $_.RedirectTo -or $_.DeleteMessage}','# Remove malicious rules\nRemove-InboxRule -Mailbox victim@company.com -Identity "Rule Name"','# Check for OAuth app consents\nGet-AzureADServiceAppRoleAssignment -All $true | Where {$_.CreationTimestamp -gt (Get-Date).AddDays(-7)}','# Search for similar emails\nGet-MessageTrace -SenderAddress attacker@evil.com -StartDate (Get-Date).AddDays(-7)']
+        },
+        'credential-leak': {
+            title: 'Credential Leak / Exposed Secrets Response',
+            mitre: 'T1552, T1078, T1110.004',
+            phases: {
+                identification: ['Identify source of leak: paste site, GitHub, dark web, data broker, breach notification','Classify exposed credential types: passwords, API keys, tokens, certificates, SSH keys','Determine number of affected accounts/services','Check if leaked credentials have been used for unauthorized access','Cross-reference with authentication logs for suspicious logins','Assess age of credentials and likelihood of active exploitation'],
+                containment: ['Immediately rotate ALL exposed passwords/secrets','Revoke exposed API keys, tokens, and certificates','Force password reset for affected users','Block source IPs associated with credential abuse','Enable MFA on all affected accounts','Disable service accounts with leaked credentials','Revoke and regenerate SSH keys'],
+                eradication: ['Remove credentials from source (GitHub commits, paste sites, public repos)','Scrub secrets from Git history (git filter-branch or BFG)','Implement secrets scanning in CI/CD pipeline','Remove hardcoded credentials from codebase','Update vault/secrets manager with new credentials','Audit all systems accessed by leaked credentials'],
+                recovery: ['Deploy secrets management solution (HashiCorp Vault, AWS Secrets Manager)','Implement pre-commit hooks for secret detection','Enable credential breach monitoring service','Implement password breach detection (HaveIBeenPwned API)','Review and enforce credential rotation policy','Monitor affected accounts for 90 days'],
+                lessons: ['Root cause: how did credentials get exposed?','Implement secrets scanning: truffleHog, GitLeaks, detect-secrets','Review developer security training','Enforce secrets management policy','Implement credential rotation automation','Add dark web monitoring for organization credentials']
+            },
+            commands: ['# Search GitHub for leaked secrets\ntrufflehog git https://github.com/org/repo --only-verified','# Scan codebase for secrets\ngitleaks detect --source . --report-format json','# Check if password was breached\npython -c "import hashlib,requests;h=hashlib.sha1(b\\"PASSWORD\\").hexdigest().upper();r=requests.get(f\\"https://api.pwnedpasswords.com/range/{h[:5]}\\");print(h[5:] in r.text)"','# Force password reset (Azure AD)\nSet-AzureADUserPassword -ObjectId USER_ID -ForceChangePasswordNextLogin $true']
+        },
+        'api-compromise': {
+            title: 'API Key / Token Compromise Response',
+            mitre: 'T1552.004, T1078.004, T1550',
+            phases: {
+                identification: ['Identify which API keys/tokens were compromised','Determine services and data accessible via compromised credentials','Review API access logs for unauthorized usage','Check for unusual API call patterns, volumes, or endpoints','Identify source of compromise (code repo, log files, phishing, insider)','Assess data accessed or modified through the compromised API'],
+                containment: ['Immediately revoke compromised API keys/tokens','Rotate associated secrets and certificates','Block IP addresses used for unauthorized API access','Apply rate limiting and geo-restrictions','Disable affected service accounts','Enable enhanced API logging and monitoring'],
+                eradication: ['Generate new API credentials with minimum required permissions','Remove compromised keys from all environments (dev, staging, prod)','Scrub credentials from logs, config files, and code repositories','Update application configurations with new credentials','Implement API key restrictions (IP, referrer, scope)','Review and tighten API permissions (least privilege)'],
+                recovery: ['Deploy API gateway with enhanced security controls','Implement short-lived tokens (JWT with short expiry)','Enable API anomaly detection','Set up automated credential rotation','Implement mutual TLS for service-to-service communication','Monitor API usage patterns for 30 days post-incident'],
+                lessons: ['Audit all API credentials across the organization','Implement centralized secrets management','Add API key scanning to CI/CD pipeline','Review API authentication architecture (move to OAuth2/OIDC)','Implement API security testing (OWASP API Top 10)','Create API credential lifecycle management policy']
+            },
+            commands: ['# Revoke AWS access keys\naws iam update-access-key --access-key-id AKIAIOSFODNN7EXAMPLE --status Inactive --user-name compromised-user','# Check CloudTrail for API key usage\naws cloudtrail lookup-events --lookup-attributes AttributeKey=AccessKeyId,AttributeValue=AKIA...','# Revoke Azure service principal\nRemove-AzADServicePrincipalCredential -ObjectId SP_ID -KeyId KEY_ID','# Check GitHub for exposed keys\ngitleaks detect --source /path/to/repo']
+        },
+        'web-app-compromise': {
+            title: 'Web Application Compromise Response',
+            mitre: 'T1190, T1505.003, T1059, T1071',
+            phases: {
+                identification: ['Identify attack vector: SQLi, RCE, file upload, deserialization, SSRF','Check WAF logs for attack patterns and source IPs','Scan for webshells in web root directories','Review web server access logs for suspicious requests','Check for unauthorized file modifications (compare against known-good)','Assess data exposure via database logs and application audit trail','Identify affected applications, servers, and databases'],
+                containment: ['Block attacking IPs at WAF and firewall','Take compromised application offline if actively exploited','Isolate compromised web server from internal network','Enable WAF blocking mode with strict rules','Disable compromised application accounts','Preserve web server logs, webshell samples, and database logs','Block outbound connections from web server to unknown IPs'],
+                eradication: ['Remove all webshells and backdoors','Patch the exploited vulnerability','Reset all application and database credentials','Review and clean database for injected data/stored XSS','Remove unauthorized user accounts created by attacker','Rebuild web server from clean image if severely compromised','Update WAF rules to block the specific attack pattern'],
+                recovery: ['Redeploy application from verified clean source code','Run DAST/SAST scan before redeployment','Enable enhanced WAF monitoring','Implement Content Security Policy (CSP) headers','Enable file integrity monitoring on web roots','Conduct penetration test before going live','Monitor for recompromise attempts for 30 days'],
+                lessons: ['Conduct code review of exploited component','Implement SAST/DAST in CI/CD pipeline','Review OWASP Top 10 coverage','Update vulnerability management for web apps','Implement Web Application Firewall tuning process','Add runtime application self-protection (RASP)','Review input validation and output encoding practices']
+            },
+            commands: ['# Find webshells\nfind /var/www -name "*.php" -newer /var/www/index.php -exec grep -l "eval\\|system\\|exec\\|base64_decode\\|passthru" {} \\;','# Check for modified files\nfind /var/www -mtime -7 -type f | head -50','# Scan for known webshell signatures\nyara -r webshell_rules.yar /var/www/','# Block IP at WAF\ncurl -X POST https://waf-api/blocklist -d \'{"ip":"ATTACKER_IP","action":"block"}\'']
         }
     };
 
@@ -5966,7 +6247,14 @@ function generateMITREBundle() {
         'T1071.004': 'dns tunnel', 'T1055': 'uac bypass', 'T1070.001': 'log clear',
         'T1036': 'reverse shell', 'T1548.002': 'uac bypass', 'T1134': 'uac bypass',
         'T1566.001': 'phishing', 'T1566.002': 'phishing', 'T1078': 'brute force',
-        'T1190': 'webshell'
+        'T1190': 'webshell', 'T1003.003': 'ntds', 'T1003.006': 'dcsync',
+        'T1550.002': 'pass the hash', 'T1558.001': 'golden ticket',
+        'T1218.010': 'lolbas', 'T1218.011': 'lolbas', 'T1218.005': 'lolbas',
+        'T1574.002': 'dll sideload', 'T1546.003': 'wmi persist',
+        'T1021.006': 'winrm', 'T1098': 'brute force',
+        'T1562.001': 'disable security', 'T1140': 'lolbas',
+        'T1552.001': 'credential stuff', 'T1557': 'aitm phish',
+        'T1534': 'bec', 'T1110.004': 'credential stuff', 'T1134.001': 'token theft'
     };
 
     const threatName = techMap[technique] || 'brute force';
