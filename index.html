@@ -193,6 +193,7 @@
     <div class="nav-tab" onclick="showTab('hunting')">&#128270; Hunt Builder</div>
     <div class="nav-tab" onclick="showTab('playbooks')">&#128214; IR Playbooks</div>
     <div class="nav-tab" onclick="showTab('mitre')">&#127919; MITRE Builder</div>
+    <div class="nav-tab" onclick="showTab('crowdstrike-lab')" style="border-color:#e04040;color:#e04040">&#129413; CrowdStrike Lab</div>
     <div class="nav-tab" onclick="showTab('quickstart')">&#128187; Quick Access</div>
 </div>
 
@@ -2892,6 +2893,487 @@ def phishing_triage(sw_context):
  Tor Exit Nodes &#9508;  &#9474; <span class="g">DATABASE</span>  &#9474;   Timeline Gen &#9472;&#9472;&#9472;&#9472;&#9508;  &#9474; <span class="w">ENGINE</span> &#9474;                     &#9474;  &#9474; 9 Playbooks &#9474;
  MalwareBazaar &#9472;&#9508;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;   Network Scan &#9472;&#9472;&#9472;&#9472;&#9508;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  Threat Reports &#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
  ThreatFox &#9472;&#9472;&#9472;&#9472;&#9472;&#9496;                  Hash Checker &#9472;&#9472;&#9472;&#9472;&#9496;
+    </div>
+</div>
+</div>
+
+<!-- ==================== CROWDSTRIKE LAB ==================== -->
+<div id="tab-crowdstrike-lab" class="tab-content">
+<div class="sec">
+    <div class="sec-hdr">
+        <div class="sec-ic" style="background:rgba(224,64,64,.15)">&#129413;</div>
+        <h3>CrowdStrike Falcon — Zero to Hero Lab</h3>
+    </div>
+    <p style="color:var(--text2);margin-bottom:1.5rem">Learn CrowdStrike Falcon from scratch. Interactive labs, step-by-step guides, and real rule builders for IOA Rules, IOC Policies, Prevention Policies, Firewall Rules, RTR Scripts, and LogScale Queries. Every example is production-ready — learn by building.</p>
+
+    <!-- Learning Path Navigation -->
+    <div class="siem-tabs">
+        <div class="siem-tab active" onclick="showSiem('cs-learn')">&#128218; Learning Path</div>
+        <div class="siem-tab" onclick="showSiem('cs-ioa-lab')">&#128737; IOA Rules</div>
+        <div class="siem-tab" onclick="showSiem('cs-ioc-lab')">&#128270; IOC Policies</div>
+        <div class="siem-tab" onclick="showSiem('cs-prev-lab')">&#128737; Prevention Policies</div>
+        <div class="siem-tab" onclick="showSiem('cs-fw-lab')">&#128274; Firewall Rules</div>
+        <div class="siem-tab" onclick="showSiem('cs-rtr-lab')">&#128187; RTR Scripts</div>
+        <div class="siem-tab" onclick="showSiem('cs-logscale-lab')">&#128202; LogScale Queries</div>
+        <div class="siem-tab" onclick="showSiem('cs-api-lab')">&#9881; Falcon API</div>
+    </div>
+
+    <!-- ===== LEARNING PATH ===== -->
+    <div id="siem-cs-learn" class="siem-content active">
+        <div style="margin-bottom:2rem">
+            <h4 style="color:var(--accent);margin-bottom:1rem">&#127891; CrowdStrike Falcon — Learning Roadmap</h4>
+            <p style="color:var(--text2);margin-bottom:1.5rem">Follow this path from beginner to advanced. Each section has interactive builders — click any topic to jump there and practice.</p>
+        </div>
+
+        <div class="grid" style="grid-template-columns:1fr;gap:1rem;max-width:900px">
+            <!-- Level 1 -->
+            <div class="card" style="border-left:4px solid #10b981">
+                <div class="card-t" style="color:#10b981">Level 1: Fundamentals — Understanding CrowdStrike</div>
+                <div class="card-d">
+                    <strong>What is CrowdStrike Falcon?</strong><br>
+                    CrowdStrike Falcon is a cloud-native endpoint protection platform (EPP) that combines next-gen antivirus (NGAV), endpoint detection &amp; response (EDR), threat intelligence, and managed hunting in a single lightweight agent (the Falcon Sensor).<br><br>
+                    <strong>Key Components:</strong><br>
+                    &#8226; <strong>Falcon Sensor</strong> — Lightweight agent installed on endpoints (Windows, Linux, Mac). Uses ~1% CPU, ~40MB RAM.<br>
+                    &#8226; <strong>Falcon Console</strong> — Web-based management UI at falcon.crowdstrike.com<br>
+                    &#8226; <strong>Threat Graph</strong> — Cloud AI that processes 1 trillion+ events/day for real-time detection<br>
+                    &#8226; <strong>CID</strong> — Customer ID, unique to your organization<br><br>
+                    <strong>Core Modules:</strong><br>
+                    &#8226; <strong>Falcon Prevent</strong> — NGAV (next-gen antivirus) — replaces traditional AV<br>
+                    &#8226; <strong>Falcon Insight</strong> — EDR (endpoint detection &amp; response) — visibility + investigation<br>
+                    &#8226; <strong>Falcon OverWatch</strong> — 24/7 managed threat hunting by CrowdStrike experts<br>
+                    &#8226; <strong>Falcon Discover</strong> — IT hygiene and asset inventory<br>
+                    &#8226; <strong>Falcon Intelligence</strong> — Threat intel reports and IOC feeds<br>
+                    &#8226; <strong>Falcon LogScale</strong> — Log management and SIEM (formerly Humio)<br>
+                    &#8226; <strong>Falcon Identity</strong> — Identity threat protection (Active Directory monitoring)
+                </div>
+            </div>
+
+            <!-- Level 2 -->
+            <div class="card" style="border-left:4px solid #00d4ff">
+                <div class="card-t" style="color:var(--accent)">Level 2: Detection — IOA vs IOC (The Most Important Concept)</div>
+                <div class="card-d">
+                    <strong>IOC (Indicator of Compromise)</strong> — Static indicators: file hashes, IP addresses, domain names.<br>
+                    &#8226; Reactive: you need to know the indicator first<br>
+                    &#8226; Easy to evade: attacker changes hash → bypass<br>
+                    &#8226; Example: Block SHA256 of known Mimikatz binary<br>
+                    &#8226; <em>Use case: Block known-bad from threat intel feeds</em><br><br>
+                    <strong>IOA (Indicator of Attack)</strong> — Behavioral patterns: what processes do, not what they look like.<br>
+                    &#8226; Proactive: detects new/unknown attacks by behavior<br>
+                    &#8226; Hard to evade: behavior must happen for attack to work<br>
+                    &#8226; Example: "Any process accessing LSASS memory that isn't a known OS process"<br>
+                    &#8226; <em>Use case: Detect zero-day credential theft tools</em><br><br>
+                    <strong>&#9989; Key Insight:</strong> IOAs are more powerful because they detect the <em>technique</em>, not the <em>tool</em>. A Mimikatz hash can change, but LSASS memory access behavior cannot.<br><br>
+                    <strong>CrowdStrike Detection Priority:</strong><br>
+                    1. Machine Learning (ML) — Automated malware detection<br>
+                    2. IOA Rules — Behavioral detection (MOST IMPORTANT to learn)<br>
+                    3. IOC Policies — Known-bad blocking<br>
+                    4. Custom IOA Rules — Your custom detections (this is what we'll build!)
+                </div>
+                <div class="tags" style="margin-top:.8rem">
+                    <span class="tag tag-r">IOA = Behavioral</span>
+                    <span class="tag">IOC = Static</span>
+                    <span class="tag tag-g">IOA > IOC for detection</span>
+                </div>
+            </div>
+
+            <!-- Level 3 -->
+            <div class="card" style="border-left:4px solid #f59e0b">
+                <div class="card-t" style="color:#f59e0b">Level 3: Policy Types — What You Can Configure</div>
+                <div class="card-d">
+                    <strong>1. Prevention Policies</strong> (Console &gt; Configuration &gt; Prevention Policies)<br>
+                    Controls what the sensor blocks automatically. Sliders for:<br>
+                    &#8226; NextGen AV sensitivity (Cautious → Moderate → Aggressive → Extra Aggressive)<br>
+                    &#8226; Cloud ML, Sensor ML, Adware/PUP, Script-Based Execution Monitoring<br>
+                    &#8226; Behavior-based protection: Credential dumping, lateral movement, ransomware<br>
+                    &#8226; Exploit mitigation: Stack pivot, heap spray, SEH overwrite<br><br>
+                    <strong>2. Custom IOA Rule Groups</strong> (Console &gt; Custom IOA Rule Groups)<br>
+                    Your custom behavioral detections. Types:<br>
+                    &#8226; Process Creation — trigger on process name, command line, parent process<br>
+                    &#8226; Process Injection — trigger on memory injection techniques<br>
+                    &#8226; DNS Request — trigger on specific domain queries<br>
+                    &#8226; Network Connection — trigger on connections to specific IPs/ports<br>
+                    &#8226; File Creation/Modification — trigger on suspicious file operations<br>
+                    &#8226; Registry Operations — trigger on persistence registry keys<br><br>
+                    <strong>3. IOC Management</strong> (Console &gt; IOC Management)<br>
+                    Import/manage static indicators:<br>
+                    &#8226; SHA256 hashes — block/detect specific files<br>
+                    &#8226; MD5 hashes — legacy hash blocking<br>
+                    &#8226; Domains — block C2/malicious domains<br>
+                    &#8226; IPv4/IPv6 — block malicious IPs<br>
+                    &#8226; Actions: Prevent, Detect, or Allow (whitelist)<br><br>
+                    <strong>4. Firewall Rules</strong> (Console &gt; Network Protection &gt; Firewall Management)<br>
+                    Host-based firewall rules pushed via sensor:<br>
+                    &#8226; Block/Allow/Monitor by IP, port, protocol, direction<br>
+                    &#8226; Rule Groups assigned to Firewall Policies<br><br>
+                    <strong>5. Real Time Response (RTR)</strong> (Console &gt; Investigate &gt; select host &gt; RTR)<br>
+                    Remote shell access to endpoints for live investigation:<br>
+                    &#8226; Read-only commands: ps, netstat, filelist, reg query<br>
+                    &#8226; Active Responder: kill, delete, remediate<br>
+                    &#8226; Custom scripts: PowerShell/Bash scripts pushed to endpoints
+                </div>
+                <div class="tags" style="margin-top:.8rem">
+                    <span class="tag tag-r">Prevention</span>
+                    <span class="tag tag-y">Custom IOA</span>
+                    <span class="tag">IOC</span>
+                    <span class="tag tag-p">Firewall</span>
+                    <span class="tag tag-g">RTR</span>
+                </div>
+            </div>
+
+            <!-- Level 4 -->
+            <div class="card" style="border-left:4px solid #7c3aed">
+                <div class="card-t" style="color:#a78bfa">Level 4: Severity &amp; Disposition — How CrowdStrike Handles Detections</div>
+                <div class="card-d">
+                    <strong>Severity Levels:</strong><br>
+                    &#8226; <span style="color:#ef4444">Critical</span> — Active breach, immediate response needed (ransomware, credential theft)<br>
+                    &#8226; <span style="color:#f59e0b">High</span> — Likely malicious, needs investigation (suspicious execution, C2)<br>
+                    &#8226; <span style="color:#3b82f6">Medium</span> — Potentially unwanted, context needed (adware, PUP)<br>
+                    &#8226; <span style="color:#6b7280">Low/Informational</span> — Visibility event, no action required<br><br>
+                    <strong>Disposition (What Happens When Rule Triggers):</strong><br>
+                    &#8226; <strong>Block, Block</strong> (ID: 80) — Kill process + prevent execution. Use for critical threats.<br>
+                    &#8226; <strong>Detect, Detect</strong> (ID: 60) — Alert only, don't block. Use when testing new rules.<br>
+                    &#8226; <strong>Monitor</strong> (ID: 40) — Log silently. Use for visibility/baselining.<br><br>
+                    <strong>&#9989; Best Practice:</strong> Always start new Custom IOA rules in <strong>Detect</strong> mode first. Monitor for 1-2 weeks for false positives. Then promote to <strong>Block</strong> after tuning.
+                </div>
+            </div>
+
+            <!-- Level 5 -->
+            <div class="card" style="border-left:4px solid #ef4444">
+                <div class="card-t" style="color:#ef4444">Level 5: Hands-On Labs — Practice Below!</div>
+                <div class="card-d">
+                    Click the tabs above to access interactive labs for each CrowdStrike feature. Each lab includes:<br><br>
+                    &#8226; <strong>Step-by-step instructions</strong> with exact Falcon Console navigation paths<br>
+                    &#8226; <strong>Interactive builder</strong> — generate real rules you can import<br>
+                    &#8226; <strong>Practice scenarios</strong> — 5-10 exercises per topic with increasing difficulty<br>
+                    &#8226; <strong>API examples</strong> — automate everything via Falcon API<br>
+                    &#8226; <strong>Copy &amp; Download</strong> — take rules directly into your Falcon Console<br><br>
+                    <strong>Recommended Lab Order:</strong><br>
+                    1. &#128737; IOA Rules (most important — learn behavioral detection)<br>
+                    2. &#128270; IOC Policies (blocking known threats)<br>
+                    3. &#128737; Prevention Policies (tuning sensor protection)<br>
+                    4. &#128274; Firewall Rules (network protection)<br>
+                    5. &#128187; RTR Scripts (live investigation)<br>
+                    6. &#128202; LogScale Queries (threat hunting)<br>
+                    7. &#9881; Falcon API (automation)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== IOA RULES LAB ===== -->
+    <div id="siem-cs-ioa-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128737; Custom IOA Rule Builder — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #e04040">
+            <div class="card-t">What is a Custom IOA Rule?</div>
+            <div class="card-d">
+                Custom IOA (Indicator of Attack) rules let you create <strong>behavioral detections</strong> that trigger when specific process behaviors are observed on endpoints. They match on process creation, command lines, parent-child relationships, network connections, DNS requests, and more.<br><br>
+                <strong>How to create in Falcon Console:</strong><br>
+                1. Go to <code>Configuration &gt; Custom IOA Rule Groups</code><br>
+                2. Click <strong>"Create Rule Group"</strong> — name it (e.g., "Credential Theft Detection")<br>
+                3. Select Platform: <strong>Windows / Linux / Mac</strong><br>
+                4. Click <strong>"Add New Rule"</strong><br>
+                5. Choose Rule Type: <strong>Process Creation</strong> (most common)<br>
+                6. Configure field values (Image, CommandLine, ParentImage, etc.)<br>
+                7. Set Disposition: <strong>Detect</strong> (start here!) or <strong>Block</strong><br>
+                8. Set Severity: Critical / High / Medium / Low<br>
+                9. <strong>Enable</strong> the rule<br>
+                10. <strong>Assign Rule Group to Prevention Policy</strong> — this is the step people forget!
+            </div>
+        </div>
+
+        <!-- IOA Builder -->
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:2">
+                    <label>What do you want to detect?</label>
+                    <input type="text" id="csIoaName" placeholder="e.g. Mimikatz, PowerShell download, LSASS access, Scheduled task persistence..." autocomplete="off">
+                </div>
+                <div class="gen-field" style="flex:0.5;min-width:140px">
+                    <label>Rule Type</label>
+                    <select id="csIoaType">
+                        <option value="process_creation">Process Creation</option>
+                        <option value="process_access">Process Access (Memory)</option>
+                        <option value="dns_request">DNS Request</option>
+                        <option value="network_connection">Network Connection</option>
+                        <option value="file_write">File Write/Create</option>
+                        <option value="registry_set">Registry Set Value</option>
+                    </select>
+                </div>
+            </div>
+            <div class="gen-row">
+                <div class="gen-field" style="flex:0.5;min-width:120px">
+                    <label>Disposition</label>
+                    <select id="csIoaDisposition">
+                        <option value="detect">Detect (Alert Only)</option>
+                        <option value="block">Block (Kill Process)</option>
+                        <option value="monitor">Monitor (Silent Log)</option>
+                    </select>
+                </div>
+                <div class="gen-field" style="flex:0.5;min-width:120px">
+                    <label>Severity</label>
+                    <select id="csIoaSeverity">
+                        <option value="critical">Critical</option>
+                        <option value="high" selected>High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="gen-field" style="flex:0.5;min-width:120px">
+                    <label>Platform</label>
+                    <select id="csIoaPlatform">
+                        <option value="windows" selected>Windows</option>
+                        <option value="linux">Linux</option>
+                        <option value="mac">macOS</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                    <button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('ioa')">Build IOA Rule</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="csIoaOutput" class="output-box">
+            <div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem">
+                <button class="copy-btn" onclick="copyCSLab('ioa')">Copy</button>
+                <button class="copy-btn" onclick="downloadCSLab('ioa','json')">Download JSON</button>
+            </div>
+            <code id="csIoaCode"></code>
+        </div>
+
+        <!-- Practice Exercises -->
+        <div style="margin-top:2rem">
+            <h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice Exercises — Build These IOA Rules:</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Detect Mimikatz via LSASS Access','process_access','block','critical')">Ex 1: Mimikatz LSASS</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','PowerShell Encoded Command Execution','process_creation','detect','high')">Ex 2: Encoded PS</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Ransomware Shadow Copy Deletion','process_creation','block','critical')">Ex 3: Ransomware</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Web Server Spawning Command Shell','process_creation','block','critical')">Ex 4: Webshell</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Suspicious DNS to Known Bad TLDs','dns_request','detect','medium')">Ex 5: DNS IOA</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','LOLBAS certutil Download','process_creation','detect','high')">Ex 6: LOLBAS</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','DCSync Replication Attack','process_creation','block','critical')">Ex 7: DCSync</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Lateral Movement via PsExec','process_creation','detect','high')">Ex 8: PsExec</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Scheduled Task Persistence','process_creation','detect','high')">Ex 9: Persistence</button>
+                <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioa','Security Tool Tampering','process_creation','block','critical')">Ex 10: AV Disable</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== IOC LAB ===== -->
+    <div id="siem-cs-ioc-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128270; IOC Policy Builder — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #f59e0b">
+            <div class="card-t">What is an IOC Policy?</div>
+            <div class="card-d">
+                IOC (Indicator of Compromise) policies let you <strong>import known-bad indicators</strong> (hashes, IPs, domains) and tell CrowdStrike what to do when they're seen on endpoints.<br><br>
+                <strong>Indicator Types:</strong> SHA256, MD5, Domain, IPv4, IPv6<br>
+                <strong>Actions:</strong> Prevent (block), Detect (alert), Allow (whitelist)<br>
+                <strong>How to add in Console:</strong> <code>IOC Management &gt; Add Indicator</code><br>
+                <strong>API Endpoint:</strong> <code>POST /iocs/entities/indicators/v1</code><br><br>
+                <strong>&#9989; Pro Tip:</strong> Set expiration dates on IOCs (90 days default). Threat infrastructure changes — stale IOCs cause false positives.
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:1">
+                    <label>Threat Name</label>
+                    <input type="text" id="csIocName" placeholder="e.g. Cobalt Strike C2, Mimikatz Hash, Ransomware Domain..." autocomplete="off">
+                </div>
+                <div class="gen-field" style="flex:0.5;min-width:120px">
+                    <label>IOC Type</label>
+                    <select id="csIocType"><option value="sha256">SHA256 Hash</option><option value="md5">MD5 Hash</option><option value="domain">Domain</option><option value="ipv4">IPv4 Address</option><option value="ipv6">IPv6 Address</option></select>
+                </div>
+                <div class="gen-field" style="flex:0.5;min-width:120px">
+                    <label>Action</label>
+                    <select id="csIocAction"><option value="prevent">Prevent (Block)</option><option value="detect">Detect (Alert)</option><option value="allow">Allow (Whitelist)</option></select>
+                </div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px">
+                    <button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('ioc')">Build IOC Policy</button>
+                </div>
+            </div>
+        </div>
+        <div id="csIocOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('ioc')">Copy</button><button class="copy-btn" onclick="downloadCSLab('ioc','json')">Download</button></div><code id="csIocCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioc','Cobalt Strike C2 Server','','','')">Block C2 Server</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioc','Mimikatz Binary Hash','','','')">Block Mimikatz Hash</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioc','Ransomware Payment Domain','','','')">Block Ransom Domain</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioc','Known APT Infrastructure IP','','','')">Block APT IP</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('ioc','Whitelist Internal Tool Hash','','','')">Whitelist Tool</button>
+        </div></div>
+    </div>
+
+    <!-- ===== PREVENTION POLICY LAB ===== -->
+    <div id="siem-cs-prev-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128737; Prevention Policy Builder — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #10b981">
+            <div class="card-t">What is a Prevention Policy?</div>
+            <div class="card-d">
+                Prevention Policies control the <strong>sensor's built-in protection capabilities</strong>. They're assigned to Host Groups and determine how aggressively the sensor blocks threats.<br><br>
+                <strong>Key Settings:</strong><br>
+                &#8226; <strong>NextGen AV</strong>: Cloud ML + Sensor ML detection sensitivity sliders<br>
+                &#8226; <strong>Ransomware</strong>: Shadow copy protection, volume encryption blocking<br>
+                &#8226; <strong>Script Monitoring</strong>: PowerShell, WScript, VBScript, AMSI integration<br>
+                &#8226; <strong>Exploit Mitigation</strong>: DEP, ASLR enforcement, heap spray prevention<br>
+                &#8226; <strong>Credential Protection</strong>: LSASS read protection, credential dumping blocking<br><br>
+                <strong>Console Path:</strong> <code>Configuration &gt; Prevention Policies &gt; Clone or Create</code><br>
+                <strong>&#9989; Best Practice:</strong> Never modify the "platform_default" policy. Clone it and create role-specific policies (Servers, Workstations, High-Value Assets).
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:1"><label>Threat Focus</label><input type="text" id="csPrevName" placeholder="e.g. Ransomware Protection, Credential Theft, PowerShell Control..." autocomplete="off"></div>
+                <div class="gen-field" style="flex:0.5;min-width:140px"><label>Policy Template</label><select id="csPrevTemplate"><option value="aggressive">Aggressive (Max Protection)</option><option value="balanced" selected>Balanced (Recommended)</option><option value="cautious">Cautious (Min False Positives)</option><option value="server">Server Optimized</option></select></div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px"><button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('prevention')">Build Policy</button></div>
+            </div>
+        </div>
+        <div id="csPrevOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('prevention')">Copy</button><button class="copy-btn" onclick="downloadCSLab('prevention','json')">Download</button></div><code id="csPrevCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('prevention','Ransomware Maximum Protection','','','')">Ransomware Policy</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('prevention','Credential Theft Prevention','','','')">Credential Policy</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('prevention','PowerShell Script Control','','','')">Script Control</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('prevention','Server Hardening Policy','','','')">Server Policy</button>
+        </div></div>
+    </div>
+
+    <!-- ===== FIREWALL LAB ===== -->
+    <div id="siem-cs-fw-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128274; Firewall Rule Builder — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #7c3aed">
+            <div class="card-t">CrowdStrike Host Firewall Rules</div>
+            <div class="card-d">
+                Falcon Firewall Management pushes <strong>host-based firewall rules</strong> to endpoints via the sensor. Rules are organized in Rule Groups, which are assigned to Firewall Policies.<br><br>
+                <strong>Console Path:</strong> <code>Network Protection &gt; Firewall Management &gt; Rule Groups</code><br>
+                <strong>Rule Parameters:</strong> Direction (IN/OUT), Protocol (TCP/UDP/ICMP), Port, Remote Address, Action (ALLOW/DENY/MONITOR)<br>
+                <strong>&#9989; Tip:</strong> Put DENY rules before ALLOW rules. Rules are evaluated top-to-bottom.
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:1"><label>Protection Scenario</label><input type="text" id="csFwName" placeholder="e.g. Block C2 Ports, Restrict RDP, Block DNS Tunneling..." autocomplete="off"></div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px"><button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('firewall')">Build Firewall Rule</button></div>
+            </div>
+        </div>
+        <div id="csFwOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('firewall')">Copy</button><button class="copy-btn" onclick="downloadCSLab('firewall','json')">Download</button></div><code id="csFwCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('firewall','Block Common C2 Ports','','','')">Block C2 Ports</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('firewall','Restrict RDP to Jump Servers','','','')">Restrict RDP</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('firewall','Block DNS to Non-Approved Resolvers','','','')">DNS Restriction</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('firewall','Block SMB from External','','','')">Block SMB</button>
+        </div></div>
+    </div>
+
+    <!-- ===== RTR LAB ===== -->
+    <div id="siem-cs-rtr-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128187; Real Time Response (RTR) — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #00d4ff">
+            <div class="card-t">What is RTR?</div>
+            <div class="card-d">
+                Real Time Response gives you a <strong>remote shell</strong> on any managed endpoint for live investigation and remediation — without needing VPN, RDP, or physical access.<br><br>
+                <strong>Console Path:</strong> <code>Investigate &gt; Host Search &gt; Select Host &gt; Connect (RTR icon)</code><br><br>
+                <strong>Permission Levels:</strong><br>
+                &#8226; <strong>Read-Only Analyst</strong>: ps, netstat, filelist, reg query, users, ifconfig<br>
+                &#8226; <strong>Active Responder</strong>: kill, rm, reg delete, remediate, memdump<br>
+                &#8226; <strong>RTR Admin</strong>: put files, run scripts, get files, custom scripts<br><br>
+                <strong>&#9989; Key Commands:</strong> <code>ps</code> (processes), <code>netstat</code> (connections), <code>filelist</code> (directory listing), <code>reg query</code> (registry), <code>runscript</code> (execute script)
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:1"><label>Investigation Scenario</label><input type="text" id="csRtrName" placeholder="e.g. Investigate credential theft, Check for persistence, Collect forensics..." autocomplete="off"></div>
+                <div class="gen-field" style="flex:0.5;min-width:140px"><label>Scenario Type</label><select id="csRtrType"><option value="investigate">Investigation</option><option value="contain">Containment</option><option value="remediate">Remediation</option><option value="forensics">Forensic Collection</option></select></div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px"><button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('rtr')">Generate RTR Script</button></div>
+            </div>
+        </div>
+        <div id="csRtrOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('rtr')">Copy</button><button class="copy-btn" onclick="downloadCSLab('rtr','ps1')">Download</button></div><code id="csRtrCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('rtr','Investigate Mimikatz Credential Theft','','','')">Investigate Cred Theft</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('rtr','Check for Persistence Mechanisms','','','')">Check Persistence</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('rtr','Ransomware Containment Response','','','')">Ransomware Response</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('rtr','Collect Forensic Artifacts','','','')">Collect Forensics</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('rtr','Network Connection Analysis','','','')">Network Analysis</button>
+        </div></div>
+    </div>
+
+    <!-- ===== LOGSCALE LAB ===== -->
+    <div id="siem-cs-logscale-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#128202; Falcon LogScale Query Builder — Hands-On Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #f59e0b">
+            <div class="card-t">LogScale Query Language Basics</div>
+            <div class="card-d">
+                Falcon LogScale (formerly Humio) uses its own query language for searching and analyzing endpoint telemetry.<br><br>
+                <strong>Key Concepts:</strong><br>
+                &#8226; <code>#event_simpleName</code> — Event type filter (ProcessRollup2, DnsRequest, NetworkConnectIP4, etc.)<br>
+                &#8226; <code>|</code> — Pipe operator (chain transformations)<br>
+                &#8226; <code>field=value</code> or <code>field=/regex/</code> — Field matching<br>
+                &#8226; <code>groupBy()</code> — Aggregate results by field<br>
+                &#8226; <code>count()</code>, <code>avg()</code>, <code>sum()</code> — Aggregation functions<br>
+                &#8226; <code>sort()</code> — Order results<br>
+                &#8226; <code>test()</code> — Post-aggregation filtering<br><br>
+                <strong>Common Event Types:</strong><br>
+                &#8226; <code>ProcessRollup2</code> — Process creation events (most used!)<br>
+                &#8226; <code>DnsRequest</code> — DNS queries from endpoints<br>
+                &#8226; <code>NetworkConnectIP4</code> — Outbound network connections<br>
+                &#8226; <code>UserLogon</code> — User login events<br>
+                &#8226; <code>FileWritten</code> — File creation/modification<br>
+                &#8226; <code>RegKeyValueSet</code> — Registry modifications<br>
+                &#8226; <code>ModuleLoad</code> — DLL loading events
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:2"><label>What do you want to hunt for?</label><input type="text" id="csLogName" placeholder="e.g. Credential dumping, PowerShell encoded, DNS beaconing, Lateral movement..." autocomplete="off"></div>
+                <div class="gen-field" style="flex:0.5;min-width:140px"><label>Event Type</label><select id="csLogEvent"><option value="process">Process Events</option><option value="network">Network Events</option><option value="dns">DNS Events</option><option value="file">File Events</option><option value="auth">Authentication</option><option value="all">All Events</option></select></div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px"><button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('logscale')">Build Query</button></div>
+            </div>
+        </div>
+        <div id="csLogOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('logscale')">Copy</button><button class="copy-btn" onclick="downloadCSLab('logscale','txt')">Download</button></div><code id="csLogCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice — LogScale Queries:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','Mimikatz Credential Dumping','','','')">Hunt: Mimikatz</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','PowerShell Encoded Execution','','','')">Hunt: Encoded PS</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','DNS Beaconing Detection','','','')">Hunt: DNS Beacon</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','Lateral Movement via SMB','','','')">Hunt: SMB Lateral</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','Rare Process Discovery','','','')">Hunt: Rare Processes</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('logscale','Ransomware Behavior','','','')">Hunt: Ransomware</button>
+        </div></div>
+    </div>
+
+    <!-- ===== API LAB ===== -->
+    <div id="siem-cs-api-lab" class="siem-content">
+        <h4 style="color:#e04040;margin-bottom:1rem">&#9881; Falcon API — Automation Lab</h4>
+        <div class="card" style="margin-bottom:1.5rem;border-left:4px solid #10b981">
+            <div class="card-t">CrowdStrike Falcon API Basics</div>
+            <div class="card-d">
+                The Falcon API lets you <strong>automate everything</strong> you can do in the console. Authentication uses OAuth2 client credentials flow.<br><br>
+                <strong>Setup:</strong><br>
+                1. <code>Support &amp; Resources &gt; API Clients and Keys</code><br>
+                2. Create new API Client with required scopes<br>
+                3. Note your <code>client_id</code> and <code>client_secret</code><br>
+                4. Base URL: <code>https://api.crowdstrike.com</code> (US-1), <code>api.us-2.crowdstrike.com</code> (US-2), <code>api.eu-1.crowdstrike.com</code> (EU)<br><br>
+                <strong>Authentication:</strong> POST to <code>/oauth2/token</code> with client_id + client_secret → get bearer token<br><br>
+                <strong>Key Endpoints:</strong><br>
+                &#8226; <code>GET /devices/queries/devices/v1</code> — List hosts<br>
+                &#8226; <code>POST /detects/queries/detects/v1</code> — Query detections<br>
+                &#8226; <code>POST /iocs/entities/indicators/v1</code> — Create IOCs<br>
+                &#8226; <code>POST /ioarules/entities/rules/v1</code> — Create IOA rules<br>
+                &#8226; <code>POST /devices/entities/devices-actions/v2</code> — Contain/lift containment<br>
+                &#8226; <code>POST /real-time-response/entities/sessions/v1</code> — Start RTR session
+            </div>
+        </div>
+        <div class="gen-box">
+            <div class="gen-row">
+                <div class="gen-field" style="flex:1"><label>What do you want to automate?</label><select id="csApiAction"><option value="auth">Authenticate (Get Token)</option><option value="list-hosts">List All Hosts</option><option value="search-detections">Search Detections</option><option value="create-ioc">Create IOC</option><option value="contain-host">Contain/Isolate Host</option><option value="search-iocs">Search IOCs</option><option value="create-ioa">Create IOA Rule</option><option value="rtr-session">Start RTR Session</option><option value="full-workflow">Full IR Workflow</option></select></div>
+                <div class="gen-field" style="flex:0.5;min-width:120px"><label>Language</label><select id="csApiLang"><option value="python" selected>Python</option><option value="curl">cURL</option><option value="powershell">PowerShell</option></select></div>
+                <div style="display:flex;gap:.5rem;align-items:flex-end;padding-bottom:2px"><button class="btn btn-primary" style="background:linear-gradient(135deg,#e04040,#7c3aed)" onclick="generateCSLab('api')">Generate API Code</button></div>
+            </div>
+        </div>
+        <div id="csApiOutput" class="output-box"><div style="position:absolute;top:.75rem;right:.75rem;display:flex;gap:.4rem"><button class="copy-btn" onclick="copyCSLab('api')">Copy</button><button class="copy-btn" onclick="downloadCSLab('api','py')">Download</button></div><code id="csApiCode"></code></div>
+        <div style="margin-top:1.5rem"><h4 style="color:#f59e0b;margin-bottom:.75rem">&#127891; Practice — API Automation:</h4><div style="display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','auth','','','')">1. Authenticate</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','list-hosts','','','')">2. List Hosts</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','search-detections','','','')">3. Search Detections</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','create-ioc','','','')">4. Create IOC</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','contain-host','','','')">5. Contain Host</button>
+            <button class="btn btn-secondary" style="font-size:.75rem;padding:.5rem .8rem;text-transform:none;border-color:#e04040;color:#e04040" onclick="csLabPreset('api','full-workflow','','','')">6. Full IR Workflow</button>
+        </div></div>
     </div>
 </div>
 </div>
@@ -6307,6 +6789,247 @@ function generateMITREBundle() {
     lastMITRERule = rule;
     document.getElementById('mitreRuleCode').textContent = rule;
     document.getElementById('mitreRuleOutput').classList.add('show');
+}
+
+// ==================== CROWDSTRIKE LAB ====================
+const csLabOutputs = {};
+function copyCSLab(type) { navigator.clipboard.writeText(csLabOutputs[type]||''); const b=document.querySelector(`#cs${type.charAt(0).toUpperCase()+type.slice(1)}Output .copy-btn`)||document.querySelector(`#cs${type.replace(/^\w/,c=>c.toUpperCase())}Output .copy-btn`); if(b){b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500);}}
+function downloadCSLab(type,ext) { const n=`crowdstrike_${type}`; const b=new Blob([csLabOutputs[type]||''],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n+'.'+ext; a.click(); }
+function csLabPreset(type,name,p2,p3,p4) {
+    const ids={ioa:['csIoaName','csIoaType','csIoaDisposition','csIoaSeverity'],ioc:['csIocName'],prevention:['csPrevName'],firewall:['csFwName'],rtr:['csRtrName'],logscale:['csLogName'],api:['csApiAction']};
+    if(ids[type]&&ids[type][0]) document.getElementById(ids[type][0]).value=name;
+    if(type==='ioa'&&p2) document.getElementById('csIoaType').value=p2;
+    if(type==='ioa'&&p3) document.getElementById('csIoaDisposition').value=p3;
+    if(type==='ioa'&&p4) document.getElementById('csIoaSeverity').value=p4;
+    if(type==='api') document.getElementById('csApiAction').value=name;
+    generateCSLab(type);
+}
+function generateCSLab(type) {
+    const now = new Date().toISOString().split('T')[0];
+    let rule = '';
+    if (type === 'ioa') {
+        const name = document.getElementById('csIoaName').value.trim(); if(!name){alert('Enter threat description');return;}
+        const ruleType = document.getElementById('csIoaType').value;
+        const disposition = document.getElementById('csIoaDisposition').value;
+        const severity = document.getElementById('csIoaSeverity').value;
+        const platform = document.getElementById('csIoaPlatform').value;
+        const match = findMatch(name);
+        const dispId = disposition==='block'?80:disposition==='detect'?60:40;
+        const dispLabel = disposition==='block'?'Block, Block':disposition==='detect'?'Detect, Detect':'Monitor';
+        const t = match?match.t:'T1059';
+        const desc = match?match.desc:name;
+        // Build practical IOA with step-by-step guide
+        let fieldValues = [];
+        if(match&&(match.key.includes('mimikatz')||match.key.includes('credential')||match.key.includes('lsass'))){
+            if(ruleType==='process_access'){fieldValues=[{name:"TargetImageFileName",type:"string",values:["*\\\\lsass.exe"],operator:"match_any",description:"Target process is LSASS (stores credentials in memory)"},{name:"SourceImageFileName",type:"string",values:["*\\\\csrss.exe","*\\\\svchost.exe","*\\\\wininit.exe","*\\\\MsMpEng.exe","*\\\\vmtoolsd.exe"],operator:"not_match_any",description:"Exclude known legitimate processes that access LSASS"},{name:"DesiredAccess",type:"string",values:["0x1010","0x1410","0x1438","0x143a","0x1fffff"],operator:"match_any",description:"Memory read access flags used by credential dumping tools"}];}
+            else{fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\mimikatz.exe","*\\\\mimi.exe","*\\\\procdump.exe","*\\\\procdump64.exe","*\\\\pypykatz*"],operator:"match_any",description:"Known credential dumping tool names"},{name:"CommandLine",type:"string",values:["*sekurlsa*","*logonpasswords*","*lsadump*","*kerberos::list*","*privilege::debug*","*token::elevate*"],operator:"match_any",description:"Mimikatz command-line arguments"}];}
+        }else if(match&&match.key.includes('powershell')){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\powershell.exe","*\\\\pwsh.exe"],operator:"match_any",description:"PowerShell executable"},{name:"CommandLine",type:"string",values:["*-EncodedCommand*","*-enc *","*-ec *","*DownloadString*","*IEX*","*Invoke-Expression*","*bypass*","*WebClient*","*FromBase64String*","*hidden*"],operator:"match_any",description:"Suspicious PowerShell arguments indicating download/execute or evasion"}];
+        }else if(match&&match.key.includes('ransom')){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\vssadmin.exe","*\\\\wmic.exe","*\\\\bcdedit.exe","*\\\\wbadmin.exe"],operator:"match_any",description:"Windows utilities abused by ransomware"},{name:"CommandLine",type:"string",values:["*delete*shadows*","*shadowcopy*delete*","*recoveryenabled*no*","*delete*catalog*"],operator:"match_any",description:"Commands that delete backups/shadow copies"}];
+        }else if(match&&match.key.includes('webshell')){fieldValues=[{name:"ParentImageFileName",type:"string",values:["*\\\\w3wp.exe","*\\\\httpd.exe","*\\\\nginx.exe","*\\\\tomcat*","*\\\\php-cgi.exe","*\\\\javaw.exe"],operator:"match_any",description:"Web server process (parent of webshell)"},{name:"ImageFileName",type:"string",values:["*\\\\cmd.exe","*\\\\powershell.exe","*\\\\pwsh.exe","*\\\\bash*","*\\\\sh*","*\\\\python*","*\\\\certutil.exe"],operator:"match_any",description:"Command shell spawned by web server (webshell indicator)"}];
+        }else if(match&&(match.key.includes('lolbas')||match.key.includes('certutil'))){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\certutil.exe","*\\\\mshta.exe","*\\\\rundll32.exe","*\\\\regsvr32.exe","*\\\\wmic.exe","*\\\\bitsadmin.exe","*\\\\cmstp.exe"],operator:"match_any",description:"LOLBAS (Living Off the Land) signed binaries"},{name:"CommandLine",type:"string",values:["*http*","*ftp*","*urlcache*","*split*","*javascript*","*vbscript*","*scrobj*","*transfer*","*/i:http*","*advpack*"],operator:"match_any",description:"Download/execute indicators via LOLBAS"}];
+        }else if(match&&(match.key.includes('dcsync'))){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\mimikatz.exe","*\\\\lsass.exe","*\\\\ntdsutil.exe"],operator:"match_any",description:"Tools used for DCSync"},{name:"CommandLine",type:"string",values:["*lsadump::dcsync*","*/user:*","*-just-dc*","*secretsdump*"],operator:"match_any",description:"DCSync command patterns"}];
+        }else if(match&&match.key.includes('psexec')){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\psexec.exe","*\\\\psexec64.exe","*\\\\paexec.exe","*\\\\remcom.exe","*\\\\csexec.exe"],operator:"match_any",description:"PsExec and similar remote execution tools"}];
+        }else if(match&&(match.key.includes('scheduled')||match.key.includes('persist'))){fieldValues=[{name:"ImageFileName",type:"string",values:["*\\\\schtasks.exe"],operator:"match_any",description:"Scheduled task creation tool"},{name:"CommandLine",type:"string",values:["*/create*"],operator:"match_any",description:"Task creation flag"},{name:"CommandLine",type:"string",values:["*\\\\Temp\\\\*","*\\\\AppData\\\\*","*\\\\Downloads\\\\*","*powershell*","*cmd /c*","*http*"],operator:"match_any",description:"Suspicious task action (temp path, shell, download)"}];
+        }else if(match&&(match.key.includes('disable')||name.toLowerCase().includes('tamper'))){fieldValues=[{name:"CommandLine",type:"string",values:["*DisableRealtimeMonitoring*","*sc stop WinDefend*","*net stop*Defender*","*Set-MpPreference*-Disable*","*taskkill*/f*/im*MsMpEng*","*DisableAntiSpyware*","*sc delete*Sense*"],operator:"match_any",description:"Commands that disable Windows Defender or CrowdStrike sensor"}];
+        }else if(ruleType==='dns_request'){fieldValues=[{name:"DomainName",type:"string",values:["*.xyz","*.top","*.tk","*.ml","*.ga","*.cf","*.buzz","*.work","*.club"],operator:"match_any",description:"Suspicious top-level domains commonly used by malware"}];
+        }else{
+            const kws=match&&match.sigma?Object.values(match.sigma.detection).flatMap(v=>typeof v==='object'?Object.values(v).flat():[]).filter(x=>typeof x==='string').slice(0,6):[name.toLowerCase()];
+            fieldValues=[{name:"CommandLine",type:"string",values:kws.map(k=>`*${k}*`),operator:"match_any",description:`Detection pattern for ${name}`}];
+        }
+
+        const ioaJSON = {
+            _title: `Custom IOA Rule: ${name}`,
+            _description: desc,
+            _mitre_attack: t,
+            _created: now,
+            _console_path: "Configuration > Custom IOA Rule Groups > [Your Group] > Add Rule",
+            rule_config: {
+                name: name, description: `Detects ${desc}. MITRE: ${t}`,
+                disposition_id: dispId, disposition: dispLabel,
+                severity: severity, platform: platform, enabled: true,
+                detection_type: ruleType,
+                field_values: fieldValues,
+                mitre_attack: {technique_id:t, tactic: match?match.tac:'execution'}
+            },
+            _step_by_step: [
+                `STEP 1: Go to Falcon Console > Configuration > Custom IOA Rule Groups`,
+                `STEP 2: Click "Create Rule Group" (or select existing group)`,
+                `STEP 3: Name your group (e.g., "Custom Detections - ${match?match.tac:'Threats'}")`,
+                `STEP 4: Select Platform: ${platform.charAt(0).toUpperCase()+platform.slice(1)}`,
+                `STEP 5: Click "Add New Rule"`,
+                `STEP 6: Select Rule Type: "${ruleType.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}"`,
+                ...fieldValues.map((fv,i) => `STEP ${7+i}: Set field "${fv.name}" ${fv.operator.replace(/_/g,' ')} ${JSON.stringify(fv.values).slice(0,100)}... — ${fv.description}`),
+                `STEP ${7+fieldValues.length}: Set Disposition to "${dispLabel}" — ${disposition==='block'?'BLOCKS the process':'ALERTS only, does NOT block'}`,
+                `STEP ${8+fieldValues.length}: Set Severity to "${severity.toUpperCase()}"`,
+                `STEP ${9+fieldValues.length}: Click "Save" to create the rule`,
+                `STEP ${10+fieldValues.length}: IMPORTANT: Assign this Rule Group to a Prevention Policy!`,
+                `   Go to: Configuration > Prevention Policies > [Your Policy] > Custom IOA Rule Groups`,
+                `   Add your new Rule Group and click Save`,
+                ``,
+                `API ALTERNATIVE: POST /ioarules/entities/rules/v1 with the rule_config JSON above`
+            ],
+            _api_endpoint: "POST /ioarules/entities/rules/v1"
+        };
+        rule = JSON.stringify(ioaJSON, null, 2);
+    }
+    else if (type === 'ioc') {
+        const name = document.getElementById('csIocName').value.trim(); if(!name){alert('Enter threat name');return;}
+        const iocType = document.getElementById('csIocType').value;
+        const action = document.getElementById('csIocAction').value;
+        const match = findMatch(name);
+        const t = match?match.t:'T1078';
+        const placeholders = {sha256:'__PASTE_SHA256_HASH_HERE__',md5:'__PASTE_MD5_HASH_HERE__',domain:'__PASTE_DOMAIN_HERE__',ipv4:'__PASTE_IP_HERE__',ipv6:'__PASTE_IPv6_HERE__'};
+        rule = JSON.stringify({
+            _title: `IOC Policy: ${name}`,
+            _console_path: "IOC Management > Add Indicator",
+            _step_by_step: [
+                `STEP 1: Go to Falcon Console > IOC Management`,
+                `STEP 2: Click "Add Indicator" button (top right)`,
+                `STEP 3: Select Type: "${iocType.toUpperCase()}"`,
+                `STEP 4: Paste the indicator value in the "Value" field`,
+                `STEP 5: Set Action: "${action.charAt(0).toUpperCase()+action.slice(1)}"`,
+                `STEP 6: Set Severity: "High" (adjust as needed)`,
+                `STEP 7: Add Description: "${name}"`,
+                `STEP 8: Add Tags: "${t}", "${match?match.tac:'threat'}"`,
+                `STEP 9: Set Expiration: 90 days (recommended)`,
+                `STEP 10: Set Host Groups: "All" or specific groups`,
+                `STEP 11: Click "Save"`,
+                ``,
+                `BULK IMPORT: Use CSV upload for multiple IOCs`,
+                `API: POST /iocs/entities/indicators/v1 with the indicators array below`
+            ],
+            indicators: [
+                {type:iocType, value:placeholders[iocType], action:action,
+                 severity:"high", description:`${name} — ${match?match.desc:name}`,
+                 platforms:["windows","linux","mac"], applied_globally:true,
+                 tags:[t, match?match.tac:'threat', name.split(' ')[0]],
+                 expiration:new Date(Date.now()+90*24*60*60*1000).toISOString(),
+                 metadata:{mitre_attack:t, source:"Blue Team Toolkit", created:now}}
+            ],
+            _api_endpoint: "POST /iocs/entities/indicators/v1",
+            _csv_format: `type,value,action,severity,description,tags,platforms,expiration\n${iocType},${placeholders[iocType]},${action},high,"${name}","${t}",windows|linux|mac,${new Date(Date.now()+90*24*60*60*1000).toISOString().split('T')[0]}`
+        }, null, 2);
+    }
+    else if (type === 'prevention') {
+        const name = document.getElementById('csPrevName').value.trim()||'General Protection';
+        const template = document.getElementById('csPrevTemplate').value;
+        const match = findMatch(name);
+        const ml = template==='aggressive'?'AGGRESSIVE':template==='cautious'?'CAUTIOUS':'MODERATE';
+        const prev = template==='aggressive'?'AGGRESSIVE':template==='cautious'?'CAUTIOUS':'MODERATE';
+        rule = JSON.stringify({
+            _title: `Prevention Policy: ${name}`,
+            _template: template,
+            _console_path: "Configuration > Prevention Policies > Create/Clone Policy",
+            _step_by_step: [
+                `STEP 1: Go to Falcon Console > Configuration > Prevention Policies`,
+                `STEP 2: Click "Create Policy" or clone "platform_default"`,
+                `STEP 3: Name it: "${name}"`,
+                `STEP 4: Set each section below to the recommended values`,
+                `STEP 5: Assign to Host Groups (Workstations, Servers, etc.)`,
+                `STEP 6: Enable the policy`,
+                ``,
+                `IMPORTANT: Never modify "platform_default" — always clone it!`,
+                `TIP: Create separate policies for Workstations vs Servers`,
+            ],
+            policy_settings: {
+                NextGenAV: {Enabled:true, CloudAntiMalware:{Detection:ml,Prevention:prev}, OnSensorMLSlider:{Detection:ml,Prevention:prev==='AGGRESSIVE'?'MODERATE':prev}, AdwarePUP:{Detection:"MODERATE",Prevention:template==='aggressive'?"MODERATE":"CAUTIOUS"}},
+                Ransomware: {RansomwareEnhancedVisibility:true, FilesystemProtection:true, BackupDeletion:{Enabled:true,Action:template!=='cautious'?"BLOCK":"DETECT"}, VolumeEncryption:{Enabled:true,Action:template!=='cautious'?"BLOCK":"DETECT"}, MBRProtection:true},
+                BehavioralProtection: {SuspiciousProcessBlocking:template!=='cautious', SuspiciousScriptBlocking:true, SuspiciousCommandLineBlocking:template!=='cautious', CredentialDumpingBlocking:template!=='cautious', ProcessInjectionBlocking:template==='aggressive', LateralMovementBlocking:template==='aggressive'},
+                ScriptBasedExecution: {Enabled:true, PreventSuspiciousScripts:template!=='cautious', AMSIIntegration:true, ScriptContentLogging:true, PowerShellVisibility:true},
+                ExploitMitigation: {HeapSprayPreallocation:true, StackPivot:template!=='cautious', SEHOverwrite:true, NullPage:true, DEP:true, ASLR:true},
+                SensorVisibility: {NetworkVisibility:true, USBVisibility:true, ProcessTreeVisibility:true, RegistryVisibility:true},
+                ...(match&&match.key.includes('credential')?{CredentialProtection:{LsassReadProtection:true,CredentialDumpingBlocking:true,HashDumpPrevention:true}}:{}),
+                ...(template==='server'?{ServerOptimizations:{ReducedScanPriority:true,ExcludeDBPaths:true,ReducedNetworkMonitoring:false}}:{})
+            },
+            host_groups: template==='server'?["Windows Servers","Linux Servers"]:["All Workstations"],
+            enabled: true
+        }, null, 2);
+    }
+    else if (type === 'firewall') {
+        const name = document.getElementById('csFwName').value.trim()||'Network Protection';
+        const match = findMatch(name);
+        rule = buildCSFirewall(name, 'high', match||findMatch('cobalt strike'), now);
+    }
+    else if (type === 'rtr') {
+        const name = document.getElementById('csRtrName').value.trim()||'Investigation';
+        const rtrType = document.getElementById('csRtrType').value;
+        const match = findMatch(name);
+        if(match) { rule = buildCSRTR(name, 'high', match); }
+        else {
+            const scenarios = {
+                investigate: `# ============================================================\n# CrowdStrike RTR Investigation Script\n# Scenario: ${name}\n# ============================================================\n# Connect: Investigate > Host Search > Select Host > RTR icon\n\n# --- SYSTEM INFO ---\nps                                    # List running processes\nnetstat                               # Active network connections\nusers                                 # Logged-in users\nifconfig                              # Network interfaces\n\n# --- PROCESS INVESTIGATION ---\nrunscript -Raw=\`\`\`\nGet-Process | Sort-Object CPU -Descending | Select-Object -First 20 Id, ProcessName, CPU, WorkingSet64, Path\n\`\`\`\n\n# --- NETWORK CONNECTIONS ---\nrunscript -Raw=\`\`\`\nGet-NetTCPConnection | Where-Object State -eq 'Established' | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess, @{N='Process';E={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | Format-Table\n\`\`\`\n\n# --- CHECK PERSISTENCE ---\nrunscript -Raw=\`\`\`\nGet-ItemProperty "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -ErrorAction SilentlyContinue\nGet-ItemProperty "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -ErrorAction SilentlyContinue\nGet-ScheduledTask | Where-Object State -eq 'Ready' | Select-Object TaskName, @{N='Action';E={$_.Actions.Execute}} | Format-Table\n\`\`\`\n\n# --- RECENT FILE CHANGES ---\nrunscript -Raw=\`\`\`\nGet-ChildItem C:\\Users -Recurse -File -ErrorAction SilentlyContinue | Where-Object {$_.LastWriteTime -gt (Get-Date).AddHours(-24)} | Select-Object FullName, LastWriteTime, Length | Sort-Object LastWriteTime -Descending | Select-Object -First 30\n\`\`\``,
+                contain: `# ============================================================\n# CrowdStrike RTR Containment Script\n# Scenario: ${name}\n# ============================================================\n\n# --- STEP 1: NETWORK CONTAINMENT ---\n# In Falcon Console: Select host > Actions > Contain\n# OR via API: POST /devices/entities/devices-actions/v2 {action:"contain"}\n\n# --- STEP 2: KILL MALICIOUS PROCESSES ---\nrunscript -Raw=\`\`\`\n# Find suspicious processes\nGet-Process | Where-Object {$_.Path -like '*Temp*' -or $_.Path -like '*AppData*Downloads*'} | Select Id, ProcessName, Path\n\`\`\`\n# Then kill: kill <PID>\n\n# --- STEP 3: BLOCK NETWORK ---\nrunscript -Raw=\`\`\`\n# Block outbound to C2 IP\nNew-NetFirewallRule -DisplayName "Block C2" -Direction Outbound -RemoteAddress "__C2_IP__" -Action Block\n\`\`\`\n\n# --- STEP 4: DISABLE COMPROMISED ACCOUNT ---\nrunscript -Raw=\`\`\`\nnet user COMPROMISED_USER /active:no\n\`\`\``,
+                remediate: `# ============================================================\n# CrowdStrike RTR Remediation Script\n# Scenario: ${name}\n# ============================================================\n\n# --- REMOVE MALWARE ---\nrm "C:\\\\Users\\\\*\\\\AppData\\\\Local\\\\Temp\\\\malware.exe" --force\n\n# --- REMOVE PERSISTENCE ---\nrunscript -Raw=\`\`\`\n# Remove malicious scheduled tasks\nGet-ScheduledTask | Where-Object {$_.Actions.Execute -like '*Temp*' -or $_.Actions.Execute -like '*AppData*'} | Unregister-ScheduledTask -Confirm:$false\n\n# Remove run key entries\nRemove-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "MaliciousEntry" -ErrorAction SilentlyContinue\nRemove-ItemProperty -Path "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "MaliciousEntry" -ErrorAction SilentlyContinue\n\n# Remove malicious services\nGet-Service | Where-Object {$_.PathName -like '*Temp*'} | Stop-Service -Force\nsc.exe delete "MaliciousService"\n\`\`\`\n\n# --- VERIFY CLEAN ---\nrunscript -Raw=\`\`\`\nGet-Process | Where-Object {$_.Path -like '*Temp*'}\nGet-ScheduledTask | Where-Object {$_.Actions.Execute -like '*Temp*'}\n\`\`\``,
+                forensics: `# ============================================================\n# CrowdStrike RTR Forensic Collection Script\n# Scenario: ${name}\n# ============================================================\n\n# --- MEMORY DUMP ---\nmemdump                               # Full memory dump (large file!)\n\n# --- COLLECT KEY ARTIFACTS ---\nrunscript -Raw=\`\`\`\n$artifacts = @()\n\n# Event logs\n$artifacts += Get-WinEvent -LogName Security -MaxEvents 1000 | Select TimeCreated, Id, Message\n\n# Prefetch files (execution evidence)\n$artifacts += Get-ChildItem C:\\Windows\\Prefetch -ErrorAction SilentlyContinue | Select Name, LastWriteTime\n\n# Recent files\n$artifacts += Get-ChildItem "C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Recent" -ErrorAction SilentlyContinue | Select Name, LastWriteTime\n\n# Browser history\n$artifacts += Get-ChildItem "C:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History" -ErrorAction SilentlyContinue\n\n$artifacts | ConvertTo-Json | Out-File C:\\Windows\\Temp\\forensic_collection.json\n\`\`\`\n\n# --- DOWNLOAD ARTIFACTS ---\nget "C:\\\\Windows\\\\Temp\\\\forensic_collection.json"\n\n# --- COLLECT REGISTRY HIVES ---\nrunscript -Raw=\`\`\`\nreg save HKLM\\SYSTEM C:\\Windows\\Temp\\SYSTEM.hiv /y\nreg save HKLM\\SAM C:\\Windows\\Temp\\SAM.hiv /y\nreg save HKLM\\SOFTWARE C:\\Windows\\Temp\\SOFTWARE.hiv /y\n\`\`\`\nget "C:\\\\Windows\\\\Temp\\\\SYSTEM.hiv"\nget "C:\\\\Windows\\\\Temp\\\\SAM.hiv"`
+            };
+            rule = scenarios[rtrType] || scenarios.investigate;
+        }
+    }
+    else if (type === 'logscale') {
+        const name = document.getElementById('csLogName').value.trim()||'threat'; if(!name){alert('Enter search term');return;}
+        const eventType = document.getElementById('csLogEvent').value;
+        const match = findMatch(name);
+        if(match) { rule = buildCrowdStrike(name, 'high', match); }
+        else {
+            const templates = {
+                process: `// ${name} — CrowdStrike LogScale Hunt\n// Event Type: Process Creation\n\n#event_simpleName=ProcessRollup2\n| CommandLine=/${name.replace(/\s+/g,'|')}/i\n| groupBy([ComputerName, UserName, ImageFileName, CommandLine, ParentBaseFileName])\n| count(aid, as=hits)\n| sort(hits, order=desc, limit=100)\n\n// === Bonus: Rare Process Hunt ===\n#event_simpleName=ProcessRollup2\n| groupBy([ImageFileName], function=count(aid, as=total))\n| sort(total, order=asc, limit=50)\n| test(total < 3)`,
+                network: `// ${name} — CrowdStrike LogScale Hunt\n// Event Type: Network Connections\n\n#event_simpleName=NetworkConnectIP4\n| RemoteAddressIP4 != /^(10\\.|172\\.(1[6-9]|2\\d|3[01])\\.|192\\.168\\.|127\\.)/\n| groupBy([ComputerName, RemoteAddressIP4, RemotePort], function=count(aid, as=connections))\n| sort(connections, order=desc, limit=100)\n\n// === Suspicious Port Connections ===\n#event_simpleName=NetworkConnectIP4\n| RemotePort IN [4444, 5555, 6666, 7777, 8888, 9999, 1234, 50050, 8443]\n| groupBy([ComputerName, RemoteAddressIP4, RemotePort, ImageFileName])`,
+                dns: `// ${name} — CrowdStrike LogScale Hunt\n// Event Type: DNS Requests\n\n#event_simpleName=DnsRequest\n| DomainName=/${name.replace(/\s+/g,'|')}/i\n| groupBy([ComputerName, DomainName, ContextBaseFileName])\n| count(aid, as=queries)\n| sort(queries, order=desc)\n\n// === DGA Detection (high entropy domains) ===\n#event_simpleName=DnsRequest\n| regex("^[a-z0-9]{20,}\\\\.", field=DomainName)\n| groupBy([ComputerName, DomainName])\n\n// === DNS Beaconing (regular intervals) ===\n#event_simpleName=DnsRequest\n| groupBy([ComputerName, DomainName], function=[count(aid, as=total), min(@timestamp, as=first), max(@timestamp, as=last)])\n| total > 100`,
+                file: `// ${name} — CrowdStrike LogScale Hunt\n// Event Type: File Events\n\n#event_simpleName=NewExecutableWritten OR #event_simpleName=ExecutableDeleted\n| TargetFileName=/${name.replace(/\s+/g,'|')}/i\n| groupBy([ComputerName, TargetFileName, ContextBaseFileName])\n| count(aid, as=hits)\n| sort(hits, order=desc)\n\n// === Suspicious File Locations ===\n#event_simpleName=NewExecutableWritten\n| TargetFileName=/\\\\(Temp|AppData|Downloads|Public|ProgramData)\\\\/\n| groupBy([ComputerName, TargetFileName, ContextBaseFileName])`,
+                auth: `// ${name} — CrowdStrike LogScale Hunt\n// Event Type: Authentication\n\n#event_simpleName=UserLogon\n| LogonType IN [3, 10]\n| groupBy([UserName, ComputerName, RemoteAddressIP4, LogonType], function=count(aid, as=logons))\n| sort(logons, order=desc)\n\n// === Failed Logons (Brute Force) ===\n#event_simpleName=UserLogonFailed2\n| groupBy([UserName, RemoteAddressIP4], function=count(aid, as=failures))\n| sort(failures, order=desc)\n| test(failures > 5)`,
+                all: `// ${name} — CrowdStrike LogScale Full Hunt\n\n// Process Events\n#event_simpleName=ProcessRollup2\n| CommandLine=/${name.replace(/\s+/g,'|')}/i\n| groupBy([ComputerName, UserName, ImageFileName, CommandLine])\n| count(aid, as=hits) | sort(hits, order=desc, limit=50)\n\n// Network Events\n#event_simpleName=NetworkConnectIP4\n| RemotePort IN [4444, 5555, 8888, 443, 8443]\n| RemoteAddressIP4 != /^(10\\.|172\\.|192\\.168\\.|127\\.)/\n| groupBy([ComputerName, RemoteAddressIP4, RemotePort])\n\n// DNS Events\n#event_simpleName=DnsRequest\n| DomainName=/${name.replace(/\s+/g,'|')}/i\n| groupBy([ComputerName, DomainName])`
+            };
+            rule = templates[eventType] || templates.all;
+        }
+    }
+    else if (type === 'api') {
+        const action = document.getElementById('csApiAction').value;
+        const lang = document.getElementById('csApiLang').value;
+        const apiScripts = {
+            auth: {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — Authentication\nStep 1: Get an OAuth2 bearer token\n"""\nimport requests\n\n# Replace with your API credentials\n# Get these from: Support & Resources > API Clients and Keys\nCLIENT_ID = "__YOUR_CLIENT_ID__"\nCLIENT_SECRET = "__YOUR_CLIENT_SECRET__"\nBASE_URL = "https://api.crowdstrike.com"  # US-1 (change for US-2 or EU-1)\n\ndef get_token():\n    """Authenticate and get bearer token"""\n    response = requests.post(\n        f"{BASE_URL}/oauth2/token",\n        data={\n            "client_id": CLIENT_ID,\n            "client_secret": CLIENT_SECRET\n        }\n    )\n    response.raise_for_status()\n    token = response.json()["access_token"]\n    print(f"Token obtained (expires in {response.json()['expires_in']}s)")\n    return token\n\nif __name__ == "__main__":\n    token = get_token()\n    print(f"Bearer {token[:20]}...")`,
+                curl: `# CrowdStrike Falcon API — Authentication\n# Get OAuth2 bearer token\n\ncurl -X POST "https://api.crowdstrike.com/oauth2/token" \\\n  -H "Content-Type: application/x-www-form-urlencoded" \\\n  -d "client_id=__YOUR_CLIENT_ID__&client_secret=__YOUR_CLIENT_SECRET__"\n\n# Save the access_token from the response\n# Use it in subsequent requests as: -H "Authorization: Bearer <token>"`,
+                powershell: `# CrowdStrike Falcon API — Authentication\n$clientId = "__YOUR_CLIENT_ID__"\n$clientSecret = "__YOUR_CLIENT_SECRET__"\n$baseUrl = "https://api.crowdstrike.com"\n\n$body = @{client_id=$clientId; client_secret=$clientSecret}\n$response = Invoke-RestMethod -Uri "$baseUrl/oauth2/token" -Method Post -Body $body\n$token = $response.access_token\nWrite-Host "Token: $($token.Substring(0,20))..." -ForegroundColor Green\n\n# Use in subsequent requests:\n$headers = @{Authorization = "Bearer $token"}`
+            },
+            'list-hosts': {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — List All Hosts"""\nimport requests\n\nBASE_URL = "https://api.crowdstrike.com"\nTOKEN = "__YOUR_BEARER_TOKEN__"  # From authentication step\n\nheaders = {"Authorization": f"Bearer {TOKEN}"}\n\n# Step 1: Get host IDs\nresp = requests.get(f"{BASE_URL}/devices/queries/devices/v1",\n    headers=headers, params={"limit": 100})\nhost_ids = resp.json()["resources"]\nprint(f"Found {len(host_ids)} hosts")\n\n# Step 2: Get host details\nresp = requests.post(f"{BASE_URL}/devices/entities/devices/v2",\n    headers=headers, json={"ids": host_ids[:10]})\nfor host in resp.json()["resources"]:\n    print(f"  {host['hostname']} | {host.get('os_version','')} | {host.get('local_ip','')} | Last seen: {host.get('last_seen','')}")`,
+                curl: `# List hosts\ncurl -X GET "https://api.crowdstrike.com/devices/queries/devices/v1?limit=10" \\\n  -H "Authorization: Bearer __TOKEN__"\n\n# Get host details\ncurl -X POST "https://api.crowdstrike.com/devices/entities/devices/v2" \\\n  -H "Authorization: Bearer __TOKEN__" \\\n  -H "Content-Type: application/json" \\\n  -d '{"ids":["__HOST_ID__"]}'`,
+                powershell: `# List hosts\n$hosts = Invoke-RestMethod -Uri "$baseUrl/devices/queries/devices/v1?limit=100" -Headers $headers\nWrite-Host "Found $($hosts.resources.Count) hosts"\n\n# Get details\n$details = Invoke-RestMethod -Uri "$baseUrl/devices/entities/devices/v2" -Method Post -Headers $headers -Body (@{ids=$hosts.resources[0..9]} | ConvertTo-Json) -ContentType 'application/json'\n$details.resources | Select hostname, os_version, local_ip, last_seen | Format-Table`
+            },
+            'create-ioc': {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — Create IOC"""\nimport requests, json\n\nBASE_URL = "https://api.crowdstrike.com"\nTOKEN = "__YOUR_BEARER_TOKEN__"\nheaders = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}\n\n# Create IOC indicator\nioc_data = {\n    "indicators": [{\n        "type": "sha256",                    # sha256, md5, domain, ipv4, ipv6\n        "value": "__HASH_OR_IOC_VALUE__",\n        "action": "prevent",                  # prevent, detect, allow\n        "severity": "high",\n        "description": "Malware hash from incident IR-2024-001",\n        "platforms": ["windows", "linux"],\n        "tags": ["malware", "T1059"],\n        "applied_globally": True,\n        "expiration": "2025-06-30T00:00:00Z"  # Set expiration!\n    }]\n}\n\nresp = requests.post(f"{BASE_URL}/iocs/entities/indicators/v1",\n    headers=headers, json=ioc_data)\nprint(json.dumps(resp.json(), indent=2))\nprint(f"Status: {resp.status_code} — {'SUCCESS' if resp.status_code==201 else 'FAILED'}")`,
+                curl: `# Create IOC\ncurl -X POST "https://api.crowdstrike.com/iocs/entities/indicators/v1" \\\n  -H "Authorization: Bearer __TOKEN__" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "indicators": [{\n      "type": "sha256",\n      "value": "__HASH__",\n      "action": "prevent",\n      "severity": "high",\n      "description": "Blocked malware",\n      "platforms": ["windows"],\n      "applied_globally": true\n    }]\n  }'`,
+                powershell: `# Create IOC\n$ioc = @{indicators=@(@{\n    type='sha256'; value='__HASH__'; action='prevent'\n    severity='high'; description='Blocked malware'\n    platforms=@('windows'); applied_globally=$true\n})} | ConvertTo-Json -Depth 5\n\nInvoke-RestMethod -Uri "$baseUrl/iocs/entities/indicators/v1" -Method Post -Headers $headers -Body $ioc -ContentType 'application/json'`
+            },
+            'contain-host': {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — Contain (Isolate) Host"""\nimport requests, json\n\nBASE_URL = "https://api.crowdstrike.com"\nTOKEN = "__YOUR_BEARER_TOKEN__"\nheaders = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}\n\nHOST_ID = "__HOST_AID__"  # Get from host search\n\n# CONTAIN (isolate) the host\nresp = requests.post(\n    f"{BASE_URL}/devices/entities/devices-actions/v2?action_name=contain",\n    headers=headers,\n    json={"ids": [HOST_ID]}\n)\nprint(f"Containment: {resp.status_code} — {resp.json().get('resources',[{}])[0].get('id','')}")\n\n# To LIFT containment later:\n# resp = requests.post(\n#     f"{BASE_URL}/devices/entities/devices-actions/v2?action_name=lift_containment",\n#     headers=headers, json={"ids": [HOST_ID]}\n# )`,
+                curl: `# Contain host\ncurl -X POST "https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name=contain" \\\n  -H "Authorization: Bearer __TOKEN__" \\\n  -H "Content-Type: application/json" \\\n  -d '{"ids":["__HOST_AID__"]}'\n\n# Lift containment\ncurl -X POST "https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name=lift_containment" \\\n  -H "Authorization: Bearer __TOKEN__" \\\n  -H "Content-Type: application/json" \\\n  -d '{"ids":["__HOST_AID__"]}'`,
+                powershell: `# Contain host\nInvoke-RestMethod -Uri "$baseUrl/devices/entities/devices-actions/v2?action_name=contain" -Method Post -Headers $headers -Body (@{ids=@("__HOST_AID__")} | ConvertTo-Json) -ContentType 'application/json'\n\n# Lift containment\nInvoke-RestMethod -Uri "$baseUrl/devices/entities/devices-actions/v2?action_name=lift_containment" -Method Post -Headers $headers -Body (@{ids=@("__HOST_AID__")} | ConvertTo-Json) -ContentType 'application/json'`
+            },
+            'search-detections': {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — Search Detections"""\nimport requests, json\n\nBASE_URL = "https://api.crowdstrike.com"\nTOKEN = "__YOUR_BEARER_TOKEN__"\nheaders = {"Authorization": f"Bearer {TOKEN}"}\n\n# Search for recent detections\nresp = requests.get(f"{BASE_URL}/detects/queries/detects/v1",\n    headers=headers,\n    params={"filter": "status:'new'+severity:>='3'", "limit": 20, "sort": "last_behavior|desc"})\ndetect_ids = resp.json().get("resources", [])\nprint(f"Found {len(detect_ids)} detections")\n\n# Get detection details\nif detect_ids:\n    resp = requests.post(f"{BASE_URL}/detects/entities/summaries/GET/v1",\n        headers={**headers, "Content-Type": "application/json"},\n        json={"ids": detect_ids[:5]})\n    for det in resp.json().get("resources", []):\n        behaviors = det.get("behaviors", [{}])\n        for b in behaviors:\n            print(f"  [{b.get('severity_name','')}] {b.get('tactic','')}/{b.get('technique','')} — "\n                  f"{b.get('filename','')} on {det.get('device',{}).get('hostname','')} "\n                  f"({b.get('timestamp','')[:19]})")`,
+                curl: `# Search detections\ncurl -X GET "https://api.crowdstrike.com/detects/queries/detects/v1?filter=status:'new'&limit=10&sort=last_behavior|desc" \\\n  -H "Authorization: Bearer __TOKEN__"`,
+                powershell: `# Search detections\n$detections = Invoke-RestMethod -Uri "$baseUrl/detects/queries/detects/v1?filter=status:'new'&limit=10" -Headers $headers\nWrite-Host "Found $($detections.resources.Count) detections"`
+            },
+            'search-iocs': {python:`# Search IOCs\nimport requests\nresp = requests.get("https://api.crowdstrike.com/iocs/queries/indicators/v1",\n    headers={"Authorization":"Bearer __TOKEN__"}, params={"limit":50})\nprint(resp.json())`,curl:`curl -X GET "https://api.crowdstrike.com/iocs/queries/indicators/v1?limit=50" -H "Authorization: Bearer __TOKEN__"`,powershell:`Invoke-RestMethod -Uri "$baseUrl/iocs/queries/indicators/v1?limit=50" -Headers $headers`},
+            'create-ioa': {python:`# Create IOA Rule — see IOA Lab tab for full builder\nimport requests,json\nresp = requests.post("https://api.crowdstrike.com/ioarules/entities/rules/v1",\n    headers={"Authorization":"Bearer __TOKEN__","Content-Type":"application/json"},\n    json={"comment":"Auto-created","description":"Custom IOA","name":"My Rule",\n          "disposition_id":60,"field_values":[],"pattern_severity":"high",\n          "rulegroup_id":"__RULE_GROUP_ID__","ruletype_id":"12"})\nprint(json.dumps(resp.json(),indent=2))`,curl:`curl -X POST "https://api.crowdstrike.com/ioarules/entities/rules/v1" -H "Authorization: Bearer __TOKEN__" -H "Content-Type: application/json" -d '{"name":"Rule"}'`,powershell:`# See IOA Lab for full builder`},
+            'rtr-session': {python:`# Start RTR Session\nimport requests,json\nHOST_ID="__HOST_AID__"\nresp = requests.post("https://api.crowdstrike.com/real-time-response/entities/sessions/v1",\n    headers={"Authorization":"Bearer __TOKEN__","Content-Type":"application/json"},\n    json={"device_id":HOST_ID})\nsession = resp.json()["resources"][0]\nprint(f"Session ID: {session['session_id']}")\n\n# Execute command\nresp = requests.post("https://api.crowdstrike.com/real-time-response/entities/command/v1",\n    headers={"Authorization":"Bearer __TOKEN__","Content-Type":"application/json"},\n    json={"session_id":session["session_id"],"base_command":"ps","command_string":"ps"})\nprint(json.dumps(resp.json(),indent=2))`,curl:`# Start RTR session\ncurl -X POST "https://api.crowdstrike.com/real-time-response/entities/sessions/v1" \\\n  -H "Authorization: Bearer __TOKEN__" -H "Content-Type: application/json" \\\n  -d \'{"device_id":"__HOST_AID__"}\'`,powershell:`$session = Invoke-RestMethod -Uri "$baseUrl/real-time-response/entities/sessions/v1" -Method Post -Headers $headers -Body (@{device_id="__HOST_AID__"} | ConvertTo-Json) -ContentType 'application/json'`},
+            'full-workflow': {
+                python: `#!/usr/bin/env python3\n"""CrowdStrike Falcon API — Full Incident Response Workflow\nComplete automation: Detect → Investigate → Contain → Remediate\n"""\nimport requests, json, time\n\n# === CONFIGURATION ===\nBASE_URL = "https://api.crowdstrike.com"\nCLIENT_ID = "__YOUR_CLIENT_ID__"\nCLIENT_SECRET = "__YOUR_CLIENT_SECRET__"\n\nclass FalconIR:\n    def __init__(self):\n        self.token = self.authenticate()\n        self.headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}\n\n    def authenticate(self):\n        resp = requests.post(f"{BASE_URL}/oauth2/token",\n            data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET})\n        return resp.json()["access_token"]\n\n    def get_new_detections(self):\n        """Step 1: Get new critical/high detections"""\n        resp = requests.get(f"{BASE_URL}/detects/queries/detects/v1",\n            headers=self.headers,\n            params={"filter": "status:'new'+severity:>='4'", "limit": 10})\n        ids = resp.json().get("resources", [])\n        if not ids: return []\n        details = requests.post(f"{BASE_URL}/detects/entities/summaries/GET/v1",\n            headers=self.headers, json={"ids": ids})\n        return details.json().get("resources", [])\n\n    def contain_host(self, host_id):\n        """Step 2: Isolate compromised host"""\n        resp = requests.post(\n            f"{BASE_URL}/devices/entities/devices-actions/v2?action_name=contain",\n            headers=self.headers, json={"ids": [host_id]})\n        return resp.status_code == 202\n\n    def block_ioc(self, ioc_value, ioc_type="sha256"):\n        """Step 3: Block malicious IOC"""\n        resp = requests.post(f"{BASE_URL}/iocs/entities/indicators/v1",\n            headers=self.headers,\n            json={"indicators": [{"type": ioc_type, "value": ioc_value,\n                "action": "prevent", "severity": "critical",\n                "platforms": ["windows","linux"], "applied_globally": True}]})\n        return resp.status_code == 201\n\n    def update_detection_status(self, detect_ids, status="in_progress"):\n        """Step 4: Update detection status"""\n        resp = requests.patch(f"{BASE_URL}/detects/entities/detects/v2",\n            headers=self.headers,\n            json={"ids": detect_ids, "status": status})\n        return resp.status_code == 200\n\n    def run_ir_workflow(self):\n        """Execute full IR workflow"""\n        print("=== CrowdStrike Automated IR Workflow ===")\n\n        # Step 1: Get detections\n        detections = self.get_new_detections()\n        print(f"\\n[1] Found {len(detections)} new critical detections")\n\n        for det in detections:\n            host = det.get("device", {})\n            behaviors = det.get("behaviors", [])\n            hostname = host.get("hostname", "unknown")\n            host_id = host.get("device_id", "")\n\n            for b in behaviors:\n                print(f"\\n  Detection: {b.get('tactic','')}/{b.get('technique','')}")\n                print(f"  Host: {hostname} ({host.get('local_ip','')})")\n                print(f"  Severity: {b.get('severity_name','')}")\n                print(f"  File: {b.get('filename','')} (SHA256: {b.get('sha256','')})")\n\n                # Step 2: Contain host if critical\n                if b.get("severity", 0) >= 4:\n                    print(f"\\n[2] Containing host {hostname}...")\n                    if self.contain_host(host_id):\n                        print(f"  ✓ Host {hostname} contained")\n\n                # Step 3: Block IOC\n                sha = b.get("sha256", "")\n                if sha:\n                    print(f"\\n[3] Blocking IOC: {sha[:16]}...")\n                    if self.block_ioc(sha):\n                        print(f"  ✓ IOC blocked globally")\n\n            # Step 4: Update status\n            detect_id = det.get("detection_id", "")\n            if detect_id:\n                self.update_detection_status([detect_id], "in_progress")\n                print(f"\\n[4] Detection {detect_id} marked as in_progress")\n\n        print("\\n=== IR Workflow Complete ===")\n\nif __name__ == "__main__":\n    ir = FalconIR()\n    ir.run_ir_workflow()`,
+                curl: `# Full IR Workflow — cURL\n# Step 1: Authenticate\nTOKEN=$(curl -s -X POST "https://api.crowdstrike.com/oauth2/token" \\\n  -d "client_id=__ID__&client_secret=__SECRET__" | jq -r '.access_token')\n\n# Step 2: Get detections\ncurl -s "https://api.crowdstrike.com/detects/queries/detects/v1?filter=status:'new'&limit=5" \\\n  -H "Authorization: Bearer $TOKEN"\n\n# Step 3: Contain host\ncurl -X POST "https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name=contain" \\\n  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\\n  -d '{"ids":["__HOST_ID__"]}'\n\n# Step 4: Block IOC\ncurl -X POST "https://api.crowdstrike.com/iocs/entities/indicators/v1" \\\n  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\\n  -d '{"indicators":[{"type":"sha256","value":"__HASH__","action":"prevent","severity":"critical","platforms":["windows"],"applied_globally":true}]}'`,
+                powershell: `# Full IR Workflow — PowerShell\n$token = (Invoke-RestMethod -Uri "https://api.crowdstrike.com/oauth2/token" -Method Post -Body @{client_id='__ID__';client_secret='__SECRET__'}).access_token\n$h = @{Authorization="Bearer $token"}\n\n# Get detections\n$dets = Invoke-RestMethod -Uri "https://api.crowdstrike.com/detects/queries/detects/v1?filter=status:'new'&limit=5" -Headers $h\nWrite-Host "Detections: $($dets.resources.Count)"\n\n# Contain host\nInvoke-RestMethod -Uri "https://api.crowdstrike.com/devices/entities/devices-actions/v2?action_name=contain" -Method Post -Headers $h -Body (@{ids=@("__HOST_ID__")} | ConvertTo-Json) -ContentType 'application/json'`
+            }
+        };
+        const scripts = apiScripts[action] || apiScripts.auth;
+        rule = scripts[lang] || scripts.python;
+    }
+
+    // Store and display
+    const outputId = {ioa:'csIoaOutput',ioc:'csIocOutput',prevention:'csPrevOutput',firewall:'csFwOutput',rtr:'csRtrOutput',logscale:'csLogOutput',api:'csApiOutput'}[type];
+    const codeId = {ioa:'csIoaCode',ioc:'csIocCode',prevention:'csPrevCode',firewall:'csFwCode',rtr:'csRtrCode',logscale:'csLogCode',api:'csApiCode'}[type];
+    csLabOutputs[type] = rule;
+    document.getElementById(codeId).textContent = rule;
+    document.getElementById(outputId).classList.add('show');
 }
 </script>
 
