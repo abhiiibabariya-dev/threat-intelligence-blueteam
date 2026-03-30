@@ -1362,6 +1362,7 @@ body {
     .tactic-name { width: 100px; font-size: 10px; }
     .kb-generator-prompt { flex-direction: column; text-align: center; }
     .rb-container { margin: -20px -16px; }
+    .pg-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -1370,4 +1371,63 @@ body {
     .stat-number { font-size: 24px; }
     .page-feature-grid { grid-template-columns: 1fr; }
     .logo { font-size: 15px; }
+}
+
+/* Platform Page Rich Content */
+.pg-section { margin: 20px 0; }
+.pg-section-title { color: var(--accent); font-size: 1.2em; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+.pg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 12px 0; }
+.pg-info-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 15px; }
+.pg-info-card h4 { color: var(--accent); margin-bottom: 8px; font-size: 0.9em; }
+.pg-info-card p, .pg-info-card li { color: var(--text-secondary); font-size: 0.82em; line-height: 1.6; }
+.pg-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.82em; }
+.pg-table th { background: var(--bg-tertiary); color: var(--accent); padding: 8px 10px; text-align: left; border: 1px solid var(--border); }
+.pg-table td { padding: 8px 10px; border: 1px solid var(--border); color: var(--text-secondary); }
+.pg-table tr:hover td { background: var(--bg-secondary); }
+.pg-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 0; border-bottom: 2px solid var(--accent); }
+.pg-tab { background: var(--bg-secondary); color: var(--accent); border: 1px solid var(--border); border-bottom: none; padding: 8px 14px; cursor: pointer; font-family: var(--font-mono); font-size: 0.75em; }
+.pg-tab:hover { background: var(--bg-tertiary); }
+.pg-tab.active { background: var(--bg-card); border-color: var(--accent); color: #fff; font-weight: bold; }
+.pg-tab-content { display: none; padding: 15px; background: var(--bg-card); border: 1px solid var(--border); border-top: none; }
+.pg-tab-content.active { display: block; }
+.pg-ascii-art { background: #000; padding: 15px; border: 1px solid var(--border); border-radius: 4px; overflow-x: auto; margin: 12px 0; }
+.pg-ascii-art pre { color: var(--accent); font-size: 0.7em; line-height: 1.3; margin: 0; }
+.pg-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.7em; font-weight: bold; margin: 2px; }
+.pg-badge-green { background: rgba(0,255,65,0.15); color: var(--accent); border: 1px solid var(--accent); }
+.pg-badge-blue { background: rgba(0,212,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+.pg-badge-orange { background: rgba(255,102,0,0.15); color: #ff6600; border: 1px solid #ff6600; }
+.pg-badge-red { background: rgba(255,51,51,0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+.pg-step { display: flex; gap: 12px; margin: 10px 0; padding: 10px; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid var(--accent); }
+.pg-step-num { color: var(--accent); font-weight: bold; font-size: 1.2em; min-width: 30px; }
+.pg-step-text { color: var(--text-secondary); font-size: 0.85em; line-height: 1.5; }
+.pg-callout { padding: 12px 15px; border-radius: 4px; margin: 12px 0; font-size: 0.85em; }
+.pg-callout-info { background: rgba(0,212,255,0.08); border: 1px solid var(--accent-blue); color: var(--accent-blue); }
+.pg-callout-warn { background: rgba(255,204,0,0.08); border: 1px solid var(--accent-yellow); color: var(--accent-yellow); }
+.pg-callout-danger { background: rgba(255,51,51,0.08); border: 1px solid var(--accent-red); color: var(--accent-red); }
+.pg-callout-success { background: rgba(0,255,65,0.08); border: 1px solid var(--accent); color: var(--accent); }
+
+/* Terminal Status Indicator */
+.terminal-status { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; font-size: 0.75em; }
+.terminal-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.terminal-status-dot.connected { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.terminal-status-dot.disconnected { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+.terminal-status-dot.connecting { background: var(--accent-yellow); animation: pulse 1s infinite; }
+
+/* Scanline Effect */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9998;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+    );
 }

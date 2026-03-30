@@ -1,0 +1,28 @@
+{
+  "name": "blueshell-terminal",
+  "version": "2.0.0",
+  "description": "BlueShell Threat Intelligence Platform with Real Terminal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "blueshell",
+    "threat-intelligence",
+    "blue-team",
+    "soc",
+    "siem",
+    "terminal"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

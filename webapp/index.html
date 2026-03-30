@@ -72,7 +72,7 @@
                     <span class="arrow" id="arrow-edr">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-edr">
-                    <a href="#" onclick="loadPage('crowdstrike')" class="nav-link">CrowdStrike Falcon</a>
+                    <a href="#" onclick="loadCrowdStrikePOC()" class="nav-link" style="color:var(--accent);font-weight:bold">CrowdStrike Falcon [POC]</a>
                     <a href="#" onclick="loadPage('mde')" class="nav-link">Microsoft Defender</a>
                     <a href="#" onclick="loadPage('sentinelone')" class="nav-link">SentinelOne</a>
                     <a href="#" onclick="loadPage('carbonblack')" class="nav-link">Carbon Black</a>
@@ -207,11 +207,11 @@
                         <div class="card-desc">Open-source XDR/SIEM, rules, FIM, active response</div>
                         <div class="card-tag">SIEM</div>
                     </div>
-                    <div class="hack-card" onclick="loadPage('crowdstrike')">
+                    <div class="hack-card" onclick="loadCrowdStrikePOC()" style="border-color:var(--accent)">
                         <div class="card-icon">&#128065;</div>
-                        <div class="card-title">CrowdStrike Falcon</div>
-                        <div class="card-desc">IOA rules, FQL hunting, RTR, Falcon Fusion</div>
-                        <div class="card-tag">EDR</div>
+                        <div class="card-title">CrowdStrike Falcon POC</div>
+                        <div class="card-desc">Complete POC: Deploy, IOA Rules, RTR, Prevention, API, Client Presentation, Troubleshooting</div>
+                        <div class="card-tag" style="background:#ff6600;color:#000">POC</div>
                     </div>
                     <div class="hack-card" onclick="renderKnowledgeBase()" style="border-color:var(--accent)">
                         <div class="card-icon">&#128218;</div>
@@ -333,5 +333,10 @@
 
     <script src="js/rule-database.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/crowdstrike-poc.js"></script>
+    <script src="js/platform-pages.js"></script>
+    <script src="js/platform-content.js"></script>
+    <script src="js/real-terminal.js"></script>
+    <script src="js/features.js"></script>
 </body>
 </html>
