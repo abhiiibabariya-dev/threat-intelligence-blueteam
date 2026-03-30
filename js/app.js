@@ -10,6 +10,7 @@ const bootMessages = [
     "[BOOT] Detection engine...................OK",
     "[LOAD] SIEM: 14 | EDR: 4 | XDR: 3 | SOAR: 7",
     "[LOAD] Detection Rules: 500+ loaded",
+    "[LOAD] CrowdStrike POC Module: 12 tabs loaded",
     "[LOAD] Threat Intel Feeds: 8 configured",
     "[NET ] OSINT feeds connected..............OK",
     "[READY] All systems operational."
@@ -145,7 +146,6 @@ const pageData = {
     ir: { title: "INCIDENT RESPONSE PLAYBOOKS", type: "BLUE TEAM", desc: "8 comprehensive IR playbooks", features: ["Phishing Response", "Ransomware Response", "Data Breach Response", "Insider Threat Response", "DDoS Response", "Supply Chain Compromise", "Cloud Security Incident", "Business Email Compromise"], path: "../blue-team-resources/incident-response/" },
     hunting: { title: "THREAT HUNTING PLAYBOOKS", type: "BLUE TEAM", desc: "Hypothesis-driven threat hunting", features: ["20+ hunting hypotheses", "Ransomware pre-encryption", "APT persistence", "Insider data theft", "Living-off-the-land", "C2 communication patterns", "Query examples (SPL + KQL)"], path: "../threat-intelligence/threat-hunting/" },
     rulebuilder: { title: "RULE BUILDER", type: "TOOL", desc: "Drag-and-drop visual SIEM rule & use case builder", features: ["Visual drag-and-drop rule composition", "7 SIEM platform output formats", "MITRE ATT&CK tactic mapping", "Use case metadata & export", "Splunk SPL, Sentinel KQL, QRadar AQL, Elastic EQL, Wazuh XML, Chronicle YARA-L, Sigma"], path: "interactive" },
-    // SOAR Platforms
     splunksoar: { title: "SPLUNK SOAR (PHANTOM)", type: "SOAR", desc: "Security orchestration, automation & response by Splunk", features: ["Visual Playbook Editor", "400+ App Integrations", "Custom Actions & Python Playbooks", "Case Management & SLA Tracking", "Clustering & HA Deployment", "REST API & Webhooks", "Zero-to-Hero Training Guide", "Community Playbook Templates"], path: "../soar/splunk-soar/" },
     sentinelsoar: { title: "MICROSOFT SENTINEL SOAR", type: "SOAR", desc: "Logic Apps-based automation for Sentinel", features: ["Logic App Playbooks (ARM Templates)", "Automation Rules & Triggers", "Entity-Based Playbooks", "Incident Management Automation", "Azure Functions Integration", "Watchlist Enrichment", "Zero-to-Hero Training Guide", "Cost-Optimized Automation Patterns"], path: "../soar/sentinel-soar/" },
     xsoar: { title: "PALO ALTO XSOAR", type: "SOAR", desc: "Cortex XSOAR orchestration platform", features: ["Playbook YAML Definitions", "700+ Content Pack Integrations", "War Room & Collaboration", "Indicator Management (TIM)", "Custom Automation Scripts (Python)", "Machine Learning-Assisted Triage", "Zero-to-Hero Training Guide", "Marketplace Content Packs"], path: "../soar/palo-alto-xsoar/" },
@@ -153,16 +153,20 @@ const pageData = {
     shuffle: { title: "SHUFFLE SOAR", type: "SOAR", desc: "Open-source SOAR with visual workflow builder", features: ["Visual Drag-and-Drop Workflows", "OpenAPI App Generation", "Webhook Triggers & Schedules", "Wazuh & TheHive Integration", "Docker-Based Architecture", "Community Workflow Library", "Zero-to-Hero Training Guide", "Self-Hosted Deployment Guide"], path: "../soar/shuffle-soar/" },
     thehive: { title: "THEHIVE + CORTEX", type: "SOAR", desc: "Open-source incident response & analysis", features: ["Case & Task Management", "Observable Analysis (Cortex Analyzers)", "30+ Cortex Responders", "MISP Integration", "Alert Feeder System", "Custom Dashboards & Metrics", "Zero-to-Hero Training Guide", "Multi-Tenant Support"], path: "../soar/thehive-cortex/" },
     fortisoar: { title: "FORTISOAR", type: "SOAR", desc: "Fortinet security orchestration platform", features: ["Playbook Designer (JSON/YAML)", "350+ Connector Integrations", "Recommendation Engine (ML)", "War Room Collaboration", "Role-Based Access Control", "FortiGuard Integration", "Zero-to-Hero Training Guide", "SOC Maturity Assessment Tools"], path: "../soar/fortisoar/" },
-    // Tools & Intel
     ioc: { title: "IOC MANAGEMENT", type: "TOOL", desc: "Indicator of Compromise lifecycle management", features: ["IOC Collection & Normalization", "STIX/TAXII Feed Integration", "IOC Aging & Confidence Scoring", "Multi-SIEM Distribution", "IP/Domain/Hash/URL Enrichment", "Threat Actor Attribution", "IOC Export (CSV, JSON, STIX2)", "Blocklist Generation"], path: "../threat-intelligence/ioc-management/" },
     mitre: { title: "MITRE ATT&CK MAP", type: "TOOL", desc: "Interactive MITRE ATT&CK technique coverage mapping", features: ["14 Tactics Coverage Visualization", "Technique-to-Rule Mapping", "Coverage Gap Analysis", "Heat Map by Detection Confidence", "Enterprise + ICS Frameworks", "Navigator Layer Export", "Detection Priority Scoring", "Quarterly Coverage Trending"], path: "../threat-intelligence/mitre-attack-mapping/" },
-    // Blue Team Ops
     detection: { title: "DETECTION ENGINEERING", type: "BLUE TEAM", desc: "Build, test & maintain high-fidelity detection rules", features: ["Detection-as-Code Pipeline (CI/CD)", "Sigma Rule Development", "Rule Testing & Validation", "Detection Coverage Matrix", "False Positive Reduction", "Data Source Onboarding", "Detection Maturity Model", "Alert Tuning Methodology"], path: "../blue-team-resources/detection-engineering/" },
     triage: { title: "ALERT TRIAGE", type: "BLUE TEAM", desc: "SOC analyst alert triage procedures & workflows", features: ["Triage Decision Trees", "Priority & Severity Matrix", "Enrichment Workflows (IP, Hash, Domain)", "Escalation Criteria & Procedures", "Analyst Runbook Templates", "SLA Management (P1-P4)", "Common False Positive Catalog", "Triage Automation Playbooks"], path: "../blue-team-resources/alert-triage/" },
     runbooks: { title: "SOC RUNBOOKS", type: "BLUE TEAM", desc: "Step-by-step operational procedures for SOC analysts", features: ["L1/L2/L3 Analyst Procedures", "Shift Handoff Templates", "Escalation Workflow Guides", "Tool-Specific Runbooks (SIEM, EDR, SOAR)", "Communication Templates", "Evidence Collection Procedures", "Metrics & KPI Tracking", "Knowledge Transfer Guides"], path: "../blue-team-resources/soc-runbooks/" },
 };
 
 function loadPage(pageId) {
+    // Route CrowdStrike to full POC module
+    if (pageId === 'crowdstrike' && typeof loadCrowdStrikePOC === 'function') {
+        loadCrowdStrikePOC();
+        return;
+    }
+
     const page = pageData[pageId];
     if (!page) return;
 
@@ -175,6 +179,15 @@ function loadPage(pageId) {
     const overlay = document.getElementById('sidebar-overlay');
     if (sidebar) sidebar.classList.remove('sidebar-open');
     if (overlay) overlay.classList.remove('active');
+
+    // Check if rich content exists (from platform-pages.js)
+    if (typeof richPageContent !== 'undefined' && richPageContent[pageId]) {
+        content.innerHTML = richPageContent[pageId];
+        content.scrollTop = 0;
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        event?.target?.classList?.add('active');
+        return;
+    }
 
     const typeColors = {
         'SIEM': '#06b6d4', 'EDR': '#a855f7', 'XDR': '#ef4444',
@@ -214,6 +227,7 @@ function loadPage(pageId) {
         </div>
     `;
 
+    content.scrollTop = 0;
     // Update active nav
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     event?.target?.classList?.add('active');
@@ -261,13 +275,15 @@ function executeCommand() {
   xdr           - List XDR platforms
   soar          - List SOAR platforms
   tools         - List available tools
+  crowdstrike   - Open CrowdStrike Falcon POC Module
   kb            - SOC Knowledge Base (kb search, kb list, kb show)
   mitre         - Show MITRE ATT&CK coverage
   fetch         - Run threat intel fetcher
   status        - System status
   clear         - Clear terminal
   whoami        - Who are you?
-  matrix        - Toggle matrix rain</span>`;
+  matrix        - Toggle matrix rain
+  open [page]   - Open any platform page (e.g. open splunk)</span>`;
             break;
         case 'platforms':
         case 'siem':
@@ -281,16 +297,39 @@ function executeCommand() {
   [07] FortiSIEM         [14] Rapid7 InsightIDR</span>`;
             break;
         case 'edr':
-            output = '<span class="output">EDR: CrowdStrike Falcon | Microsoft Defender | SentinelOne | Carbon Black</span>';
+            output = `<span class="output">EDR Platforms (use 'open [id]' to view):
+  crowdstrike  - CrowdStrike Falcon [POC MODULE]
+  mde          - Microsoft Defender for Endpoint
+  sentinelone  - SentinelOne
+  carbonblack  - Carbon Black</span>`;
             break;
         case 'xdr':
-            output = '<span class="output">XDR: Palo Alto Cortex XDR | Microsoft 365 Defender | Trend Micro Vision One</span>';
+            output = `<span class="output">XDR Platforms (use 'open [id]' to view):
+  cortex       - Palo Alto Cortex XDR
+  m365         - Microsoft 365 Defender
+  visionone    - Trend Micro Vision One</span>`;
             break;
         case 'soar':
-            output = '<span class="output">SOAR: Splunk SOAR | Sentinel SOAR | QRadar SOAR | XSOAR | Shuffle | TheHive | FortiSOAR</span>';
+            output = `<span class="output">SOAR Platforms (use 'open [id]' to view):
+  splunksoar   - Splunk SOAR (Phantom)
+  sentinelsoar - Microsoft Sentinel SOAR
+  xsoar        - Palo Alto XSOAR
+  qradarsoar   - QRadar SOAR (Resilient)
+  shuffle      - Shuffle (Open Source)
+  thehive      - TheHive + Cortex
+  fortisoar    - FortiSOAR</span>`;
             break;
         case 'tools':
-            output = '<span class="output">Tools: threat-intel-fetcher.py | siem-rule-generator.py</span>';
+            output = `<span class="output">Tools & Resources:
+  fetcher      - Threat Intel Auto-Fetcher (Python)
+  rulegen      - SIEM Rule Generator
+  ioc          - IOC Management
+  mitre        - MITRE ATT&CK Navigator
+  detection    - Detection Engineering Guide
+  ir           - Incident Response Playbooks
+  hunting      - Threat Hunting Playbooks
+  triage       - Alert Triage Framework
+  runbooks     - SOC Runbooks</span>`;
             break;
         case 'fetch':
             output = '<span class="output">[*] Starting threat intel fetch...\n[*] URLhaus: 200 IOCs fetched\n[*] MalwareBazaar: 150 hashes fetched\n[*] ThreatFox: 180 IOCs fetched\n[*] FeodoTracker: 95 C2 IPs fetched\n[+] Total: 625 unique IOCs collected\n[+] Run: python tools/threat-intel-fetcher.py --all</span>';
@@ -324,6 +363,26 @@ function executeCommand() {
   Lateral Move   ██████░░░ 67%
   Exfiltration   █████░░░░ 56%
   C2             ████░░░░░ 44%</span>`;
+            break;
+        case 'crowdstrike':
+        case 'cs':
+        case 'falcon':
+            if (typeof loadCrowdStrikePOC === 'function') {
+                loadCrowdStrikePOC();
+                output = '<span class="output">[+] CrowdStrike Falcon POC Module loaded. Check main content area.</span>';
+            } else {
+                output = '<span class="error">CrowdStrike POC module not loaded.</span>';
+            }
+            break;
+        case 'open':
+            if (parts[1] && pageData[parts[1]]) {
+                loadPage(parts[1]);
+                output = `<span class="output">[+] Opened ${pageData[parts[1]].title}. Check main content area.</span>`;
+            } else if (parts[1]) {
+                output = `<span class="error">Unknown page: ${escapeHtml(parts[1])}. Type 'platforms' to see available pages.</span>`;
+            } else {
+                output = '<span class="error">Usage: open [page-id]. Type "platforms" to see available page IDs.</span>';
+            }
             break;
         case 'kb':
             if (typeof handleKBTerminalCommand === 'function') {
