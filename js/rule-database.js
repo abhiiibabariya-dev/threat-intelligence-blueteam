@@ -1610,59 +1610,168 @@ function renderKnowledgeBase(query = '') {
     });
 
     const sevClass = s => s==='Critical'?'kb-sev-critical':s==='High'?'kb-sev-high':s==='Medium'?'kb-sev-medium':'kb-sev-low';
-
-    // Check if we should offer to generate
     const showGenerator = query.length >= 3 && results.length < 3;
+    const isSearching = query.length > 0;
+
+    // Severity stats
+    const sevStats = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    results.forEach(r => { if (sevStats[r.severity] !== undefined) sevStats[r.severity]++; });
+
+    // Popular searches
+    const popularSearches = ['phishing', 'ransomware', 'brute force', 'kerberoasting', 'powershell', 'mimikatz', 'lateral movement', 'cobalt strike', 'dns tunneling', 'privilege escalation', 'LSASS', 'PLC tampering'];
 
     let html = `
         <div class="kb-header">
-            <h1>SOC KNOWLEDGE BASE</h1>
-            <p class="subtitle">MITRE ATT&CK Enterprise + ICS | ${ruleDatabase.length} Rules | Smart Rule Generator</p>
-            <p class="subtitle" style="color:var(--accent);font-size:10px;margin-top:4px">Type ANY rule name → get full query, playbook, TP/FP analysis, SOAR automation & SOC guidance</p>
+            <h1>⚛ SOC KNOWLEDGE BASE</h1>
+            <p class="subtitle">MITRE ATT&CK Enterprise + ICS | ${ruleDatabase.length} Detection Rules | Smart Rule Generator</p>
         </div>
+
         <div class="kb-search-container">
             <div class="kb-search-box">
                 <span class="kb-search-icon">⌕</span>
                 <input type="text" id="kb-search-input" class="kb-search-input"
-                    placeholder="Search rules... (e.g., phishing, kerberoasting, ransomware, T1566, LSASS, PLC tampering, SCADA)"
+                    placeholder="Search any rule, technique, tool, or MITRE ID... (e.g., T1566, phishing, LSASS, SCADA)"
                     value="${escapeHtml(query)}"
                     onkeyup="debounceSearch(this.value)"
                     autofocus>
-                <span class="kb-result-count">${results.length} rules</span>
+                <span class="kb-result-count">${results.length} / ${ruleDatabase.length}</span>
             </div>
-            <div class="kb-filter-bar">
+        </div>
+
+        <!-- Severity Quick Stats -->
+        <div class="kb-sev-stats">
+            <div class="kb-sev-stat" onclick="filterKB('')" style="border-color:var(--accent)">
+                <span class="kb-sev-stat-num" style="color:var(--accent)">${results.length}</span>
+                <span class="kb-sev-stat-label">TOTAL</span>
+            </div>
+            <div class="kb-sev-stat" onclick="debounceSearch('Critical')">
+                <span class="kb-sev-stat-num" style="color:#ff3333">${sevStats.Critical}</span>
+                <span class="kb-sev-stat-label">CRITICAL</span>
+            </div>
+            <div class="kb-sev-stat" onclick="debounceSearch('High')">
+                <span class="kb-sev-stat-num" style="color:#ffcc00">${sevStats.High}</span>
+                <span class="kb-sev-stat-label">HIGH</span>
+            </div>
+            <div class="kb-sev-stat" onclick="debounceSearch('Medium')">
+                <span class="kb-sev-stat-num" style="color:#00d4ff">${sevStats.Medium}</span>
+                <span class="kb-sev-stat-label">MEDIUM</span>
+            </div>
+            <div class="kb-sev-stat" onclick="debounceSearch('Low')">
+                <span class="kb-sev-stat-num" style="color:#8b949e">${sevStats.Low}</span>
+                <span class="kb-sev-stat-label">LOW</span>
+            </div>
+        </div>
+
+        <!-- Framework & Tactic Filter Bar -->
+        <div class="kb-filter-section">
+            <div class="kb-filter-row">
+                <span class="kb-filter-label">FRAMEWORK</span>
                 <button class="kb-filter-btn ${!query?'kb-filter-active':''}" onclick="filterKB('')">ALL (${ruleDatabase.length})</button>
-                <button class="kb-filter-btn" onclick="filterKB('Enterprise')" style="border-color:#00d4ff;color:#00d4ff">IT/ENTERPRISE</button>
-                <button class="kb-filter-btn" onclick="filterKB('ICS')" style="border-color:#ff6b35;color:#ff6b35">ICS/OT</button>
-                <span style="color:var(--text-dim);font-size:9px;padding:3px">|</span>
-                ${Object.keys(categoryMeta).filter(c=>!c.startsWith('ICS')).map(cat =>
-                    `<button class="kb-filter-btn" onclick="filterKB('${cat}')">${cat.split(' ').map(w=>w[0]).join('').toUpperCase()}</button>`
-                ).join('')}
+                <button class="kb-filter-btn" onclick="filterKB('Enterprise')" style="border-color:#00d4ff;color:#00d4ff">IT / ENTERPRISE</button>
+                <button class="kb-filter-btn" onclick="filterKB('ICS')" style="border-color:#ff6b35;color:#ff6b35">ICS / OT</button>
+            </div>
+            <div class="kb-filter-row">
+                <span class="kb-filter-label">TACTIC</span>
+                ${Object.keys(categoryMeta).filter(c=>!c.startsWith('ICS')).map(cat => {
+                    const m = categoryMeta[cat];
+                    const cnt = ruleDatabase.filter(r => r.category === cat).length;
+                    return `<button class="kb-filter-btn kb-tactic-btn" onclick="filterKB('${cat}')" style="border-color:${m.color}" title="${cat} (${cnt} rules)">
+                        <span style="color:${m.color}">${m.icon}</span> ${cat.split(' ').map(w=>w[0]).join('').toUpperCase()} <span class="kb-tactic-cnt">${cnt}</span>
+                    </button>`;
+                }).join('')}
             </div>
         </div>`;
 
-    // Show generator prompt if few results
-    if (showGenerator) {
+    // Popular searches (shown when no active query)
+    if (!isSearching) {
         html += `
-        <div class="kb-generator-prompt" style="background:var(--bg-card);border:1px solid var(--accent);border-radius:4px;padding:16px;margin-bottom:16px">
-            <div style="color:var(--accent);font-size:13px;font-weight:700;margin-bottom:8px">⚛ SMART RULE GENERATOR</div>
-            <div style="color:var(--text-secondary);font-size:12px;margin-bottom:12px">Can't find what you're looking for? Generate a complete detection rule for "<strong style="color:var(--accent)">${escapeHtml(query)}</strong>" with full queries, TP/FP analysis, SOAR automation, and playbook.</div>
-            <button class="btn-hack" onclick="generateAndShowRule('${escapeHtml(query)}')" style="border-color:var(--accent)">⚡ GENERATE RULE FOR "${escapeHtml(query).toUpperCase()}"</button>
+        <div class="kb-popular">
+            <span class="kb-popular-label">POPULAR</span>
+            ${popularSearches.map(s => `<button class="kb-popular-tag" onclick="document.getElementById('kb-search-input').value='${s}';debounceSearch('${s}')">${s}</button>`).join('')}
         </div>`;
     }
 
+    // Generator prompt
+    if (showGenerator) {
+        html += `
+        <div class="kb-generator-prompt">
+            <div class="kb-gen-icon">⚛</div>
+            <div class="kb-gen-content">
+                <div class="kb-gen-title">SMART RULE GENERATOR</div>
+                <div class="kb-gen-desc">Can't find what you're looking for? Auto-generate a complete detection rule for "<strong style="color:var(--accent)">${escapeHtml(query)}</strong>" with queries, TP/FP analysis, SOAR automation & playbook.</div>
+            </div>
+            <button class="btn-hack kb-gen-btn" onclick="generateAndShowRule('${escapeHtml(query)}')">⚡ GENERATE</button>
+        </div>`;
+    }
+
+    // Category overview cards (shown when no search query)
+    if (!isSearching) {
+        const entCats = Object.keys(categoryMeta).filter(c => !c.startsWith('ICS'));
+        const icsCats = Object.keys(categoryMeta).filter(c => c.startsWith('ICS'));
+        html += `
+        <div class="kb-section-divider">⟦ ENTERPRISE ATT&CK CATEGORIES ⟧</div>
+        <div class="kb-cat-grid">
+            ${entCats.map(cat => {
+                const m = categoryMeta[cat];
+                const cnt = ruleDatabase.filter(r => r.category === cat).length;
+                const topRules = ruleDatabase.filter(r => r.category === cat).slice(0, 3);
+                return `<div class="kb-cat-card" onclick="filterKB('${cat}')" style="--cat-color:${m.color}">
+                    <div class="kb-cat-card-header">
+                        <span class="kb-cat-card-icon" style="color:${m.color}">${m.icon}</span>
+                        <span class="kb-cat-card-name">${cat}</span>
+                        <span class="kb-cat-card-badge">${cnt}</span>
+                    </div>
+                    <div class="kb-cat-card-id">${m.tactics}</div>
+                    <div class="kb-cat-card-rules">
+                        ${topRules.map(r => `<div class="kb-cat-card-rule" onclick="event.stopPropagation();showRuleDetail('${r.id}')"><span class="kb-cat-rule-sev ${sevClass(r.severity)}">${r.severity[0]}</span> ${r.name}</div>`).join('')}
+                    </div>
+                    ${cnt > 3 ? `<div class="kb-cat-card-more">+ ${cnt - 3} more rules</div>` : ''}
+                </div>`;
+            }).join('')}
+        </div>`;
+
+        if (icsCats.some(c => ruleDatabase.filter(r => r.category === c).length > 0)) {
+            html += `
+            <div class="kb-section-divider" style="color:#ff6b35;border-color:#ff6b35">⟦ ICS / OT ATT&CK CATEGORIES ⟧</div>
+            <div class="kb-cat-grid">
+                ${icsCats.map(cat => {
+                    const m = categoryMeta[cat];
+                    const cnt = ruleDatabase.filter(r => r.category === cat).length;
+                    if (cnt === 0) return '';
+                    const topRules = ruleDatabase.filter(r => r.category === cat).slice(0, 3);
+                    return `<div class="kb-cat-card kb-cat-card-ics" onclick="filterKB('${cat}')" style="--cat-color:#ff6b35">
+                        <div class="kb-cat-card-header">
+                            <span class="kb-cat-card-icon" style="color:#ff6b35">${m.icon}</span>
+                            <span class="kb-cat-card-name">${cat.replace('ICS - ','')}</span>
+                            <span class="kb-cat-card-badge" style="background:#ff6b35">${cnt}</span>
+                        </div>
+                        <div class="kb-cat-card-id">${m.tactics}</div>
+                        <div class="kb-cat-card-rules">
+                            ${topRules.map(r => `<div class="kb-cat-card-rule" onclick="event.stopPropagation();showRuleDetail('${r.id}')"><span class="kb-cat-rule-sev ${sevClass(r.severity)}">${r.severity[0]}</span> ${r.name}</div>`).join('')}
+                        </div>
+                        ${cnt > 3 ? `<div class="kb-cat-card-more" style="color:#ff6b35">+ ${cnt - 3} more rules</div>` : ''}
+                    </div>`;
+                }).join('')}
+            </div>`;
+        }
+    }
+
+    // Search results
     html += '<div class="kb-results">';
 
-    if (results.length === 0) {
+    if (isSearching && results.length === 0) {
         html += `<div class="kb-empty">
             <div class="kb-empty-icon">⊘</div>
-            <div>No exact matches for "${escapeHtml(query)}"</div>
+            <div>No matches for "<strong style="color:var(--accent)">${escapeHtml(query)}</strong>"</div>
             <div class="kb-empty-hint" style="margin-top:12px">
                 <button class="btn-hack" onclick="generateAndShowRule('${escapeHtml(query)}')" style="border-color:var(--accent);font-size:12px;padding:8px 20px">⚡ AUTO-GENERATE RULE FOR "${escapeHtml(query).toUpperCase()}"</button>
             </div>
-            <div class="kb-empty-hint" style="margin-top:8px">Or try: phishing, brute force, powershell, mimikatz, kerberoasting, ransomware, cobalt strike, PLC tampering, SCADA</div>
+            <div class="kb-empty-hint" style="margin-top:12px">
+                <span style="color:var(--text-dim)">Try:</span>
+                ${popularSearches.slice(0,6).map(s => `<button class="kb-popular-tag" onclick="document.getElementById('kb-search-input').value='${s}';debounceSearch('${s}')" style="margin:2px">${s}</button>`).join('')}
+            </div>
         </div>`;
-    } else {
+    } else if (isSearching) {
         Object.keys(grouped).forEach(category => {
             const meta = categoryMeta[category] || { icon: '◈', color: 'var(--accent)' };
             const fw = (meta.framework === 'ICS') ? '<span style="color:#ff6b35;font-size:9px;margin-left:8px;border:1px solid #ff6b35;padding:0 4px;border-radius:2px">ICS</span>' : '';
@@ -1697,7 +1806,7 @@ function renderKnowledgeBase(query = '') {
         });
     }
 
-    html += `</div><div style="margin-top:24px"><button class="btn-hack" onclick="goHome()">◂ BACK TO DASHBOARD</button></div>`;
+    html += `</div><div style="margin-top:24px;padding-bottom:16px"><button class="btn-hack" onclick="goHome()">◂ BACK TO DASHBOARD</button></div>`;
     content.innerHTML = html;
     const si = document.getElementById('kb-search-input');
     if (si && !query) si.focus();

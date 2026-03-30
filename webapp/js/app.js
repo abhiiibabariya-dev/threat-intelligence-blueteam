@@ -163,6 +163,21 @@ const pageData = {
     ir: { title: "INCIDENT RESPONSE PLAYBOOKS", type: "BLUE TEAM", desc: "8 comprehensive IR playbooks", features: ["Phishing Response", "Ransomware Response", "Data Breach Response", "Insider Threat Response", "DDoS Response", "Supply Chain Compromise", "Cloud Security Incident", "Business Email Compromise"], path: "../blue-team-resources/incident-response/" },
     hunting: { title: "THREAT HUNTING PLAYBOOKS", type: "BLUE TEAM", desc: "Hypothesis-driven threat hunting", features: ["20+ hunting hypotheses", "Ransomware pre-encryption", "APT persistence", "Insider data theft", "Living-off-the-land", "C2 communication patterns", "Query examples (SPL + KQL)"], path: "../threat-intelligence/threat-hunting/" },
     rulebuilder: { title: "RULE BUILDER", type: "TOOL", desc: "Drag-and-drop visual SIEM rule & use case builder", features: ["Visual drag-and-drop rule composition", "7 SIEM platform output formats", "MITRE ATT&CK tactic mapping", "Use case metadata & export", "Splunk SPL, Sentinel KQL, QRadar AQL, Elastic EQL, Wazuh XML, Chronicle YARA-L, Sigma"], path: "interactive" },
+    // SOAR Platforms
+    splunksoar: { title: "SPLUNK SOAR (PHANTOM)", type: "SOAR", desc: "Security orchestration, automation & response by Splunk", features: ["Visual Playbook Editor", "400+ App Integrations", "Custom Actions & Python Playbooks", "Case Management & SLA Tracking", "Clustering & HA Deployment", "REST API & Webhooks", "Zero-to-Hero Training Guide", "Community Playbook Templates"], path: "../soar/splunk-soar/" },
+    sentinelsoar: { title: "MICROSOFT SENTINEL SOAR", type: "SOAR", desc: "Logic Apps-based automation for Sentinel", features: ["Logic App Playbooks (ARM Templates)", "Automation Rules & Triggers", "Entity-Based Playbooks", "Incident Management Automation", "Azure Functions Integration", "Watchlist Enrichment", "Zero-to-Hero Training Guide", "Cost-Optimized Automation Patterns"], path: "../soar/sentinel-soar/" },
+    xsoar: { title: "PALO ALTO XSOAR", type: "SOAR", desc: "Cortex XSOAR orchestration platform", features: ["Playbook YAML Definitions", "700+ Content Pack Integrations", "War Room & Collaboration", "Indicator Management (TIM)", "Custom Automation Scripts (Python)", "Machine Learning-Assisted Triage", "Zero-to-Hero Training Guide", "Marketplace Content Packs"], path: "../soar/palo-alto-xsoar/" },
+    qradarsoar: { title: "IBM QRADAR SOAR (RESILIENT)", type: "SOAR", desc: "Incident response orchestration platform", features: ["Dynamic Playbooks & Tasks", "NIST/SANS Framework Alignment", "Breach Response Module", "Privacy & Compliance Workflows", "REST API Functions", "Custom Actions & Scripts", "Zero-to-Hero Training Guide", "Threat Intelligence Integration"], path: "../soar/qradar-soar/" },
+    shuffle: { title: "SHUFFLE SOAR", type: "SOAR", desc: "Open-source SOAR with visual workflow builder", features: ["Visual Drag-and-Drop Workflows", "OpenAPI App Generation", "Webhook Triggers & Schedules", "Wazuh & TheHive Integration", "Docker-Based Architecture", "Community Workflow Library", "Zero-to-Hero Training Guide", "Self-Hosted Deployment Guide"], path: "../soar/shuffle-soar/" },
+    thehive: { title: "THEHIVE + CORTEX", type: "SOAR", desc: "Open-source incident response & analysis", features: ["Case & Task Management", "Observable Analysis (Cortex Analyzers)", "30+ Cortex Responders", "MISP Integration", "Alert Feeder System", "Custom Dashboards & Metrics", "Zero-to-Hero Training Guide", "Multi-Tenant Support"], path: "../soar/thehive-cortex/" },
+    fortisoar: { title: "FORTISOAR", type: "SOAR", desc: "Fortinet security orchestration platform", features: ["Playbook Designer (JSON/YAML)", "350+ Connector Integrations", "Recommendation Engine (ML)", "War Room Collaboration", "Role-Based Access Control", "FortiGuard Integration", "Zero-to-Hero Training Guide", "SOC Maturity Assessment Tools"], path: "../soar/fortisoar/" },
+    // Tools & Intel
+    ioc: { title: "IOC MANAGEMENT", type: "TOOL", desc: "Indicator of Compromise lifecycle management", features: ["IOC Collection & Normalization", "STIX/TAXII Feed Integration", "IOC Aging & Confidence Scoring", "Multi-SIEM Distribution", "IP/Domain/Hash/URL Enrichment", "Threat Actor Attribution", "IOC Export (CSV, JSON, STIX2)", "Blocklist Generation"], path: "../threat-intelligence/ioc-management/" },
+    mitre: { title: "MITRE ATT&CK MAP", type: "TOOL", desc: "Interactive MITRE ATT&CK technique coverage mapping", features: ["14 Tactics Coverage Visualization", "Technique-to-Rule Mapping", "Coverage Gap Analysis", "Heat Map by Detection Confidence", "Enterprise + ICS Frameworks", "Navigator Layer Export", "Detection Priority Scoring", "Quarterly Coverage Trending"], path: "../threat-intelligence/mitre-attack-mapping/" },
+    // Blue Team Ops
+    detection: { title: "DETECTION ENGINEERING", type: "BLUE TEAM", desc: "Build, test & maintain high-fidelity detection rules", features: ["Detection-as-Code Pipeline (CI/CD)", "Sigma Rule Development", "Rule Testing & Validation", "Detection Coverage Matrix", "False Positive Reduction", "Data Source Onboarding", "Detection Maturity Model", "Alert Tuning Methodology"], path: "../blue-team-resources/detection-engineering/" },
+    triage: { title: "ALERT TRIAGE", type: "BLUE TEAM", desc: "SOC analyst alert triage procedures & workflows", features: ["Triage Decision Trees", "Priority & Severity Matrix", "Enrichment Workflows (IP, Hash, Domain)", "Escalation Criteria & Procedures", "Analyst Runbook Templates", "SLA Management (P1-P4)", "Common False Positive Catalog", "Triage Automation Playbooks"], path: "../blue-team-resources/alert-triage/" },
+    runbooks: { title: "SOC RUNBOOKS", type: "BLUE TEAM", desc: "Step-by-step operational procedures for SOC analysts", features: ["L1/L2/L3 Analyst Procedures", "Shift Handoff Templates", "Escalation Workflow Guides", "Tool-Specific Runbooks (SIEM, EDR, SOAR)", "Communication Templates", "Evidence Collection Procedures", "Metrics & KPI Tracking", "Knowledge Transfer Guides"], path: "../blue-team-resources/soc-runbooks/" },
 };
 
 function loadPage(pageId) {
@@ -173,27 +188,41 @@ function loadPage(pageId) {
     const content = document.getElementById('page-content');
     content.classList.remove('hidden');
 
-    const featuresHtml = page.features.map(f => `<tr><td>▸ ${f}</td></tr>`).join('');
+    const typeColors = {
+        'SIEM': '#00d4ff', 'EDR': '#a855f7', 'XDR': '#ff3333',
+        'SOAR': '#ffcc00', 'TOOL': 'var(--accent)', 'BLUE TEAM': '#00ff41',
+        'SIEM/XDR': '#00d4ff', 'SIEM/UEBA': '#00d4ff'
+    };
+    const typeColor = typeColors[page.type] || 'var(--accent)';
+
+    const featuresHtml = page.features.map((f, i) =>
+        `<div class="page-feature-item" style="animation-delay:${i*50}ms">
+            <span class="page-feature-icon" style="color:${typeColor}">▸</span>
+            <span class="page-feature-text">${f}</span>
+        </div>`
+    ).join('');
 
     content.innerHTML = `
-        <div style="margin-bottom:24px">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-                <h1 style="margin:0;border:none;padding:0">${page.title}</h1>
-                <span class="card-tag" style="position:static">${page.type}</span>
+        <div class="page-detail">
+            <div class="page-detail-header" style="border-left:3px solid ${typeColor}">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap">
+                    <h1 style="margin:0;border:none;padding:0">${page.title}</h1>
+                    <span class="card-tag" style="position:static;background:${typeColor};color:#000">${page.type}</span>
+                </div>
+                <p style="color:var(--text-secondary);font-size:13px;margin:0">${page.desc}</p>
             </div>
-            <p style="color:var(--text-secondary);font-size:13px">${page.desc}</p>
-        </div>
 
-        <div class="section-title">⟦ AVAILABLE CONTENT ⟧</div>
-        <table><tbody>${featuresHtml}</tbody></table>
+            <div class="section-title" style="margin-top:24px">⟦ CAPABILITIES & CONTENT (${page.features.length}) ⟧</div>
+            <div class="page-feature-grid">${featuresHtml}</div>
 
-        <div class="section-title" style="margin-top:24px">⟦ FILE LOCATION ⟧</div>
-        <pre><code>${page.path}</code></pre>
+            <div class="section-title" style="margin-top:24px">⟦ FILE LOCATION ⟧</div>
+            <pre style="margin-bottom:0"><code>${page.path}</code></pre>
 
-        <div class="section-title" style="margin-top:24px">⟦ QUICK ACTIONS ⟧</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn-hack" onclick="loadPage('${pageId}')">↻ REFRESH</button>
-            <button class="btn-hack" onclick="goHome()">◂ BACK TO DASHBOARD</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:24px;padding-bottom:16px">
+                <button class="btn-hack" onclick="goHome()">◂ BACK TO DASHBOARD</button>
+                <button class="btn-hack" onclick="loadPage('${pageId}')">↻ REFRESH</button>
+                ${typeof renderKnowledgeBase === 'function' ? '<button class="btn-hack" onclick="renderKnowledgeBase()" style="border-color:var(--accent)">⚛ KNOWLEDGE BASE</button>' : ''}
+            </div>
         </div>
     `;
 
