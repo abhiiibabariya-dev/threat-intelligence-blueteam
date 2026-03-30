@@ -1,0 +1,24 @@
+{
+  "name": "threat-intelligence-blueteam",
+  "version": "1.0.0",
+  "description": "A comprehensive collection of tools, detection rules, threat hunting queries, and incident response playbooks for blue team operations. Built for defenders, mapped to MITRE ATT&CK and NIST SP 800-61.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam/issues"
+  },
+  "homepage": "https://github.com/abhiiibabariya-dev/threat-intelligence-blueteam#readme",
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}

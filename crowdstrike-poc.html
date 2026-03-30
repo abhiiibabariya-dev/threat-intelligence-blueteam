@@ -243,7 +243,15 @@ CrowdStrike Falcon POC Kit
 <div class="nav-item" data-section="vuln"><span class="icon">🐛</span><span class="label">Vulnerability Mgmt</span></div>
 <div class="nav-item" data-section="scenarios"><span class="icon">🧪</span><span class="label">POC Test Scenarios</span></div>
 <div class="nav-item" data-section="report"><span class="icon">📄</span><span class="label">Report Generator</span></div>
-<div class="nav-item" data-section="terminal"><span class="icon">&gt;_</span><span class="label">Terminal</span></div>
+<div class="nav-item" data-section="setup"><span class="icon">📖</span><span class="label">POC Setup Guide</span></div>
+<div class="nav-item" data-section="console"><span class="icon">🖥️</span><span class="label">Console Walkthrough</span></div>
+<div class="nav-item" data-section="demo"><span class="icon">🎤</span><span class="label">Demo Script</span></div>
+<div class="nav-item" data-section="faq"><span class="icon">❓</span><span class="label">Client FAQ</span></div>
+<div class="nav-item" data-section="compliance"><span class="icon">📜</span><span class="label">Compliance Mapping</span></div>
+<div class="nav-item" data-section="compare"><span class="icon">⚔️</span><span class="label">Competitor Compare</span></div>
+<div class="nav-item" data-section="troubleshoot"><span class="icon">🔧</span><span class="label">Troubleshooting</span></div>
+<div class="nav-item" data-section="terminal"><span class="icon">&gt;_</span><span class="label">Simulated Terminal</span></div>
+<div class="nav-item" data-section="realterminal"><span class="icon">💻</span><span class="label">Real Terminal</span></div>
 <div class="nav-item" data-section="ai"><span class="icon">🤖</span><span class="label">AI Assistant</span></div>
 </div>
 </nav>
@@ -258,10 +266,10 @@ CrowdStrike Falcon POC Kit
 <p>Complete Proof-of-Concept toolkit for deploying, configuring, testing, and reporting on CrowdStrike Falcon</p>
 </div>
 <div class="card-grid">
-<div class="stat-card"><div class="stat-value">20</div><div class="stat-label">Total Sections</div></div>
-<div class="stat-card"><div class="stat-value">12</div><div class="stat-label">Interactive Builders</div></div>
+<div class="stat-card"><div class="stat-value">27</div><div class="stat-label">Total Sections</div></div>
+<div class="stat-card"><div class="stat-value">15</div><div class="stat-label">Interactive Builders</div></div>
 <div class="stat-card"><div class="stat-value">15</div><div class="stat-label">Test Scenarios</div></div>
-<div class="stat-card"><div class="stat-value">30+</div><div class="stat-label">API Endpoints</div></div>
+<div class="stat-card"><div class="stat-value">50+</div><div class="stat-label">Terminal Commands</div></div>
 </div>
 
 <div class="card">
@@ -1347,6 +1355,999 @@ ipv4,203.0.113.50,detect,medium"></textarea></div>
 <button class="btn btn-purple" onclick="generateExecReport()">Generate Executive Summary</button>
 </div>
 <div class="output-box" id="rptOutput" style="display:none"><button class="copy-btn" onclick="copyOutput('rptOutput')">Copy</button></div>
+</div>
+
+<!-- ========== POC SETUP GUIDE ========== -->
+<div class="section" id="sec-setup">
+<div class="section-title"><span class="icon">📖</span> POC Day-by-Day Setup Guide</div>
+<div class="section-subtitle">Complete step-by-step guide - follow this to set up CrowdStrike from zero to hero</div>
+
+<div class="card">
+<div class="card-header">🎯 Before You Start - What You Need</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--accent)">FROM YOUR CROWDSTRIKE PARTNER/SE:</span>
+  1. Falcon Console URL (e.g., falcon.crowdstrike.com)
+  2. Admin credentials (email + password)
+  3. Customer ID (CID) - found in Console > Host Setup
+  4. API Client ID & Secret (if using API)
+  5. Sensor installer files (or download from console)
+
+<span style="color:var(--accent)">FROM THE CLIENT:</span>
+  1. Number of endpoints to deploy on (start with 10-50)
+  2. OS types (Windows, macOS, Linux)
+  3. Network requirements (proxy, firewall whitelist)
+  4. Existing security tools (for coexistence)
+  5. Key applications to test against (ensure no FPs)
+  6. Compliance requirements (HIPAA, PCI, SOC2, etc.)
+
+<span style="color:var(--accent)">WHITELIST REQUIREMENTS:</span>
+  Client firewall must allow outbound HTTPS (443) to:
+  • ts01-b.cloudsink.net
+  • lfodown01-b.cloudsink.net
+  • *.crowdstrike.com
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">📅 DAY 1: Console Setup & First Deployment (2-3 hours)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--green)">STEP 1: Login to Falcon Console</span>
+  → Go to falcon.crowdstrike.com (or your region's URL)
+  → Login with admin credentials
+  → You'll land on the main dashboard
+
+<span style="color:var(--green)">STEP 2: Download Sensor Installer</span>
+  → Console > Support & Resources > Sensor Downloads
+  → Download installer for each OS type
+  → Note the Customer ID (CID) shown on the download page
+
+<span style="color:var(--green)">STEP 3: Create Host Groups (IMPORTANT - DO THIS FIRST)</span>
+  → Console > Host Setup > Host Groups
+  → Click "Create Host Group"
+  → Create these groups:
+    • "POC-Test-Group" (Dynamic: hostname contains 'POC')
+    • "POC-Detect-Only" (Dynamic: tag contains 'detect-mode')
+    • "POC-Full-Prevention" (Dynamic: tag contains 'full-prevent')
+  → These let you apply different policies to different hosts
+
+<span style="color:var(--green)">STEP 4: Create Prevention Policy (DETECT ONLY for Day 1)</span>
+  → Console > Configuration > Prevention Policies
+  → Click "Create Policy"
+  → Name: "POC-Detect-Mode" Platform: Windows
+  → Set ALL toggles to DETECT (not prevent yet!)
+  → Cloud ML: Moderate, Sensor ML: Moderate
+  → Assign to "POC-Detect-Only" host group
+  → This ensures no business disruption on Day 1
+
+<span style="color:var(--green)">STEP 5: Install Sensor on First 5 Endpoints</span>
+  → Copy installer + CID to target machines
+  → Windows: WindowsSensor.exe /install /quiet CID=YOUR_CID GROUPING_TAGS="poc,detect-mode"
+  → Wait 5 minutes for hosts to appear in console
+  → Verify: Console > Hosts > search for your endpoints
+  → Check sensor version and "Connected" status
+
+<span style="color:var(--green)">STEP 6: Verify Deployment</span>
+  → Console > Host Setup > Sensor Health
+  → All hosts should show green "Connected" status
+  → If any show "RFM" = Reduced Functionality Mode (troubleshoot!)
+  → Run EICAR test: create eicar.com file on one host
+  → Check Console > Activity > Detections for EICAR alert
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">📅 DAY 2-3: Expand Deployment & Baseline (2-4 hours)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--green)">STEP 7: Deploy to Remaining POC Endpoints</span>
+  → Deploy sensor to all POC endpoints (target: 20-50)
+  → Use same GROUPING_TAGS="poc,detect-mode" for all
+  → For bulk deployment:
+    • GPO: Copy to NETLOGON share, create startup script
+    • SCCM: Create Application with detection rule
+    • Ansible: Use playbook from Deployment section
+  → Monitor Console > Hosts for new endpoints appearing
+
+<span style="color:var(--green)">STEP 8: Review Baseline Detections</span>
+  → After 24-48 hours in DETECT mode:
+  → Console > Activity > Detections
+  → Review all detections - categorize as:
+    • True Positive: Real threat activity (good!)
+    • False Positive: Legitimate app flagged (needs exclusion)
+    • Noise: Low-severity info detections (normal)
+  → Note any false positives for exclusion configuration
+
+<span style="color:var(--green)">STEP 9: Configure Exclusions (if needed)</span>
+  → Console > Configuration > Prevention Policies > Exclusions
+  → For each false positive, add:
+    • File path exclusion (e.g., C:\CompanyApp\app.exe)
+    • Hash exclusion (allow specific file hash)
+  → Keep exclusions minimal - better to tune ML than exclude
+
+<span style="color:var(--green)">STEP 10: Set Up Detection Policy</span>
+  → Console > Configuration > Detection Policies
+  → Create "POC-Detection-Policy"
+  → Cloud ML: Moderate, Sensor ML: Moderate
+  → Extended Visibility: ON (more telemetry data)
+  → Assign to your POC host groups
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">📅 DAY 4-5: Enable Prevention & Custom Rules (3-4 hours)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--green)">STEP 11: Create Full Prevention Policy</span>
+  → Console > Configuration > Prevention Policies
+  → Create "POC-Full-Prevention"
+  → Enable ALL behavioral protections in PREVENT mode:
+    ✓ Credential Dumping, Ransomware, Code Injection
+    ✓ Lateral Movement, Webshell, Fileless Ransomware
+  → ML: Moderate (or Aggressive if client wants max protection)
+  → Exploit Mitigation: ALL ON
+  → Script Monitoring: PowerShell + cmd + WMI = PREVENT
+  → Assign to "POC-Full-Prevention" host group
+  → Move a few test hosts to this group to validate
+
+<span style="color:var(--green)">STEP 12: Create Custom IOA Rules</span>
+  → Console > Configuration > Custom IOA Rule Groups
+  → Create group: "POC-Custom-Rules" (Windows)
+  → Add rules from this toolkit's IOA section:
+    1. Mimikatz Detection (T1003.001)
+    2. Encoded PowerShell (T1059.001)
+    3. Ransomware Shadow Delete (T1490)
+    4. PsExec Lateral Movement (T1021.002)
+    5. LOLBin Abuse (T1218)
+  → Start with DETECT disposition
+  → Assign group to your POC host groups
+
+<span style="color:var(--green)">STEP 13: Import IOC Blocklist</span>
+  → Console > Support > IOC Management
+  → Click "Upload Indicators"
+  → Import known-bad hashes, domains, IPs from:
+    • AlienVault OTX (free)
+    • abuse.ch (MalwareBazaar, URLhaus)
+    • Your own threat intel
+  → Use this toolkit's IOC section to generate import JSON
+
+<span style="color:var(--green)">STEP 14: Configure Firewall Rules</span>
+  → Console > Configuration > Firewall Management
+  → Create rule group: "POC-Firewall-Rules"
+  → Add rules:
+    • Block C2 ports (4444, 5555, 8080, 8443)
+    • Block external SMB (445, 139)
+    • Block Tor (9001, 9030, 9050)
+  → Assign to POC host groups
+
+<span style="color:var(--green)">STEP 15: Configure USB Device Control</span>
+  → Console > Configuration > USB Device Control
+  → Create policy: "Block-USB-Storage"
+  → Block all mass storage devices
+  → Add exceptions for approved devices if needed
+  → Assign to POC host groups
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">📅 WEEK 2-3: Testing & Validation (4-6 hours)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--green)">STEP 16: Run Test Scenarios</span>
+  → Go to "POC Test Scenarios" section in this toolkit
+  → Execute each of the 15 test scenarios
+  → Mark Pass/Fail for each
+  → Key tests to impress client:
+    1. EICAR test (basic - should pass immediately)
+    2. Mimikatz (shows credential protection)
+    3. Ransomware simulation (biggest client fear)
+    4. PowerShell encoded command (fileless attack)
+    5. USB block (visual proof of device control)
+    6. Network containment (impressive response capability)
+
+<span style="color:var(--green)">STEP 17: Demonstrate RTR (Real Time Response)</span>
+  → Console > Hosts > Select any host > Connect (RTR)
+  → Show the client you can:
+    • See running processes: ps
+    • Check network connections: netstat
+    • Kill suspicious processes: kill <PID>
+    • Collect evidence: runscript
+    • Download files: get <path>
+  → This is a HUGE differentiator vs competitors
+
+<span style="color:var(--green)">STEP 18: Show Threat Hunting</span>
+  → Console > Investigate > Event Search
+  → Run LogScale queries from this toolkit
+  → Show proactive hunting capabilities
+  → Demonstrate: "We can find threats others miss"
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">📅 WEEK 4: Report & Close (2-3 hours)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--green)">STEP 19: Generate POC Report</span>
+  → Go to "Report Generator" section in this toolkit
+  → Fill in client info, test results, metrics
+  → Generate executive summary + detailed report
+  → Include ROI calculation (use the built-in calculator)
+
+<span style="color:var(--green)">STEP 20: Client Presentation</span>
+  → Show detection rate (target: >95%)
+  → Show prevention rate (target: >90%)
+  → Show mean time to detect (<5 seconds)
+  → Walk through 2-3 best detection examples
+  → Show ROI: CrowdStrike saves $X per year
+  → Recommend production deployment plan
+
+<span style="color:var(--green)">STEP 21: Transition to Production</span>
+  → If client approves (PO!):
+  → Move all hosts to full prevention policy
+  → Increase ML to Aggressive
+  → Enable all IOA rules in Prevent mode
+  → Set up SIEM integration
+  → Configure email notifications
+  → Enable Falcon OverWatch (managed hunting)
+</div>
+</div>
+</div>
+
+<!-- ========== CONSOLE WALKTHROUGH ========== -->
+<div class="section" id="sec-console">
+<div class="section-title"><span class="icon">🖥️</span> Falcon Console Walkthrough</div>
+<div class="section-subtitle">Visual guide to every area of the CrowdStrike Falcon console</div>
+
+<div class="card">
+<div class="card-header">🏠 Console Navigation Map</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--accent)">━━━ FALCON CONSOLE TOP-LEVEL MENU ━━━</span>
+
+<span style="color:var(--yellow)">ACTIVITY</span> (Your daily driver - check this first every morning)
+  ├── <span style="color:var(--green)">Detections</span>
+  │   → All alerts from sensors, ML, IOA rules
+  │   → Filter by severity: Critical, High, Medium, Low, Info
+  │   → Actions: Assign, Update Status, View Process Tree
+  │   → THIS IS WHERE YOU START EVERY DAY
+  │
+  ├── <span style="color:var(--green)">Incidents</span>
+  │   → Correlated groups of related detections
+  │   → Shows attack story across multiple hosts
+  │   → Better for understanding full attack scope
+  │
+  └── <span style="color:var(--green)">Quarantined Files</span>
+      → Files blocked and quarantined by sensor
+      → Can release false positives from here
+
+<span style="color:var(--yellow)">INVESTIGATE</span> (Deep analysis & threat hunting)
+  ├── <span style="color:var(--green)">Host Search</span>
+  │   → Find any endpoint by name, IP, OS, etc.
+  │   → View host details, timeline, detections
+  │   → Start RTR session from here
+  │   → Network containment controls here
+  │
+  ├── <span style="color:var(--green)">Event Search (LogScale)</span>
+  │   → Raw telemetry search
+  │   → Write LogScale/Humio queries
+  │   → Threat hunting playground
+  │
+  ├── <span style="color:var(--green)">User Search</span>
+  │   → Find activity by user across all hosts
+  │   → Great for insider threat investigation
+  │
+  └── <span style="color:var(--green)">Hash Search</span>
+      → Look up any file hash
+      → See where it appeared in your environment
+      → Check CrowdStrike intelligence on the hash
+
+<span style="color:var(--yellow)">CONFIGURATION</span> (Where you build everything)
+  ├── <span style="color:var(--green)">Prevention Policies</span>
+  │   → NGAV settings (ML sensitivity, behavioral protection)
+  │   → Create per platform (Windows, macOS, Linux)
+  │   → Assign to host groups
+  │
+  ├── <span style="color:var(--green)">Detection Policies</span>
+  │   → Cloud & sensor ML sensitivity for detection
+  │   → Extended visibility settings
+  │
+  ├── <span style="color:var(--green)">Sensor Update Policies</span>
+  │   → Control sensor auto-update behavior
+  │   → N-1, N-2 build selection
+  │   → Maintenance windows
+  │
+  ├── <span style="color:var(--green)">Custom IOA Rule Groups</span>
+  │   → Create custom behavioral detection rules
+  │   → Map to MITRE ATT&CK
+  │   → Detect or Prevent disposition
+  │
+  ├── <span style="color:var(--green)">Firewall Management</span>
+  │   → Host-based firewall rules
+  │   → Managed from cloud (no GPO needed)
+  │
+  └── <span style="color:var(--green)">USB Device Control</span>
+      → Block/allow USB storage devices
+      → Granular by vendor/product/serial number
+
+<span style="color:var(--yellow)">HOST SETUP</span> (Deployment & management)
+  ├── <span style="color:var(--green)">Sensor Downloads</span>
+  │   → Download installers for all platforms
+  │   → Shows CID for deployment
+  │
+  ├── <span style="color:var(--green)">Host Groups</span>
+  │   → Create static or dynamic groups
+  │   → Dynamic groups auto-assign based on rules
+  │
+  └── <span style="color:var(--green)">Sensor Health</span>
+      → Overall sensor deployment health
+      → RFM (Reduced Functionality Mode) hosts
+      → Connectivity issues
+
+<span style="color:var(--yellow)">SPOTLIGHT</span> (Vulnerability Management)
+  └── <span style="color:var(--green)">Vulnerabilities</span>
+      → Real-time CVE assessment (no scanning!)
+      → ExPRT AI priority rating
+      → Filter by severity, product, host group
+
+<span style="color:var(--yellow)">IDENTITY</span> (AD Protection)
+  └── <span style="color:var(--green)">Identity Dashboard</span>
+      → Active Directory attack detection
+      → Pass-the-Hash, Golden Ticket, DCSync
+      → No DC agent needed (reads AD traffic)
+
+<span style="color:var(--yellow)">SUPPORT</span> (Admin & settings)
+  ├── <span style="color:var(--green)">IOC Management</span>
+  │   → Import/manage indicators of compromise
+  │   → Block hashes, domains, IPs
+  │
+  ├── <span style="color:var(--green)">API Clients & Keys</span>
+  │   → Create API credentials
+  │   → Manage API scopes/permissions
+  │
+  └── <span style="color:var(--green)">Notification Settings</span>
+      → Email alerts for critical detections
+      → Webhook integrations (Slack, Teams, etc.)
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">🔍 How to Investigate a Detection (Step by Step)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--accent)">WHEN YOU SEE A DETECTION ALERT:</span>
+
+<span style="color:var(--yellow)">1. TRIAGE</span> (30 seconds)
+  → Activity > Detections
+  → Look at: Severity + Technique + Hostname
+  → Critical + Credential Access on server = DROP EVERYTHING
+  → Low + Info on workstation = can wait
+
+<span style="color:var(--yellow)">2. INVESTIGATE THE PROCESS TREE</span> (2-3 minutes)
+  → Click on the detection
+  → View "Execution Details" / Process Tree
+  → Look at:
+    • What process ran? (powershell, cmd, unknown.exe?)
+    • What launched it? (explorer = user ran it, w3wp = webshell)
+    • What did it do? (network connection? file write? registry?)
+    • What was the command line? (encoded? suspicious args?)
+
+<span style="color:var(--yellow)">3. CHECK THE HOST</span> (1-2 minutes)
+  → Click on hostname in detection
+  → Check: Is it a critical server or user workstation?
+  → Check: Is the user who ran it legitimate?
+  → Check: Are there other recent detections on this host?
+
+<span style="color:var(--yellow)">4. DECIDE: CONTAIN OR MONITOR</span>
+  → If active threat (C2 connection, lateral movement):
+    → CONTAIN THE HOST immediately
+    → Host > Actions > Contain
+    → This blocks all network except CrowdStrike cloud
+  → If suspicious but not confirmed:
+    → Set detection to "In Progress"
+    → Monitor for additional activity
+
+<span style="color:var(--yellow)">5. COLLECT EVIDENCE (via RTR)</span>
+  → Host > Connect to RTR
+  → Run: ps (check running processes)
+  → Run: netstat (check connections)
+  → Run: runscript -CloudFile="CollectForensics"
+  → Run: get C:\evidence.zip (download artifacts)
+
+<span style="color:var(--yellow)">6. REMEDIATE</span>
+  → Kill malicious processes: kill PID
+  → Remove persistence: check registry run keys, scheduled tasks
+  → Quarantine files: rm suspicious_file.exe
+  → Reset compromised credentials (via AD admin)
+
+<span style="color:var(--yellow)">7. CLOSE THE LOOP</span>
+  → Update detection status to "Resolved" or "Closed"
+  → Document findings
+  → If new IOC found: add to IOC blocklist
+  → If new attack pattern: create Custom IOA rule
+  → Lift containment when remediation confirmed
+</div>
+</div>
+</div>
+
+<!-- ========== DEMO SCRIPT ========== -->
+<div class="section" id="sec-demo">
+<div class="section-title"><span class="icon">🎤</span> Client Demo Script & Talking Points</div>
+<div class="section-subtitle">What to say and show during your POC demo to impress the client</div>
+
+<div class="card">
+<div class="card-header">🎯 Demo Agenda (60-90 minutes)</div>
+<div class="output-box" style="color:var(--text)">
+<span style="color:var(--accent)">RECOMMENDED DEMO FLOW:</span>
+
+<span style="color:var(--yellow)">1. OPENING (5 min)</span>
+  "Thank you for evaluating CrowdStrike Falcon. Over the past [X] weeks,
+   we deployed Falcon across [N] of your endpoints. Let me show you what
+   we found and how Falcon protected your environment."
+
+<span style="color:var(--yellow)">2. DEPLOYMENT OVERVIEW (5 min)</span>
+  Show: Console > Hosts
+  Say: "All [N] endpoints are reporting healthy. The sensor is lightweight
+       at ~1% CPU and ~50MB RAM. Your users didn't notice any impact."
+  Show: Sensor health dashboard - all green
+  Say: "Zero deployment issues, zero business disruption."
+
+<span style="color:var(--yellow)">3. LIVE ATTACK DEMO - EICAR (5 min)</span>
+  Do: Create EICAR test file on a test endpoint
+  Show: Detection appears in console within seconds
+  Say: "Falcon detected and blocked this in under 3 seconds.
+       No signature update needed - this is ML-based detection."
+
+<span style="color:var(--yellow)">4. LIVE ATTACK DEMO - RANSOMWARE (10 min) ⭐ KEY MOMENT</span>
+  Do: Run ransomware simulation (vssadmin delete shadows)
+  Show: Falcon prevents the shadow deletion
+  Say: "Ransomware is the #1 concern for organizations today.
+       Falcon stops ransomware BEFORE files are encrypted by
+       detecting the behavioral pattern - shadow copy deletion,
+       mass file renaming - not just known signatures."
+
+<span style="color:var(--yellow)">5. LIVE ATTACK DEMO - CREDENTIAL THEFT (10 min) ⭐ KEY MOMENT</span>
+  Do: Attempt Mimikatz or LSASS access on test host
+  Show: Falcon prevents credential dumping
+  Say: "Credential theft leads to lateral movement and full compromise.
+       Falcon detects and prevents LSASS memory access regardless of
+       what tool the attacker uses."
+
+<span style="color:var(--yellow)">6. RTR DEMONSTRATION (10 min) ⭐ WOW MOMENT</span>
+  Do: Open RTR session to remote endpoint
+  Show: Run ps, netstat, collect artifacts
+  Say: "Real Time Response gives your team remote shell access to any
+       endpoint - no VPN, no RDP, no SSH needed. Just click and connect.
+       You can investigate, remediate, and collect evidence all from
+       the Falcon console."
+
+<span style="color:var(--yellow)">7. THREAT HUNTING (10 min)</span>
+  Show: LogScale with threat hunting queries
+  Say: "Beyond automated detection, Falcon gives you the data to
+       proactively hunt for threats. And with Falcon OverWatch,
+       CrowdStrike's elite team hunts 24/7 on your behalf."
+
+<span style="color:var(--yellow)">8. RESULTS SUMMARY (10 min)</span>
+  Show: POC report with metrics
+  Say: "Over [X] weeks, Falcon achieved:
+       • [97]% detection rate across all test scenarios
+       • [93]% prevention rate
+       • Sub-5 second mean time to detect
+       • Zero false positives on your critical applications
+       • Zero performance impact on your endpoints"
+
+<span style="color:var(--yellow)">9. ROI & RECOMMENDATION (10 min)</span>
+  Show: ROI calculator results
+  Say: "Based on industry breach costs of $4.45M and your risk profile,
+       CrowdStrike delivers an estimated [500]% ROI in the first year.
+       We recommend proceeding with full deployment across all
+       [total] endpoints."
+
+<span style="color:var(--yellow)">10. Q&A (10-15 min)</span>
+  → See FAQ section for common questions and answers
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">💡 Power Phrases for Client Conversations</div>
+<div class="card-grid">
+<div class="preset-card"><div class="preset-name">Single Agent</div><div class="preset-desc">"One lightweight agent replaces 5-7 legacy tools - AV, EDR, vulnerability scanner, USB control, firewall, SIEM agent"</div></div>
+<div class="preset-card"><div class="preset-name">Cloud-Native</div><div class="preset-desc">"No on-premise infrastructure needed. No servers to maintain. Full protection in minutes, not months."</div></div>
+<div class="preset-card"><div class="preset-name">AI-Powered</div><div class="preset-desc">"Machine learning detects novel threats that signature-based tools miss. No waiting for vendor updates."</div></div>
+<div class="preset-card"><div class="preset-name">1-10-60 Rule</div><div class="preset-desc">"CrowdStrike's benchmark: 1 minute to detect, 10 minutes to investigate, 60 minutes to remediate."</div></div>
+<div class="preset-card"><div class="preset-name">OverWatch</div><div class="preset-desc">"24/7 managed threat hunting by CrowdStrike's elite team - like having a SOC team for free."</div></div>
+<div class="preset-card"><div class="preset-name">Threat Intel</div><div class="preset-desc">"CrowdStrike tracks 200+ threat actor groups. This intelligence powers every detection."</div></div>
+</div>
+</div>
+</div>
+
+<!-- ========== CLIENT FAQ ========== -->
+<div class="section" id="sec-faq">
+<div class="section-title"><span class="icon">❓</span> Client FAQ & Objection Handling</div>
+<div class="section-subtitle">Common client questions and how to answer them confidently</div>
+
+<div id="faqContainer">
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"How is CrowdStrike different from our current antivirus?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+Traditional AV uses signatures - a database of known bad files. It can only detect what it already knows.
+
+CrowdStrike uses Machine Learning and Behavioral Analysis:
+• <span style="color:var(--accent)">ML</span>: Analyzes file characteristics to determine if it's malicious, even for never-seen-before threats
+• <span style="color:var(--accent)">Behavioral</span>: Watches WHAT programs DO, not just what they look like
+  → If a process deletes shadow copies + encrypts files = ransomware behavior = blocked
+  → Doesn't matter if it's a brand new ransomware variant
+
+Plus: EDR (investigation), RTR (remote response), Threat Intel, Managed Hunting
+Traditional AV = just a lock on the door
+CrowdStrike = lock + cameras + alarm + 24/7 security guard</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"Will it slow down our computers?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+CrowdStrike is specifically designed to be lightweight:
+• CPU: ~1% average usage (less than Chrome)
+• RAM: ~50-80MB (less than Outlook)
+• Disk: ~25MB installed
+• No scheduled full-disk scans (unlike traditional AV)
+• No bulky signature database downloads
+
+During our POC, we monitored [N] endpoints for [X] weeks with zero
+performance complaints. Your users won't notice it's there.
+
+<span style="color:var(--accent)">Fun fact:</span> Many customers report BETTER performance after removing
+legacy AV and replacing with CrowdStrike because CrowdStrike's sensor
+is more efficient than traditional AV scanning engines.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"What about false positives? Will it block our business apps?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+False positive management is a key CrowdStrike strength:
+
+1. <span style="color:var(--accent)">ML Tuning</span>: We start at "Moderate" sensitivity during POC.
+   If any FPs occur, we can adjust per-app or globally.
+
+2. <span style="color:var(--accent)">Detect-First Approach</span>: We start in detect-only mode.
+   We validate zero FPs BEFORE enabling prevention.
+   Only after confirming safety do we enable blocking.
+
+3. <span style="color:var(--accent)">Granular Exclusions</span>: We can exclude specific:
+   • File paths (e.g., your custom app folder)
+   • File hashes (specific versions of your apps)
+   • Process names (named exclusions)
+
+During our POC: [0] false positives on your production applications.
+Your critical apps ran without any interference.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"What happens if the internet goes down?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+CrowdStrike works OFFLINE:
+
+• <span style="color:var(--accent)">Sensor ML models run locally</span> on the endpoint
+• Behavioral protection works without cloud connection
+• Exploit mitigation is entirely local
+• The sensor caches events and uploads when reconnected
+• No "cloud-only" single point of failure
+
+The cloud connection provides:
+• Cloud ML models (additional layer - enhances, doesn't replace)
+• Central management console visibility
+• Real-time threat intelligence updates
+• RTR remote access
+
+Bottom line: Protection continues offline. Management requires connectivity.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"How much does CrowdStrike cost?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+CrowdStrike pricing is per-endpoint/year and varies by:
+• Number of endpoints
+• Modules selected
+• Contract length
+
+<span style="color:var(--accent)">Common Bundles:</span>
+• Falcon Go: ~$60/endpoint/year (NGAV only)
+• Falcon Pro: ~$100/endpoint/year (NGAV + EDR basics)
+• Falcon Enterprise: ~$185/endpoint/year (NGAV + EDR + Hunting)
+• Falcon Elite: ~$250/endpoint/year (Full platform)
+
+<span style="color:var(--accent)">ROI Perspective:</span>
+• Average breach cost: $4.45M (IBM 2024)
+• CrowdStrike for 1000 endpoints ≈ $185K/year
+• One prevented breach = 24x ROI
+• Plus: Replaces 5-7 tools = cost consolidation
+
+Contact your CrowdStrike sales rep for exact pricing.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"Can it protect our Linux servers and Macs too?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+Yes! CrowdStrike provides full cross-platform support:
+
+<span style="color:var(--accent)">Windows:</span> 7 SP1+, Server 2008 R2+ (full feature set)
+<span style="color:var(--accent)">macOS:</span> 10.15+ Catalina and later (full feature set)
+<span style="color:var(--accent)">Linux:</span> RHEL 6+, Ubuntu 16.04+, SLES 12+, Amazon Linux 2
+  → Supports kernel mode AND user mode
+  → Container/Kubernetes protection available
+  → Cloud workload protection (AWS, Azure, GCP)
+
+Same console, same agent, same policies.
+Manage everything from one place.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"What about the July 2024 incident?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER (handle with care):</span>
+Acknowledge it directly and focus on improvements:
+
+"CrowdStrike took full responsibility for the July 2024 incident.
+Since then, they have implemented significant safeguards:
+
+1. <span style="color:var(--accent)">Content Update Testing</span>: Additional validation layers before
+   any content update is released globally
+2. <span style="color:var(--accent)">Staged Rollouts</span>: Content updates now deploy gradually,
+   not simultaneously to all endpoints
+3. <span style="color:var(--accent)">Customer Control</span>: New sensor update policies give you
+   full control over update timing and N-1/N-2 version pinning
+4. <span style="color:var(--accent)">Independent Review</span>: Third-party code review process added
+
+The incident, while serious, was a content update issue - not a
+security breach. No customer data was compromised. CrowdStrike's
+detection and prevention capabilities remain industry-leading."</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4>"We're already using [Competitor]. Why switch?"</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--green)">ANSWER:</span>
+Don't badmouth competitors. Focus on CrowdStrike's strengths:
+
+"That's a solid tool. Here's what differentiates CrowdStrike:
+
+1. <span style="color:var(--accent)">Cloud-Native Architecture</span>: No on-premise servers = zero infra cost
+2. <span style="color:var(--accent)">Single Agent</span>: NGAV + EDR + Device Control + Firewall + Vuln Mgmt
+3. <span style="color:var(--accent)">OverWatch</span>: 24/7 managed threat hunting included
+4. <span style="color:var(--accent)">Threat Intel</span>: Tracks 200+ adversary groups
+5. <span style="color:var(--accent)">1-10-60</span>: Industry-best detection and response times
+6. <span style="color:var(--accent)">LogScale SIEM</span>: Built-in log management at no extra cost
+
+The best way to compare is to run both side by side during a POC
+and let the results speak for themselves."
+
+See Competitor Comparison section for detailed comparisons.</div>
+</div></div>
+</div>
+</div>
+
+<!-- ========== COMPLIANCE MAPPING ========== -->
+<div class="section" id="sec-compliance">
+<div class="section-title"><span class="icon">📜</span> Compliance Mapping</div>
+<div class="section-subtitle">How CrowdStrike Falcon maps to major compliance frameworks</div>
+
+<div class="tab-bar" data-tabgroup="comply">
+<button class="tab-btn active" data-tab="comply-pci">PCI-DSS</button>
+<button class="tab-btn" data-tab="comply-hipaa">HIPAA</button>
+<button class="tab-btn" data-tab="comply-soc2">SOC 2</button>
+<button class="tab-btn" data-tab="comply-nist">NIST CSF</button>
+<button class="tab-btn" data-tab="comply-iso">ISO 27001</button>
+</div>
+
+<div class="tab-pane active" id="comply-pci">
+<div class="card">
+<div class="card-header">PCI-DSS 4.0 Compliance Mapping</div>
+<table class="cmd-table">
+<thead><tr><th>PCI Requirement</th><th>CrowdStrike Feature</th><th>How to Configure</th></tr></thead>
+<tbody>
+<tr><td>5.2 - Malicious software prevented/detected</td><td>Falcon Prevent (NGAV)</td><td>Enable Cloud + Sensor ML at Aggressive</td></tr>
+<tr><td>5.3 - Anti-malware mechanisms active</td><td>Sensor Tamper Protection</td><td>Enable in Prevention Policy</td></tr>
+<tr><td>5.4 - Phishing attacks detected</td><td>Script Monitoring + IOA Rules</td><td>Enable PowerShell monitoring, create phishing IOA</td></tr>
+<tr><td>6.4 - Software developed securely</td><td>Spotlight Vulnerability Mgmt</td><td>Monitor for CVEs in dev dependencies</td></tr>
+<tr><td>10.2 - Audit trail established</td><td>Falcon Insight EDR + LogScale</td><td>Extended Visibility ON, LogScale retention 90d</td></tr>
+<tr><td>10.4 - Audit logs reviewed</td><td>LogScale dashboards</td><td>Create daily review dashboard</td></tr>
+<tr><td>11.5 - Change detection on critical systems</td><td>File Integrity Monitoring (FIM)</td><td>Enable FIM in sensor policy</td></tr>
+<tr><td>12.10 - Incident response plan</td><td>RTR + Automated Response</td><td>Configure containment workflows</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<div class="tab-pane" id="comply-hipaa">
+<div class="card">
+<div class="card-header">HIPAA Security Rule Mapping</div>
+<table class="cmd-table">
+<thead><tr><th>HIPAA Safeguard</th><th>CrowdStrike Feature</th><th>Configuration</th></tr></thead>
+<tbody>
+<tr><td>164.308(a)(1) - Risk Analysis</td><td>Spotlight + Falcon Discover</td><td>Vulnerability assessment + asset inventory</td></tr>
+<tr><td>164.308(a)(5) - Security Awareness</td><td>Detection alerts + reporting</td><td>Email notifications for critical events</td></tr>
+<tr><td>164.308(a)(6) - Security Incident Response</td><td>Falcon Insight + RTR</td><td>Incident workflow + remote response</td></tr>
+<tr><td>164.310(d) - Device & Media Controls</td><td>USB Device Control</td><td>Block unauthorized USB storage</td></tr>
+<tr><td>164.312(a) - Access Control</td><td>Identity Protection</td><td>Monitor AD authentication events</td></tr>
+<tr><td>164.312(b) - Audit Controls</td><td>EDR telemetry + LogScale</td><td>Full endpoint activity logging</td></tr>
+<tr><td>164.312(c) - Integrity Controls</td><td>Prevention Policy + FIM</td><td>Prevent unauthorized changes to ePHI</td></tr>
+<tr><td>164.312(e) - Transmission Security</td><td>Firewall Management</td><td>Control network access to ePHI systems</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<div class="tab-pane" id="comply-soc2">
+<div class="card">
+<div class="card-header">SOC 2 Trust Criteria Mapping</div>
+<table class="cmd-table">
+<thead><tr><th>SOC 2 Criteria</th><th>CrowdStrike Feature</th><th>Configuration</th></tr></thead>
+<tbody>
+<tr><td>CC6.1 - Logical Access Security</td><td>Identity Protection + Prevention</td><td>AD monitoring + endpoint protection</td></tr>
+<tr><td>CC6.6 - Boundary Protection</td><td>Firewall Management</td><td>Network rules + C2 blocking</td></tr>
+<tr><td>CC6.8 - Malware Prevention</td><td>Falcon Prevent + IOC Management</td><td>NGAV + threat intel indicators</td></tr>
+<tr><td>CC7.1 - Detection of Threats</td><td>Falcon Insight + Custom IOA</td><td>EDR + behavioral detection rules</td></tr>
+<tr><td>CC7.2 - Monitoring</td><td>LogScale + OverWatch</td><td>SIEM + managed threat hunting</td></tr>
+<tr><td>CC7.3 - Incident Response</td><td>RTR + Response Policies</td><td>Remote response + automated actions</td></tr>
+<tr><td>CC7.4 - Incident Recovery</td><td>RTR remediation scripts</td><td>Pre-built remediation playbooks</td></tr>
+<tr><td>CC8.1 - Change Management</td><td>FIM + Registry Monitoring</td><td>Detect unauthorized system changes</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<div class="tab-pane" id="comply-nist">
+<div class="card">
+<div class="card-header">NIST Cybersecurity Framework Mapping</div>
+<table class="cmd-table">
+<thead><tr><th>NIST Function</th><th>CrowdStrike Feature</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td><span class="tag tag-blue">IDENTIFY</span> Asset Management</td><td>Falcon Discover</td><td>Automated asset inventory</td></tr>
+<tr><td><span class="tag tag-blue">IDENTIFY</span> Risk Assessment</td><td>Spotlight</td><td>Real-time vulnerability assessment</td></tr>
+<tr><td><span class="tag tag-green">PROTECT</span> Access Control</td><td>Identity Protection</td><td>AD monitoring + MFA enforcement</td></tr>
+<tr><td><span class="tag tag-green">PROTECT</span> Data Security</td><td>USB Device Control</td><td>Block unauthorized data transfer</td></tr>
+<tr><td><span class="tag tag-green">PROTECT</span> Endpoint Protection</td><td>Falcon Prevent</td><td>NGAV + behavioral prevention</td></tr>
+<tr><td><span class="tag tag-yellow">DETECT</span> Anomaly Detection</td><td>Falcon Insight + IOA</td><td>ML + behavioral + custom rules</td></tr>
+<tr><td><span class="tag tag-yellow">DETECT</span> Continuous Monitoring</td><td>LogScale + OverWatch</td><td>24/7 monitoring + hunting</td></tr>
+<tr><td><span class="tag tag-red">RESPOND</span> Incident Response</td><td>RTR + Containment</td><td>Remote investigation + isolation</td></tr>
+<tr><td><span class="tag tag-red">RESPOND</span> Mitigation</td><td>Auto-remediation</td><td>Kill, quarantine, remove persistence</td></tr>
+<tr><td><span class="tag tag-purple">RECOVER</span> Recovery Planning</td><td>Response workflows</td><td>Automated remediation scripts</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<div class="tab-pane" id="comply-iso">
+<div class="card">
+<div class="card-header">ISO 27001 Controls Mapping</div>
+<table class="cmd-table">
+<thead><tr><th>ISO Control</th><th>CrowdStrike Feature</th></tr></thead>
+<tbody>
+<tr><td>A.8.1 - Endpoint Protection</td><td>Falcon Prevent (NGAV + Behavioral)</td></tr>
+<tr><td>A.8.7 - Malware Protection</td><td>Cloud ML + Sensor ML + IOC Blocking</td></tr>
+<tr><td>A.8.15 - Logging</td><td>EDR Telemetry + LogScale SIEM</td></tr>
+<tr><td>A.8.16 - Monitoring</td><td>Falcon Insight + OverWatch</td></tr>
+<tr><td>A.5.24 - Incident Response</td><td>RTR + Automated Response Policies</td></tr>
+<tr><td>A.5.25 - Information Security Events</td><td>Detection alerts + Incident correlation</td></tr>
+<tr><td>A.8.8 - Vulnerability Management</td><td>Falcon Spotlight</td></tr>
+<tr><td>A.8.12 - Data Leakage Prevention</td><td>USB Device Control + Firewall</td></tr>
+</tbody></table>
+</div>
+</div>
+</div>
+
+<!-- ========== COMPETITOR COMPARISON ========== -->
+<div class="section" id="sec-compare">
+<div class="section-title"><span class="icon">⚔️</span> Competitor Comparison</div>
+<div class="section-subtitle">How CrowdStrike compares to other EDR/XDR solutions</div>
+
+<div class="card">
+<div class="card-header">Feature Comparison Matrix</div>
+<div style="overflow-x:auto">
+<table class="cmd-table">
+<thead><tr><th>Feature</th><th style="color:var(--accent)">CrowdStrike</th><th>SentinelOne</th><th>Microsoft Defender</th><th>Carbon Black</th><th>Palo Alto XDR</th></tr></thead>
+<tbody>
+<tr><td>Architecture</td><td style="color:var(--green)">Cloud-native</td><td>Hybrid/Cloud</td><td>Cloud (Azure)</td><td>On-prem/Cloud</td><td>Cloud</td></tr>
+<tr><td>Single Agent</td><td style="color:var(--green)">Yes (all modules)</td><td>Yes</td><td>Built into Windows</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>ML Detection</td><td style="color:var(--green)">Cloud + Sensor ML</td><td>Static + Behavioral AI</td><td>Cloud ML</td><td>Behavioral</td><td>ML + Analytics</td></tr>
+<tr><td>Managed Hunting</td><td style="color:var(--green)">OverWatch 24/7</td><td>Vigilance (add-on)</td><td>Experts (add-on)</td><td>Limited</td><td>Unit 42 (add-on)</td></tr>
+<tr><td>Threat Intel</td><td style="color:var(--green)">200+ groups tracked</td><td>Basic</td><td>Microsoft TI</td><td>Basic</td><td>Unit 42</td></tr>
+<tr><td>RTR (Remote Shell)</td><td style="color:var(--green)">Full RTR</td><td>Remote Shell</td><td>Live Response</td><td>Live Response</td><td>Live Terminal</td></tr>
+<tr><td>Built-in SIEM</td><td style="color:var(--green)">LogScale (Humio)</td><td>No (3rd party)</td><td>Sentinel (extra $)</td><td>No</td><td>XSIAM (extra $)</td></tr>
+<tr><td>Vuln Mgmt</td><td style="color:var(--green)">Spotlight (scanless)</td><td>Ranger (network)</td><td>TVM</td><td>No</td><td>Cortex XPANSE</td></tr>
+<tr><td>Identity Protection</td><td style="color:var(--green)">Falcon Identity</td><td>No</td><td>Entra ID</td><td>No</td><td>Limited</td></tr>
+<tr><td>USB Control</td><td style="color:var(--green)">Device Control</td><td>Device Control</td><td>DLP</td><td>No</td><td>No</td></tr>
+<tr><td>Infrastructure Needed</td><td style="color:var(--green)">Zero (SaaS)</td><td>Minimal</td><td>Azure sub needed</td><td>On-prem servers</td><td>Minimal</td></tr>
+<tr><td>Gartner MQ Position</td><td style="color:var(--green)">Leader (#1)</td><td>Leader</td><td>Leader</td><td>Niche</td><td>Leader</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">Key Differentiators to Highlight</div>
+<div class="card-grid">
+<div class="preset-card" style="border-left:3px solid var(--accent)"><div class="preset-name">vs SentinelOne</div><div class="preset-desc">CrowdStrike advantage: Superior threat intel (200+ groups), built-in SIEM (LogScale), OverWatch managed hunting included, Identity Protection. SentinelOne's Singularity is strong on autonomous response but lacks CrowdStrike's intel depth.</div></div>
+<div class="preset-card" style="border-left:3px solid var(--accent)"><div class="preset-name">vs Microsoft Defender</div><div class="preset-desc">CrowdStrike advantage: Platform-agnostic (not tied to Microsoft stack), no Azure dependency, better Linux/macOS support, dedicated OverWatch hunting team, no license tier confusion. Defender is "good enough" but CrowdStrike is "best-in-class."</div></div>
+<div class="preset-card" style="border-left:3px solid var(--accent)"><div class="preset-name">vs Carbon Black (VMware)</div><div class="preset-desc">CrowdStrike advantage: Cloud-native (no on-prem servers), lighter agent, faster deployment, better ML models, OverWatch hunting, LogScale SIEM. Carbon Black requires significant infrastructure.</div></div>
+<div class="preset-card" style="border-left:3px solid var(--accent)"><div class="preset-name">vs Palo Alto Cortex XDR</div><div class="preset-desc">CrowdStrike advantage: Purpose-built endpoint agent (not firewall company bolting on EDR), better managed hunting with OverWatch, more mature identity protection, simpler deployment.</div></div>
+</div>
+</div>
+</div>
+
+<!-- ========== TROUBLESHOOTING ========== -->
+<div class="section" id="sec-troubleshoot">
+<div class="section-title"><span class="icon">🔧</span> Troubleshooting Guide</div>
+<div class="section-subtitle">Common issues during POC deployment and how to fix them</div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4><span class="tag tag-red">CRITICAL</span> Sensor shows RFM (Reduced Functionality Mode)</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--yellow)">CAUSE:</span> Kernel driver failed to load. Common on:
+  • Older kernels (Linux)
+  • Secure Boot conflicts
+  • VBS/HVCI enabled Windows
+
+<span style="color:var(--green)">FIX:</span>
+  1. Check kernel compatibility: falconctl -g --rfm-reason
+  2. Update sensor to latest version
+  3. Linux: Check kernel version against support matrix
+  4. Windows: Temporarily disable VBS for testing
+  5. If persists: Contact CrowdStrike support with rfm-reason output
+
+<span style="color:var(--accent)">VERIFY:</span>
+  Windows: reg query "HKLM\SYSTEM\CrowdStrike" /v RFMState
+  Linux: /opt/CrowdStrike/falconctl -g --rfm-state
+  Expected: rfm-state=false</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4><span class="tag tag-yellow">HIGH</span> Sensor not connecting to cloud</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--yellow)">CAUSE:</span> Network connectivity blocked
+
+<span style="color:var(--green)">FIX:</span>
+  1. Verify outbound HTTPS (443) is allowed to:
+     • ts01-b.cloudsink.net
+     • lfodown01-b.cloudsink.net
+     • *.crowdstrike.com
+  2. Check proxy settings:
+     falconctl -g --aph (proxy host)
+     falconctl -g --apd (proxy disabled?)
+  3. If using proxy:
+     falconctl -s --aph=proxy.company.com --app=8080
+  4. Test connectivity:
+     curl -v https://ts01-b.cloudsink.net:443
+  5. Check for SSL inspection/MITM proxy (must exempt CS traffic)</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4><span class="tag tag-yellow">HIGH</span> False positive blocking a business application</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--yellow)">CAUSE:</span> ML or behavioral rule flagging legitimate app
+
+<span style="color:var(--green)">FIX (in order of preference):</span>
+  1. Console > Activity > Detections > Find the detection
+  2. Click "..." > "Allow" to whitelist that specific file hash
+  3. OR: Configuration > Prevention Policy > ML Exclusions
+     → Add file path exclusion: C:\CompanyApp\*
+  4. OR: Lower ML sensitivity for that host group only
+     → Create a separate prevention policy with lower ML
+     → Assign to the affected host group
+  5. For IOA false positives:
+     → Modify the IOA rule to exclude the specific process
+     → Add condition: ParentImage NOT contains "companyapp"
+
+<span style="color:var(--accent)">IMPORTANT:</span> Document all exclusions. Keep them minimal.
+  Too many exclusions = security gaps.</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4><span class="tag tag-yellow">MEDIUM</span> Sensor installation fails</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--yellow)">CAUSE:</span> Prerequisites not met or conflicting software
+
+<span style="color:var(--green)">FIX (Windows):</span>
+  1. Check prerequisites: .NET 3.5+, TLS 1.2 enabled
+  2. Check for conflicting AV: Temporarily disable other AV
+  3. Check install log: %TEMP%\CrowdStrike\*.log
+  4. Ensure admin rights for installation
+  5. If MSI fails: Try EXE installer or vice versa
+  6. Check Windows Event Log > Application for CS errors
+
+<span style="color:var(--green)">FIX (macOS):</span>
+  1. Grant Full Disk Access + System Extension via MDM
+  2. Or manually: System Preferences > Security > Allow CrowdStrike
+  3. Network Filter approval required (macOS 11+)
+
+<span style="color:var(--green)">FIX (Linux):</span>
+  1. Check kernel version against support matrix
+  2. Ensure running as root/sudo
+  3. Check: /var/log/falcon_install.log
+  4. For RHEL: Ensure proper SELinux context</div>
+</div></div>
+
+<div class="scenario-card">
+<div class="scenario-header" onclick="this.parentElement.classList.toggle('open')">
+<h4><span class="tag tag-blue">INFO</span> How to uninstall the sensor</h4></div>
+<div class="scenario-body">
+<div class="output-box" style="color:var(--text)"><span style="color:var(--yellow)">NOTE:</span> You need the Maintenance Token from the console
+
+<span style="color:var(--green)">Get Token:</span>
+  Console > Host Setup > Sensor Update Policy > Reveal Maintenance Token
+
+<span style="color:var(--green)">Windows:</span>
+  CsUninstallTool.exe /quiet MAINTENANCE_TOKEN=&lt;token&gt;
+  OR: msiexec /x WindowsSensor.exe /quiet MAINTENANCE_TOKEN=&lt;token&gt;
+
+<span style="color:var(--green)">macOS:</span>
+  sudo /Applications/Falcon.app/Contents/Resources/falconctl uninstall --maintenance-token &lt;token&gt;
+
+<span style="color:var(--green)">Linux:</span>
+  sudo /opt/CrowdStrike/falconctl -d -f --maintenance-token &lt;token&gt;
+  sudo dpkg --purge falcon-sensor  (Debian/Ubuntu)
+  sudo yum remove falcon-sensor    (RHEL/CentOS)</div>
+</div></div>
+</div>
+
+<!-- ========== REAL TERMINAL ========== -->
+<div class="section" id="sec-realterminal">
+<div class="section-title"><span class="icon">💻</span> Real System Terminal</div>
+<div class="section-subtitle">Live terminal connected to your system shell - run claude, npm, git, and any command</div>
+
+<div class="card" style="padding:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;margin-bottom:8px">
+<div><span class="tag tag-green" id="realTermStatus">Disconnected</span> <span style="font-size:.75rem;color:var(--text2)">Start server: <code>node server.js</code> then refresh</span></div>
+<div class="btn-group" style="margin:0">
+<button class="btn btn-sm btn-primary" onclick="connectRealTerminal()">Connect</button>
+<button class="btn btn-sm btn-danger" onclick="disconnectRealTerminal()">Disconnect</button>
+<button class="btn btn-sm btn-secondary" onclick="clearRealTerminal()">Clear</button>
+</div>
+</div>
+<div class="terminal">
+<div class="terminal-header">
+<div class="terminal-dot r"></div><div class="terminal-dot y"></div><div class="terminal-dot g"></div>
+<div class="terminal-title">Real System Shell (WebSocket)</div>
+</div>
+<div class="terminal-body" id="realTermBody" style="height:550px;white-space:pre-wrap;font-size:.82rem">
+<span style="color:#0ff">This is a REAL terminal. Start the server first:
+
+  1. Open your terminal (Termux)
+  2. cd threat-intelligence-blueteam
+  3. node server.js
+  4. Open http://localhost:3000/crowdstrike-poc.html
+  5. Come to this section and click "Connect"
+
+All system commands will work: claude, npm, git, python, etc.
+</span>
+</div>
+<div style="padding:4px 12px 12px;display:flex;align-items:center">
+<div class="terminal-input-line" style="flex:1">
+<span class="prompt" id="realTermPrompt">$ </span>
+<input type="text" id="realTermInput" spellcheck="false" autocomplete="off" placeholder="Type command... (connect first)">
+</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">Useful Commands to Try</div>
+<div class="card-grid">
+<div class="preset-card" onclick="sendRealCmd('claude --version')"><div class="preset-name">claude --version</div><div class="preset-desc">Check Claude CLI version</div></div>
+<div class="preset-card" onclick="sendRealCmd('claude &quot;Create a CrowdStrike IOA rule for detecting ransomware behavior including shadow copy deletion and mass file encryption&quot;')"><div class="preset-name">Claude: Generate IOA Rule</div><div class="preset-desc">Ask Claude to create a detection rule</div></div>
+<div class="preset-card" onclick="sendRealCmd('claude &quot;Write a PowerShell RTR script to collect forensic artifacts from a compromised Windows endpoint&quot;')"><div class="preset-name">Claude: RTR Script</div><div class="preset-desc">Ask Claude to write forensic collection script</div></div>
+<div class="preset-card" onclick="sendRealCmd('claude &quot;Generate a LogScale query to detect lateral movement using PsExec, WMI, and WinRM&quot;')"><div class="preset-name">Claude: LogScale Query</div><div class="preset-desc">Ask Claude to build a hunting query</div></div>
+<div class="preset-card" onclick="sendRealCmd('claude &quot;Create a complete CrowdStrike prevention policy JSON for a healthcare organization with HIPAA compliance&quot;')"><div class="preset-name">Claude: Prevention Policy</div><div class="preset-desc">Ask Claude for industry-specific policy</div></div>
+<div class="preset-card" onclick="sendRealCmd('claude &quot;Explain CrowdStrike Falcon sensor deployment best practices for 500 Windows endpoints using SCCM&quot;')"><div class="preset-name">Claude: Deployment Guide</div><div class="preset-desc">Ask Claude for deployment help</div></div>
+<div class="preset-card" onclick="sendRealCmd('npm list -g --depth=0')"><div class="preset-name">npm list</div><div class="preset-desc">Check installed global packages</div></div>
+<div class="preset-card" onclick="sendRealCmd('git log --oneline -10')"><div class="preset-name">git log</div><div class="preset-desc">Recent git history</div></div>
+</div>
+</div>
 </div>
 
 <!-- ========== SECTION 19: TERMINAL ========== -->
@@ -4733,6 +5734,157 @@ function sendChat() {
 function sendAiPrompt(text) {
   document.getElementById('chatInput').value = text;
   sendChat();
+}
+
+// ==================== REAL TERMINAL (WebSocket) ====================
+let realTermWs = null;
+const realTermBody = document.getElementById('realTermBody');
+const realTermInput = document.getElementById('realTermInput');
+const realTermStatus = document.getElementById('realTermStatus');
+const realTermHistory = [];
+let realHistIdx = -1;
+
+function connectRealTerminal() {
+  if (realTermWs && realTermWs.readyState === WebSocket.OPEN) {
+    realTermPrint('\n[Already connected]\n', '#0f0');
+    return;
+  }
+
+  const wsUrl = `ws://${window.location.hostname || 'localhost'}:${window.location.port || '3000'}/terminal`;
+  realTermPrint(`\nConnecting to ${wsUrl}...\n`, '#0ff');
+
+  try {
+    realTermWs = new WebSocket(wsUrl);
+
+    realTermWs.onopen = () => {
+      realTermStatus.textContent = 'Connected';
+      realTermStatus.className = 'tag tag-green';
+      realTermPrint('[Connected to system shell]\n', '#0f0');
+      realTermInput.placeholder = 'Type command and press Enter...';
+      realTermInput.focus();
+    };
+
+    realTermWs.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'output') {
+          realTermPrintRaw(msg.data);
+        } else if (msg.type === 'exit') {
+          realTermPrint(`\n[Shell exited with code ${msg.code}]\n`, '#f55');
+          realTermStatus.textContent = 'Disconnected';
+          realTermStatus.className = 'tag tag-red';
+        } else if (msg.type === 'error') {
+          realTermPrint(`\n[Error: ${msg.data}]\n`, '#f55');
+        }
+      } catch (e) {
+        realTermPrintRaw(evt.data);
+      }
+    };
+
+    realTermWs.onclose = () => {
+      realTermStatus.textContent = 'Disconnected';
+      realTermStatus.className = 'tag tag-red';
+      realTermPrint('\n[Connection closed]\n', '#f55');
+      realTermInput.placeholder = 'Disconnected - click Connect to reconnect';
+    };
+
+    realTermWs.onerror = (err) => {
+      realTermStatus.textContent = 'Error';
+      realTermStatus.className = 'tag tag-red';
+      realTermPrint('\n[Connection error - is server.js running? Start with: node server.js]\n', '#f55');
+    };
+  } catch (e) {
+    realTermPrint(`\n[Failed to connect: ${e.message}]\n`, '#f55');
+  }
+}
+
+function disconnectRealTerminal() {
+  if (realTermWs) {
+    realTermWs.close();
+    realTermWs = null;
+  }
+}
+
+function clearRealTerminal() {
+  if (realTermBody) realTermBody.innerHTML = '';
+}
+
+function realTermPrint(text, color) {
+  if (!realTermBody) return;
+  const span = document.createElement('span');
+  if (color) span.style.color = color;
+  span.textContent = text;
+  realTermBody.appendChild(span);
+  realTermBody.scrollTop = realTermBody.scrollHeight;
+}
+
+function realTermPrintRaw(text) {
+  if (!realTermBody) return;
+  // Convert ANSI color codes to HTML (basic support)
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\x1b\[0m/g, '</span>')
+    .replace(/\x1b\[1m/g, '<span style="font-weight:bold">')
+    .replace(/\x1b\[31m/g, '<span style="color:#f55">')
+    .replace(/\x1b\[32m/g, '<span style="color:#0f0">')
+    .replace(/\x1b\[33m/g, '<span style="color:#ff0">')
+    .replace(/\x1b\[34m/g, '<span style="color:#55f">')
+    .replace(/\x1b\[35m/g, '<span style="color:#f5f">')
+    .replace(/\x1b\[36m/g, '<span style="color:#0ff">')
+    .replace(/\x1b\[37m/g, '<span style="color:#fff">')
+    .replace(/\x1b\[90m/g, '<span style="color:#888">')
+    .replace(/\x1b\[\d+;?\d*m/g, '') // Remove other ANSI codes
+    .replace(/\r\n/g, '\n');
+
+  const span = document.createElement('span');
+  span.innerHTML = html;
+  realTermBody.appendChild(span);
+  realTermBody.scrollTop = realTermBody.scrollHeight;
+}
+
+function sendRealCmd(cmd) {
+  if (!realTermWs || realTermWs.readyState !== WebSocket.OPEN) {
+    realTermPrint('\n[Not connected. Click Connect first.]\n', '#f55');
+    navigateTo('realterminal');
+    return;
+  }
+  realTermWs.send(JSON.stringify({ type: 'input', data: cmd + '\n' }));
+  navigateTo('realterminal');
+}
+
+if (realTermInput) {
+  realTermInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const cmd = realTermInput.value;
+      if (cmd.trim()) {
+        realTermHistory.push(cmd);
+        realHistIdx = realTermHistory.length;
+      }
+      if (realTermWs && realTermWs.readyState === WebSocket.OPEN) {
+        realTermWs.send(JSON.stringify({ type: 'input', data: cmd + '\n' }));
+      } else {
+        realTermPrint('\n[Not connected - click Connect]\n', '#f55');
+      }
+      realTermInput.value = '';
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (realHistIdx > 0) { realHistIdx--; realTermInput.value = realTermHistory[realHistIdx]; }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (realHistIdx < realTermHistory.length - 1) { realHistIdx++; realTermInput.value = realTermHistory[realHistIdx]; }
+      else { realHistIdx = realTermHistory.length; realTermInput.value = ''; }
+    } else if (e.key === 'c' && e.ctrlKey) {
+      // Send Ctrl+C
+      if (realTermWs && realTermWs.readyState === WebSocket.OPEN) {
+        realTermWs.send(JSON.stringify({ type: 'input', data: '\x03' }));
+      }
+    }
+  });
+}
+
+// Auto-connect if accessed via server
+if (window.location.port && window.location.port !== '' && window.location.protocol !== 'file:') {
+  setTimeout(() => connectRealTerminal(), 1000);
 }
 
 // ==================== INITIALIZATION ====================
