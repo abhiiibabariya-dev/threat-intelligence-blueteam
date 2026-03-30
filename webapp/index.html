@@ -22,121 +22,123 @@
     <div id="app" class="app hidden">
         <!-- Top Bar -->
         <header class="top-bar">
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>
             <div class="logo">
-                <span class="logo-icon">⟦</span>
                 <span class="logo-text">BLUE<span class="accent">SHELL</span></span>
-                <span class="logo-icon">⟧</span>
             </div>
             <div class="status-bar">
-                <span class="status-item pulse">● LIVE</span>
+                <span class="status-item pulse">&#9679; LIVE</span>
                 <span class="status-item" id="clock"></span>
                 <span class="status-item">MITRE ATT&CK v15</span>
                 <span class="status-item" id="threat-level">THREAT: <span class="threat-high">ELEVATED</span></span>
             </div>
             <div class="nav-controls">
-                <button class="btn-hack" onclick="toggleTerminal()">⌨ TERMINAL</button>
-                <button class="btn-hack" onclick="toggleMatrix()">◉ MATRIX</button>
+                <button class="btn-hack" onclick="toggleTerminal()">Terminal</button>
+                <button class="btn-hack" onclick="toggleMatrix()">Matrix</button>
             </div>
         </header>
+
+        <!-- Mobile Sidebar Overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
 
         <!-- Sidebar Navigation -->
         <nav class="sidebar" id="sidebar">
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('siem')">
-                    <span class="nav-icon">◈</span> SIEM PLATFORMS
-                    <span class="arrow" id="arrow-siem">▶</span>
+                    <span class="nav-icon">&#9670;</span> SIEM PLATFORMS
+                    <span class="arrow" id="arrow-siem">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-siem">
-                    <a href="#" onclick="loadPage('splunk')" class="nav-link">├─ Splunk</a>
-                    <a href="#" onclick="loadPage('sentinel')" class="nav-link">├─ Microsoft Sentinel</a>
-                    <a href="#" onclick="loadPage('qradar')" class="nav-link">├─ IBM QRadar</a>
-                    <a href="#" onclick="loadPage('elastic')" class="nav-link">├─ Elastic SIEM</a>
-                    <a href="#" onclick="loadPage('chronicle')" class="nav-link">├─ Google Chronicle</a>
-                    <a href="#" onclick="loadPage('arcsight')" class="nav-link">├─ ArcSight ESM</a>
-                    <a href="#" onclick="loadPage('fortisiem')" class="nav-link">├─ FortiSIEM</a>
-                    <a href="#" onclick="loadPage('wazuh')" class="nav-link">├─ Wazuh</a>
-                    <a href="#" onclick="loadPage('exabeam')" class="nav-link">├─ Exabeam Fusion</a>
-                    <a href="#" onclick="loadPage('logrhythm')" class="nav-link">├─ LogRhythm</a>
-                    <a href="#" onclick="loadPage('securonix')" class="nav-link">├─ Securonix</a>
-                    <a href="#" onclick="loadPage('mcafee')" class="nav-link">├─ McAfee ESM / Trellix</a>
-                    <a href="#" onclick="loadPage('logpoint')" class="nav-link">├─ LogPoint</a>
-                    <a href="#" onclick="loadPage('insightidr')" class="nav-link">└─ Rapid7 InsightIDR</a>
+                    <a href="#" onclick="loadPage('splunk')" class="nav-link">Splunk</a>
+                    <a href="#" onclick="loadPage('sentinel')" class="nav-link">Microsoft Sentinel</a>
+                    <a href="#" onclick="loadPage('qradar')" class="nav-link">IBM QRadar</a>
+                    <a href="#" onclick="loadPage('elastic')" class="nav-link">Elastic SIEM</a>
+                    <a href="#" onclick="loadPage('chronicle')" class="nav-link">Google Chronicle</a>
+                    <a href="#" onclick="loadPage('arcsight')" class="nav-link">ArcSight ESM</a>
+                    <a href="#" onclick="loadPage('fortisiem')" class="nav-link">FortiSIEM</a>
+                    <a href="#" onclick="loadPage('wazuh')" class="nav-link">Wazuh</a>
+                    <a href="#" onclick="loadPage('exabeam')" class="nav-link">Exabeam Fusion</a>
+                    <a href="#" onclick="loadPage('logrhythm')" class="nav-link">LogRhythm</a>
+                    <a href="#" onclick="loadPage('securonix')" class="nav-link">Securonix</a>
+                    <a href="#" onclick="loadPage('mcafee')" class="nav-link">McAfee ESM / Trellix</a>
+                    <a href="#" onclick="loadPage('logpoint')" class="nav-link">LogPoint</a>
+                    <a href="#" onclick="loadPage('insightidr')" class="nav-link">Rapid7 InsightIDR</a>
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('edr')">
-                    <span class="nav-icon">◈</span> EDR PLATFORMS
-                    <span class="arrow" id="arrow-edr">▶</span>
+                    <span class="nav-icon">&#9670;</span> EDR PLATFORMS
+                    <span class="arrow" id="arrow-edr">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-edr">
-                    <a href="#" onclick="loadPage('crowdstrike')" class="nav-link">├─ CrowdStrike Falcon</a>
-                    <a href="#" onclick="loadPage('mde')" class="nav-link">├─ Microsoft Defender</a>
-                    <a href="#" onclick="loadPage('sentinelone')" class="nav-link">├─ SentinelOne</a>
-                    <a href="#" onclick="loadPage('carbonblack')" class="nav-link">└─ Carbon Black</a>
+                    <a href="#" onclick="loadPage('crowdstrike')" class="nav-link">CrowdStrike Falcon</a>
+                    <a href="#" onclick="loadPage('mde')" class="nav-link">Microsoft Defender</a>
+                    <a href="#" onclick="loadPage('sentinelone')" class="nav-link">SentinelOne</a>
+                    <a href="#" onclick="loadPage('carbonblack')" class="nav-link">Carbon Black</a>
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('xdr')">
-                    <span class="nav-icon">◈</span> XDR PLATFORMS
-                    <span class="arrow" id="arrow-xdr">▶</span>
+                    <span class="nav-icon">&#9670;</span> XDR PLATFORMS
+                    <span class="arrow" id="arrow-xdr">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-xdr">
-                    <a href="#" onclick="loadPage('cortex')" class="nav-link">├─ Palo Alto Cortex XDR</a>
-                    <a href="#" onclick="loadPage('m365')" class="nav-link">├─ Microsoft 365 Defender</a>
-                    <a href="#" onclick="loadPage('visionone')" class="nav-link">└─ Trend Micro Vision One</a>
+                    <a href="#" onclick="loadPage('cortex')" class="nav-link">Palo Alto Cortex XDR</a>
+                    <a href="#" onclick="loadPage('m365')" class="nav-link">Microsoft 365 Defender</a>
+                    <a href="#" onclick="loadPage('visionone')" class="nav-link">Trend Micro Vision One</a>
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('soar')">
-                    <span class="nav-icon">◈</span> SOAR PLATFORMS
-                    <span class="arrow" id="arrow-soar">▶</span>
+                    <span class="nav-icon">&#9670;</span> SOAR PLATFORMS
+                    <span class="arrow" id="arrow-soar">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-soar">
-                    <a href="#" onclick="loadPage('splunksoar')" class="nav-link">├─ Splunk SOAR</a>
-                    <a href="#" onclick="loadPage('sentinelsoar')" class="nav-link">├─ Sentinel SOAR</a>
-                    <a href="#" onclick="loadPage('xsoar')" class="nav-link">├─ Palo Alto XSOAR</a>
-                    <a href="#" onclick="loadPage('qradarsoar')" class="nav-link">├─ QRadar SOAR</a>
-                    <a href="#" onclick="loadPage('shuffle')" class="nav-link">├─ Shuffle</a>
-                    <a href="#" onclick="loadPage('thehive')" class="nav-link">├─ TheHive + Cortex</a>
-                    <a href="#" onclick="loadPage('fortisoar')" class="nav-link">└─ FortiSOAR</a>
+                    <a href="#" onclick="loadPage('splunksoar')" class="nav-link">Splunk SOAR</a>
+                    <a href="#" onclick="loadPage('sentinelsoar')" class="nav-link">Sentinel SOAR</a>
+                    <a href="#" onclick="loadPage('xsoar')" class="nav-link">Palo Alto XSOAR</a>
+                    <a href="#" onclick="loadPage('qradarsoar')" class="nav-link">QRadar SOAR</a>
+                    <a href="#" onclick="loadPage('shuffle')" class="nav-link">Shuffle</a>
+                    <a href="#" onclick="loadPage('thehive')" class="nav-link">TheHive + Cortex</a>
+                    <a href="#" onclick="loadPage('fortisoar')" class="nav-link">FortiSOAR</a>
                 </div>
             </div>
 
             <div class="nav-section">
-                <div class="nav-header" onclick="renderKnowledgeBase()" style="background:rgba(0,255,65,0.08)">
-                    <span class="nav-icon">⚛</span> SOC KNOWLEDGE BASE
-                    <span class="arrow" style="color:var(--accent)">◉</span>
+                <div class="nav-header" onclick="renderKnowledgeBase()" style="color:var(--accent)">
+                    <span class="nav-icon">&#9883;</span> SOC KNOWLEDGE BASE
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('tools')">
-                    <span class="nav-icon">◈</span> TOOLS & INTEL
-                    <span class="arrow" id="arrow-tools">▶</span>
+                    <span class="nav-icon">&#9670;</span> TOOLS & INTEL
+                    <span class="arrow" id="arrow-tools">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-tools">
-                    <a href="#" onclick="loadPage('fetcher')" class="nav-link">├─ Threat Intel Fetcher</a>
-                    <a href="#" onclick="loadPage('rulegen')" class="nav-link">├─ SIEM Rule Generator</a>
-                    <a href="#" onclick="loadPage('ioc')" class="nav-link">├─ IOC Management</a>
-                    <a href="#" onclick="loadPage('mitre')" class="nav-link">└─ MITRE ATT&CK Map</a>
+                    <a href="#" onclick="loadPage('fetcher')" class="nav-link">Threat Intel Fetcher</a>
+                    <a href="#" onclick="loadPage('rulegen')" class="nav-link">SIEM Rule Generator</a>
+                    <a href="#" onclick="loadRuleBuilder()" class="nav-link">Rule Builder</a>
+                    <a href="#" onclick="loadPage('ioc')" class="nav-link">IOC Management</a>
+                    <a href="#" onclick="loadPage('mitre')" class="nav-link">MITRE ATT&CK Map</a>
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('blue')">
-                    <span class="nav-icon">◈</span> BLUE TEAM OPS
-                    <span class="arrow" id="arrow-blue">▶</span>
+                    <span class="nav-icon">&#9670;</span> BLUE TEAM OPS
+                    <span class="arrow" id="arrow-blue">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-blue">
-                    <a href="#" onclick="loadPage('usecases')" class="nav-link">├─ Use Case Library</a>
-                    <a href="#" onclick="loadPage('detection')" class="nav-link">├─ Detection Engineering</a>
-                    <a href="#" onclick="loadPage('ir')" class="nav-link">├─ Incident Response</a>
-                    <a href="#" onclick="loadPage('triage')" class="nav-link">├─ Alert Triage</a>
-                    <a href="#" onclick="loadPage('runbooks')" class="nav-link">├─ SOC Runbooks</a>
-                    <a href="#" onclick="loadPage('hunting')" class="nav-link">└─ Threat Hunting</a>
+                    <a href="#" onclick="loadPage('usecases')" class="nav-link">Use Case Library</a>
+                    <a href="#" onclick="loadPage('detection')" class="nav-link">Detection Engineering</a>
+                    <a href="#" onclick="loadPage('ir')" class="nav-link">Incident Response</a>
+                    <a href="#" onclick="loadPage('triage')" class="nav-link">Alert Triage</a>
+                    <a href="#" onclick="loadPage('runbooks')" class="nav-link">SOC Runbooks</a>
+                    <a href="#" onclick="loadPage('hunting')" class="nav-link">Threat Hunting</a>
                 </div>
             </div>
         </nav>
@@ -146,7 +148,7 @@
             <!-- Dashboard Home -->
             <div id="dashboard" class="dashboard">
                 <div class="dash-header">
-                    <h1 class="glitch" data-text="BLUESHELL // COMMAND CENTER">BLUESHELL // COMMAND CENTER</h1>
+                    <h1>BlueShell Command Center</h1>
                     <p class="subtitle">Threat Intelligence & Blue Team Operations Platform</p>
                 </div>
 
@@ -154,85 +156,91 @@
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-number" id="stat-siem">14</div>
-                        <div class="stat-label">SIEM PLATFORMS</div>
+                        <div class="stat-label">SIEM Platforms</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:100%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-rules">500+</div>
-                        <div class="stat-label">DETECTION RULES</div>
+                        <div class="stat-label">Detection Rules</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:85%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-edr">4</div>
-                        <div class="stat-label">EDR PLATFORMS</div>
+                        <div class="stat-label">EDR Platforms</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:70%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-xdr">3</div>
-                        <div class="stat-label">XDR PLATFORMS</div>
+                        <div class="stat-label">XDR Platforms</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:60%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-soar">7</div>
-                        <div class="stat-label">SOAR PLATFORMS</div>
+                        <div class="stat-label">SOAR Platforms</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:90%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-mitre">70+</div>
-                        <div class="stat-label">MITRE TECHNIQUES</div>
+                        <div class="stat-label">MITRE Techniques</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:75%"></div></div>
                     </div>
                 </div>
 
                 <!-- Quick Access Cards -->
-                <div class="section-title">⟦ QUICK ACCESS ⟧</div>
+                <div class="section-title">Quick Access</div>
                 <div class="card-grid">
                     <div class="hack-card" onclick="loadPage('splunk')">
-                        <div class="card-icon">▣</div>
+                        <div class="card-icon">&#128202;</div>
                         <div class="card-title">Splunk</div>
-                        <div class="card-desc">SPL queries, detection rules, ES, zero-to-hero training</div>
+                        <div class="card-desc">SPL queries, detection rules, Enterprise Security, zero-to-hero training</div>
                         <div class="card-tag">SIEM</div>
                     </div>
                     <div class="hack-card" onclick="loadPage('sentinel')">
-                        <div class="card-icon">▣</div>
+                        <div class="card-icon">&#9729;</div>
                         <div class="card-title">Microsoft Sentinel</div>
-                        <div class="card-desc">KQL analytics, hunting queries, workbooks, playbooks</div>
+                        <div class="card-desc">KQL analytics, hunting queries, workbooks & playbooks</div>
                         <div class="card-tag">SIEM</div>
                     </div>
                     <div class="hack-card" onclick="loadPage('wazuh')">
-                        <div class="card-icon">▣</div>
+                        <div class="card-icon">&#128737;</div>
                         <div class="card-title">Wazuh</div>
                         <div class="card-desc">Open-source XDR/SIEM, rules, FIM, active response</div>
                         <div class="card-tag">SIEM</div>
                     </div>
                     <div class="hack-card" onclick="loadPage('crowdstrike')">
-                        <div class="card-icon">◉</div>
+                        <div class="card-icon">&#128065;</div>
                         <div class="card-title">CrowdStrike Falcon</div>
                         <div class="card-desc">IOA rules, FQL hunting, RTR, Falcon Fusion</div>
                         <div class="card-tag">EDR</div>
                     </div>
+                    <div class="hack-card" onclick="renderKnowledgeBase()" style="border-color:var(--accent)">
+                        <div class="card-icon">&#128218;</div>
+                        <div class="card-title">SOC Knowledge Base</div>
+                        <div class="card-desc">Search any rule - full query, playbook, TP/FP analysis, SOAR automation</div>
+                        <div class="card-tag" style="background:var(--accent);color:#fff">NEW</div>
+                    </div>
                     <div class="hack-card" onclick="loadPage('fetcher')">
-                        <div class="card-icon">⚡</div>
+                        <div class="card-icon">&#128225;</div>
                         <div class="card-title">Threat Intel Fetcher</div>
                         <div class="card-desc">Auto-fetch IOCs from OSINT, generate SIEM rules</div>
                         <div class="card-tag">TOOL</div>
                     </div>
                     <div class="hack-card" onclick="loadPage('usecases')">
-                        <div class="card-icon">⚡</div>
+                        <div class="card-icon">&#128203;</div>
                         <div class="card-title">Use Case Library</div>
                         <div class="card-desc">100+ detection use cases mapped to MITRE ATT&CK</div>
                         <div class="card-tag">BLUE TEAM</div>
                     </div>
-                    <div class="hack-card" onclick="renderKnowledgeBase()" style="border-color:var(--accent)">
-                        <div class="card-icon">⚛</div>
-                        <div class="card-title">SOC Knowledge Base</div>
-                        <div class="card-desc">Search any rule → full query, playbook, policy, payload & use cases</div>
-                        <div class="card-tag" style="background:var(--accent);color:#000">NEW</div>
+                    <div class="hack-card" onclick="loadRuleBuilder()">
+                        <div class="card-icon">&#128295;</div>
+                        <div class="card-title">Rule Builder</div>
+                        <div class="card-desc">Visual drag-and-drop SIEM rule & use case builder</div>
+                        <div class="card-tag">TOOL</div>
                     </div>
                 </div>
 
                 <!-- MITRE ATT&CK Heatmap -->
-                <div class="section-title">⟦ MITRE ATT&CK COVERAGE ⟧</div>
+                <div class="section-title">MITRE ATT&CK Coverage</div>
                 <div class="mitre-grid">
                     <div class="mitre-tactic">
                         <div class="tactic-name">Initial Access</div>
@@ -285,7 +293,7 @@
                 </div>
 
                 <!-- Live Feed -->
-                <div class="section-title">⟦ LIVE THREAT FEED ⟧</div>
+                <div class="section-title">Live Threat Feed</div>
                 <div class="live-feed" id="live-feed">
                     <div class="feed-item">
                         <span class="feed-time">00:00:00</span>
@@ -303,7 +311,7 @@
         <div id="terminal" class="terminal hidden">
             <div class="terminal-header">
                 <span>blueshell@soc:~$</span>
-                <button class="terminal-close" onclick="toggleTerminal()">✕</button>
+                <button class="terminal-close" onclick="toggleTerminal()">&#10005;</button>
             </div>
             <div class="terminal-body" id="terminal-body">
                 <div class="terminal-line">

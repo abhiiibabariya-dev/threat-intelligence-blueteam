@@ -1,43 +1,18 @@
 // ═══════════════════════════════════════════════════════
-// BLUESHELL - Hacker Terminal UI Engine
+// BLUESHELL - SOC Dashboard Engine v3.0
 // ═══════════════════════════════════════════════════════
 
-// ── Boot Sequence ──
+// ── Boot Sequence (fast) ──
 const bootMessages = [
-    "BLUESHELL v2.0 // Threat Intelligence Platform",
-    "─────────────────────────────────────────────",
-    "[BOOT] Initializing secure environment...",
-    "[BOOT] Loading kernel modules..............OK",
-    "[BOOT] Mounting encrypted filesystem.......OK",
-    "[BOOT] Starting network stack..............OK",
-    "[BOOT] Loading MITRE ATT&CK v15 framework.OK",
-    "[BOOT] Initializing detection engine.......OK",
-    "[LOAD] SIEM Platforms: 14 loaded",
-    "[LOAD] EDR Platforms: 4 loaded",
-    "[LOAD] XDR Platforms: 3 loaded",
-    "[LOAD] SOAR Platforms: 7 loaded",
+    "BlueShell v3.0 // Threat Intelligence Platform",
+    "──────────────────────────────────────────",
+    "[BOOT] Loading MITRE ATT&CK v15..........OK",
+    "[BOOT] Detection engine...................OK",
+    "[LOAD] SIEM: 14 | EDR: 4 | XDR: 3 | SOAR: 7",
     "[LOAD] Detection Rules: 500+ loaded",
     "[LOAD] Threat Intel Feeds: 8 configured",
-    "[SCAN] Running integrity check.............OK",
-    "[SCAN] Verifying rule signatures...........OK",
-    "[NET ] Connecting to OSINT feeds...........OK",
-    "[NET ] abuse.ch URLhaus...................LIVE",
-    "[NET ] MalwareBazaar.....................LIVE",
-    "[NET ] AlienVault OTX....................LIVE",
-    "[NET ] MITRE ATT&CK......................LIVE",
-    "[AUTH] Security context established........OK",
-    "",
-    "┌─────────────────────────────────────────┐",
-    "│  ____  _    _   _ _____ ____  _   _ ___ │",
-    "│ | __ )| |  | | | | ____/ ___|| | | |_ _|│",
-    "│ |  _ \\| |  | | | |  _| \\___ \\| |_| || | │",
-    "│ | |_) | |__| |_| | |___ ___) |  _  || | │",
-    "│ |____/|_____\\___/|_____|____/|_| |_|___|│",
-    "│                                         │",
-    "│   COMMAND CENTER // READY               │",
-    "└─────────────────────────────────────────┘",
-    "",
-    "[READY] All systems operational. Welcome, Operator."
+    "[NET ] OSINT feeds connected..............OK",
+    "[READY] All systems operational."
 ];
 
 let bootIndex = 0;
@@ -50,12 +25,11 @@ function runBoot() {
         bootLog.textContent += bootMessages[bootIndex] + '\n';
         bootLog.scrollTop = bootLog.scrollHeight;
         bootIndex++;
-        const delay = bootMessages[bootIndex - 1].startsWith('[') ? 60 : 30;
-        setTimeout(runBoot, delay);
+        setTimeout(runBoot, 40);
     } else {
         setTimeout(() => {
             bootScreen.style.opacity = '0';
-            bootScreen.style.transition = 'opacity 0.5s';
+            bootScreen.style.transition = 'opacity 0.4s';
             setTimeout(() => {
                 bootScreen.style.display = 'none';
                 app.classList.remove('hidden');
@@ -63,13 +37,21 @@ function runBoot() {
                 startClock();
                 startLiveFeed();
                 animateStats();
-            }, 500);
-        }, 800);
+            }, 400);
+        }, 300);
     }
 }
 
 // Start boot
-setTimeout(runBoot, 300);
+setTimeout(runBoot, 200);
+
+// ── Mobile Menu ──
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar.classList.toggle('sidebar-open');
+    overlay.classList.toggle('active');
+}
 
 // ── Matrix Rain ──
 let matrixActive = true;
@@ -80,16 +62,16 @@ function startMatrixRain() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%^&*()_+-=[]{}|;:,.<>?/~`ァカサタナハマヤラワンヰヱヲ';
+    const chars = '01010110100110101001011010';
     const fontSize = 14;
     const columns = Math.floor(canvas.width / fontSize);
     const drops = new Array(columns).fill(1);
 
     function draw() {
         if (!matrixActive) return;
-        ctx.fillStyle = 'rgba(10, 14, 23, 0.05)';
+        ctx.fillStyle = 'rgba(15, 17, 23, 0.05)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#00ff41';
+        ctx.fillStyle = '#3b82f6';
         ctx.font = fontSize + 'px monospace';
 
         for (let i = 0; i < drops.length; i++) {
@@ -188,10 +170,16 @@ function loadPage(pageId) {
     const content = document.getElementById('page-content');
     content.classList.remove('hidden');
 
+    // Close mobile menu if open
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('sidebar-open');
+    if (overlay) overlay.classList.remove('active');
+
     const typeColors = {
-        'SIEM': '#00d4ff', 'EDR': '#a855f7', 'XDR': '#ff3333',
-        'SOAR': '#ffcc00', 'TOOL': 'var(--accent)', 'BLUE TEAM': '#00ff41',
-        'SIEM/XDR': '#00d4ff', 'SIEM/UEBA': '#00d4ff'
+        'SIEM': '#06b6d4', 'EDR': '#a855f7', 'XDR': '#ef4444',
+        'SOAR': '#eab308', 'TOOL': '#3b82f6', 'BLUE TEAM': '#22c55e',
+        'SIEM/XDR': '#06b6d4', 'SIEM/UEBA': '#06b6d4'
     };
     const typeColor = typeColors[page.type] || 'var(--accent)';
 
@@ -234,6 +222,11 @@ function loadPage(pageId) {
 function goHome() {
     document.getElementById('dashboard').classList.remove('hidden');
     document.getElementById('page-content').classList.add('hidden');
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('sidebar-open');
+    if (overlay) overlay.classList.remove('active');
 }
 
 // ── Terminal ──
