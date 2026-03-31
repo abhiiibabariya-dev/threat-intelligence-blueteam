@@ -3,23 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BlueShell // Threat Intelligence & Blue Team Ops</title>
+    <title>BlueShell - Threat Intelligence & Blue Team Operations</title>
     <link rel="stylesheet" href="css/hacker.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 </head>
 <body>
-    <!-- Matrix Rain Canvas -->
-    <canvas id="matrix-bg"></canvas>
-
-    <!-- Boot Sequence -->
-    <div id="boot-screen" class="boot-screen">
-        <div class="boot-text">
-            <pre id="boot-log"></pre>
-        </div>
-    </div>
-
     <!-- Main Application -->
-    <div id="app" class="app hidden">
+    <div id="app" class="app">
         <!-- Top Bar -->
         <header class="top-bar">
             <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>
@@ -34,7 +24,6 @@
             </div>
             <div class="nav-controls">
                 <button class="btn-hack" onclick="toggleTerminal()">Terminal</button>
-                <button class="btn-hack" onclick="toggleMatrix()">Matrix</button>
             </div>
         </header>
 
@@ -45,7 +34,7 @@
         <nav class="sidebar" id="sidebar">
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('siem')">
-                    <span class="nav-icon">&#9670;</span> SIEM PLATFORMS
+                    SIEM Platforms
                     <span class="arrow" id="arrow-siem">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-siem">
@@ -68,7 +57,7 @@
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('edr')">
-                    <span class="nav-icon">&#9670;</span> EDR PLATFORMS
+                    EDR Platforms
                     <span class="arrow" id="arrow-edr">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-edr">
@@ -81,7 +70,7 @@
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('xdr')">
-                    <span class="nav-icon">&#9670;</span> XDR PLATFORMS
+                    XDR Platforms
                     <span class="arrow" id="arrow-xdr">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-xdr">
@@ -93,7 +82,7 @@
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('soar')">
-                    <span class="nav-icon">&#9670;</span> SOAR PLATFORMS
+                    SOAR Platforms
                     <span class="arrow" id="arrow-soar">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-soar">
@@ -109,13 +98,13 @@
 
             <div class="nav-section">
                 <div class="nav-header" onclick="renderKnowledgeBase()" style="color:var(--accent)">
-                    <span class="nav-icon">&#9883;</span> SOC KNOWLEDGE BASE
+                    SOC Knowledge Base
                 </div>
             </div>
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('tools')">
-                    <span class="nav-icon">&#9670;</span> TOOLS & INTEL
+                    Tools & Intel
                     <span class="arrow" id="arrow-tools">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-tools">
@@ -129,7 +118,7 @@
 
             <div class="nav-section">
                 <div class="nav-header" onclick="toggleSection('blue')">
-                    <span class="nav-icon">&#9670;</span> BLUE TEAM OPS
+                    Blue Team Ops
                     <span class="arrow" id="arrow-blue">&#9654;</span>
                 </div>
                 <div class="nav-items hidden" id="section-blue">
@@ -148,7 +137,7 @@
             <!-- Dashboard Home -->
             <div id="dashboard" class="dashboard">
                 <div class="dash-header">
-                    <h1>BlueShell Command Center</h1>
+                    <h1>BlueShell Dashboard</h1>
                     <p class="subtitle">Threat Intelligence & Blue Team Operations Platform</p>
                 </div>
 
