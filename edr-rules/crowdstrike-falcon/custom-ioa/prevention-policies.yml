@@ -1,0 +1,887 @@
+---
+# CrowdStrike Falcon Prevention Policies
+# Version: 1.0
+# Last Updated: 2026-03-31
+# Covers: Windows, Linux, macOS
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Comprehensive CrowdStrike Falcon prevention policies for all three
+    major operating systems. Includes sensor configuration, prevention
+    settings, response/containment policies, and update policies.
+  platform: CrowdStrike Falcon
+  deployment_model: "Staged rollout: Monitor → Detect → Prevent"
+
+# =============================================================================
+# WINDOWS PREVENTION POLICIES
+# =============================================================================
+windows_policies:
+
+  # --- Policy 1: Windows Workstation - Standard ---
+  - policy_name: "Windows Workstation - Standard Prevention"
+    policy_id: "WIN-WKS-STD-001"
+    description: >
+      Standard prevention policy for Windows workstations in the corporate
+      environment. Balanced between security and user productivity.
+    platform: Windows
+    target_group: "Windows Workstations"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      adware_pup_detection: true
+      sensor_tamper_protection: true
+      reduced_functionality_mode: false
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+        description: >
+          ML-based analysis of unknown executables. Moderate prevention
+          to reduce false positives on workstations while maintaining
+          detection coverage.
+
+      sensor_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+
+      on_write_detection:
+        enabled: true
+        quarantine_on_detection: true
+        description: "Scan files on write for known malware signatures"
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: true
+        description: "Block execution of known-bad and suspicious processes"
+
+      exploit_mitigation:
+        enabled: true
+        credential_guard_emulation: true
+        heap_spray_preallocation: true
+        null_page_allocation: true
+        seh_overwrite_protection: true
+        stack_pivot_detection: true
+        description: "Hardware and software exploit mitigations"
+
+      script_control:
+        enabled: true
+        powershell_monitoring: true
+        wmi_monitoring: true
+        vbscript_monitoring: true
+        jscript_monitoring: true
+        command_line_logging: true
+        description: "Monitor and control script-based attacks"
+
+      lateral_movement_prevention:
+        enabled: true
+        credential_theft_protection: true
+        smb_lateral_prevention: true
+        remote_service_prevention: true
+
+      ransomware_prevention:
+        enabled: true
+        shadow_copy_protection: true
+        mass_file_encryption_prevention: true
+        ransom_note_detection: true
+        backup_disruption_prevention: true
+
+      usb_device_control:
+        enabled: true
+        block_unknown_usb: false
+        log_usb_activity: true
+        allow_authorized_devices: true
+
+    custom_ioa_rule_groups:
+      - "Process-Based Detections"
+      - "Network Detections"
+      - "Credential Theft Detections"
+      - "Persistence Detections"
+      - "Defense Evasion Detections"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: true
+      containment_timeout_hours: 24
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+      maintenance_window: "Sunday 02:00-06:00 UTC"
+
+  # --- Policy 2: Windows Server - Standard ---
+  - policy_name: "Windows Server - Standard Prevention"
+    policy_id: "WIN-SRV-STD-001"
+    description: >
+      Prevention policy for Windows servers. More conservative prevention
+      settings to avoid impacting server workloads while maintaining
+      strong detection.
+    platform: Windows
+    target_group: "Windows Servers"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      adware_pup_detection: false
+      sensor_tamper_protection: true
+      performance_mode: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Cautious"
+        description: >
+          Cautious prevention on servers to minimize impact on legitimate
+          server applications. Aggressive detection for full visibility.
+
+      sensor_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Cautious"
+
+      on_write_detection:
+        enabled: true
+        quarantine_on_detection: false
+        description: "Detect on write but don't auto-quarantine on servers"
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: false
+        description: "Block known-bad only on servers; detect suspicious"
+
+      exploit_mitigation:
+        enabled: true
+        credential_guard_emulation: true
+        heap_spray_preallocation: true
+        null_page_allocation: true
+
+      script_control:
+        enabled: true
+        powershell_monitoring: true
+        wmi_monitoring: true
+        command_line_logging: true
+
+      lateral_movement_prevention:
+        enabled: true
+        credential_theft_protection: true
+        smb_lateral_prevention: true
+
+      ransomware_prevention:
+        enabled: true
+        shadow_copy_protection: true
+        mass_file_encryption_prevention: true
+
+    custom_ioa_rule_groups:
+      - "Process-Based Detections"
+      - "Network Detections"
+      - "Credential Theft Detections"
+      - "Persistence Detections"
+      - "Defense Evasion Detections"
+
+    exclusions:
+      process_exclusions:
+        - path: "C:\\Windows\\System32\\inetsrv\\w3wp.exe"
+          description: "IIS Worker Process"
+        - path: "C:\\Program Files\\Microsoft SQL Server\\*\\MSSQL\\Binn\\sqlservr.exe"
+          description: "SQL Server"
+        - path: "C:\\Program Files\\Microsoft\\Exchange Server\\*\\Bin\\*"
+          description: "Exchange Server binaries"
+      directory_exclusions:
+        - "C:\\Windows\\Microsoft.NET\\Framework*\\*"
+        - "C:\\Windows\\System32\\inetsrv\\*"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: false
+      containment_requires_approval: true
+
+    update_policy:
+      sensor_update_channel: "N-2"
+      auto_update: false
+      requires_change_approval: true
+      maintenance_window: "Saturday 03:00-07:00 UTC"
+
+  # --- Policy 3: Windows Domain Controllers ---
+  - policy_name: "Windows Domain Controller Prevention"
+    policy_id: "WIN-DC-001"
+    description: >
+      Specialized policy for Active Directory Domain Controllers with
+      maximum detection and controlled prevention to avoid authentication
+      disruption.
+    platform: Windows
+    target_group: "Domain Controllers"
+    priority: critical
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      sensor_tamper_protection: true
+      performance_mode: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Extra Aggressive"
+        prevention_sensitivity: "Cautious"
+
+      credential_theft_protection:
+        enabled: true
+        lsass_protection: true
+        dcsync_detection: true
+        golden_ticket_detection: true
+        kerberoasting_detection: true
+
+      lateral_movement_prevention:
+        enabled: true
+        smb_lateral_prevention: true
+        remote_wmi_prevention: true
+
+    custom_ioa_rule_groups:
+      - "Credential Theft Detections"
+      - "Process-Based Detections"
+      - "Defense Evasion Detections"
+
+    response_policy:
+      real_time_response: true
+      network_containment: false
+      description: "Never auto-contain DCs - manual SOC decision required"
+
+    update_policy:
+      sensor_update_channel: "N-2"
+      auto_update: false
+      requires_change_approval: true
+      requires_cab_approval: true
+
+# =============================================================================
+# LINUX PREVENTION POLICIES
+# =============================================================================
+linux_policies:
+
+  # --- Policy 1: Linux Server - Standard ---
+  - policy_name: "Linux Server - Standard Prevention"
+    policy_id: "LNX-SRV-STD-001"
+    description: >
+      Standard prevention policy for Linux servers. Covers web servers,
+      application servers, databases, and general-purpose Linux systems.
+    platform: Linux
+    target_group: "Linux Servers"
+    supported_distributions:
+      - "RHEL 7/8/9"
+      - "CentOS 7/8 Stream"
+      - "Ubuntu 18.04/20.04/22.04/24.04"
+      - "Debian 10/11/12"
+      - "Amazon Linux 2/2023"
+      - "SUSE Linux Enterprise 12/15"
+      - "Oracle Linux 7/8/9"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      sensor_tamper_protection: true
+      kernel_module_protection: true
+      backend_mode: false
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+
+      sensor_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+
+      on_write_detection:
+        enabled: true
+        quarantine_on_detection: true
+        scan_elf_binaries: true
+        scan_shell_scripts: true
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: true
+        cryptominer_prevention: true
+
+      script_control:
+        enabled: true
+        bash_monitoring: true
+        python_monitoring: true
+        perl_monitoring: true
+        command_line_logging: true
+
+      exploit_mitigation:
+        enabled: true
+        kernel_exploit_detection: true
+        container_escape_detection: true
+        privilege_escalation_detection: true
+
+      network_protection:
+        enabled: true
+        reverse_shell_prevention: true
+        c2_beaconing_detection: true
+        dns_tunneling_detection: true
+        cryptomining_pool_blocking: true
+
+      file_integrity_monitoring:
+        enabled: true
+        monitored_paths:
+          - "/etc/passwd"
+          - "/etc/shadow"
+          - "/etc/sudoers"
+          - "/etc/ssh/sshd_config"
+          - "/etc/crontab"
+          - "/etc/ld.so.preload"
+          - "/root/.ssh/authorized_keys"
+
+    custom_ioa_rule_groups:
+      - "Linux Process Detections"
+      - "Network Detections"
+      - "IOC Definitions"
+
+    exclusions:
+      process_exclusions:
+        - path: "/usr/sbin/nginx"
+          description: "Nginx web server"
+        - path: "/usr/sbin/apache2"
+          description: "Apache web server"
+        - path: "/usr/bin/mysqld"
+          description: "MySQL database"
+        - path: "/usr/bin/postgres"
+          description: "PostgreSQL database"
+        - path: "/usr/lib/jvm/*/bin/java"
+          description: "Java runtime"
+      directory_exclusions:
+        - "/var/lib/docker/*"
+        - "/var/lib/containerd/*"
+        - "/var/lib/kubelet/*"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: true
+      containment_timeout_hours: 12
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+      maintenance_window: "Sunday 02:00-06:00 UTC"
+
+  # --- Policy 2: Linux Container Host ---
+  - policy_name: "Linux Container Host Prevention"
+    policy_id: "LNX-CTR-001"
+    description: >
+      Specialized policy for Linux container hosts running Docker,
+      Kubernetes, or other container runtimes. Provides container-aware
+      detection and prevention.
+    platform: Linux
+    target_group: "Container Hosts"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      sensor_tamper_protection: true
+      container_visibility: true
+      container_runtime_detection: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+
+      container_security:
+        enabled: true
+        container_drift_detection: true
+        container_image_assessment: true
+        privileged_container_detection: true
+        container_escape_prevention: true
+        kubernetes_protection:
+          enabled: true
+          admission_control: true
+          pod_security_monitoring: true
+          service_account_monitoring: true
+
+      process_blocking:
+        enabled: true
+        cryptominer_prevention: true
+        reverse_shell_prevention: true
+        known_malware: true
+
+      network_protection:
+        enabled: true
+        east_west_traffic_monitoring: true
+        c2_beaconing_detection: true
+
+    custom_ioa_rule_groups:
+      - "Linux Process Detections"
+      - "Network Detections"
+
+    exclusions:
+      process_exclusions:
+        - path: "/usr/bin/dockerd"
+          description: "Docker daemon"
+        - path: "/usr/bin/containerd"
+          description: "Containerd runtime"
+        - path: "/usr/bin/kubelet"
+          description: "Kubernetes kubelet"
+        - path: "/usr/bin/crio"
+          description: "CRI-O runtime"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+
+  # --- Policy 3: Linux Critical Infrastructure ---
+  - policy_name: "Linux Critical Infrastructure Prevention"
+    policy_id: "LNX-CRIT-001"
+    description: >
+      High-security policy for critical Linux infrastructure including
+      DNS servers, authentication servers, certificate authorities,
+      and security appliances.
+    platform: Linux
+    target_group: "Critical Linux Infrastructure"
+    priority: critical
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      sensor_tamper_protection: true
+      enhanced_logging: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Extra Aggressive"
+        prevention_sensitivity: "Aggressive"
+
+      file_integrity_monitoring:
+        enabled: true
+        realtime_monitoring: true
+        monitored_paths:
+          - "/etc/*"
+          - "/usr/bin/*"
+          - "/usr/sbin/*"
+          - "/usr/lib/*"
+          - "/boot/*"
+        alert_on_change: true
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: true
+        whitelisting_mode: true
+        allowed_processes_list: "Critical Infrastructure Whitelist"
+
+    response_policy:
+      real_time_response: true
+      network_containment: false
+      description: "Manual containment only for critical infrastructure"
+
+    update_policy:
+      sensor_update_channel: "N-2"
+      auto_update: false
+      requires_change_approval: true
+
+# =============================================================================
+# macOS PREVENTION POLICIES
+# =============================================================================
+macos_policies:
+
+  # --- Policy 1: macOS Workstation - Standard ---
+  - policy_name: "macOS Workstation - Standard Prevention"
+    policy_id: "MAC-WKS-STD-001"
+    description: >
+      Standard prevention policy for macOS workstations. Provides
+      comprehensive protection while respecting macOS-specific security
+      features like Gatekeeper, SIP, and TCC.
+    platform: macOS
+    target_group: "macOS Workstations"
+    supported_versions:
+      - "macOS 12 Monterey"
+      - "macOS 13 Ventura"
+      - "macOS 14 Sonoma"
+      - "macOS 15 Sequoia"
+    supported_architectures:
+      - "Intel (x86_64)"
+      - "Apple Silicon (arm64)"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      adware_pup_detection: true
+      sensor_tamper_protection: true
+      system_extension_mode: true
+      network_extension: true
+      full_disk_access: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+        description: >
+          Moderate prevention sensitivity to avoid conflicts with
+          legitimate macOS applications and developer tools.
+
+      sensor_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Moderate"
+
+      on_write_detection:
+        enabled: true
+        quarantine_on_detection: true
+        scan_mach_o_binaries: true
+        scan_dmg_files: true
+        scan_pkg_files: true
+        scan_app_bundles: true
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: true
+        unsigned_binary_detection: true
+
+      script_control:
+        enabled: true
+        osascript_monitoring: true
+        python_monitoring: true
+        bash_zsh_monitoring: true
+        command_line_logging: true
+
+      exploit_mitigation:
+        enabled: true
+        gatekeeper_enforcement: true
+        sip_monitoring: true
+        tcc_monitoring: true
+        dylib_hijack_prevention: true
+
+      network_protection:
+        enabled: true
+        c2_beaconing_detection: true
+        dns_tunneling_detection: true
+        tor_blocking: true
+
+      credential_protection:
+        enabled: true
+        keychain_access_monitoring: true
+        fake_password_prompt_detection: true
+        browser_credential_theft_prevention: true
+
+      persistence_protection:
+        enabled: true
+        launch_agent_monitoring: true
+        launch_daemon_monitoring: true
+        login_item_monitoring: true
+        kernel_extension_monitoring: true
+        browser_extension_monitoring: true
+
+    custom_ioa_rule_groups:
+      - "macOS Process Detections"
+      - "Network Detections"
+      - "IOC Definitions"
+
+    exclusions:
+      process_exclusions:
+        - path: "/Applications/Xcode.app/Contents/MacOS/Xcode"
+          description: "Xcode IDE"
+        - path: "/usr/bin/swift"
+          description: "Swift compiler"
+        - path: "/Applications/Docker.app/Contents/MacOS/Docker"
+          description: "Docker Desktop"
+      directory_exclusions:
+        - "/Users/*/Library/Developer/*"
+        - "/Applications/Xcode.app/*"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: true
+      containment_timeout_hours: 24
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+      maintenance_window: "Sunday 02:00-06:00 UTC"
+
+  # --- Policy 2: macOS Executive/VIP ---
+  - policy_name: "macOS Executive/VIP Prevention"
+    policy_id: "MAC-VIP-001"
+    description: >
+      Enhanced prevention policy for executive and VIP macOS users.
+      Higher sensitivity and additional monitoring for high-value targets.
+    platform: macOS
+    target_group: "Executive/VIP macOS Users"
+    priority: critical
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      adware_pup_detection: true
+      sensor_tamper_protection: true
+      enhanced_logging: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Extra Aggressive"
+        prevention_sensitivity: "Aggressive"
+
+      credential_protection:
+        enabled: true
+        keychain_access_monitoring: true
+        fake_password_prompt_detection: true
+        phishing_protection: true
+        enhanced_email_monitoring: true
+
+      network_protection:
+        enabled: true
+        c2_beaconing_detection: true
+        suspicious_wifi_detection: true
+        vpn_enforcement: true
+
+      data_loss_prevention:
+        enabled: true
+        sensitive_file_monitoring: true
+        usb_device_control: true
+        airdrop_monitoring: true
+        cloud_upload_monitoring: true
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: true
+      soc_notification: "Immediate - VIP Alert Channel"
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+
+  # --- Policy 3: macOS Developer ---
+  - policy_name: "macOS Developer Workstation Prevention"
+    policy_id: "MAC-DEV-001"
+    description: >
+      Developer-optimized prevention policy for macOS. Reduces false
+      positives from development tools while maintaining detection
+      for real threats.
+    platform: macOS
+    target_group: "macOS Developers"
+    priority: production
+
+    sensor_settings:
+      sensor_visibility: "Full"
+      cloud_anti_malware: true
+      sensor_tamper_protection: true
+
+    prevention_settings:
+
+      cloud_machine_learning:
+        prevention: true
+        detection_sensitivity: "Aggressive"
+        prevention_sensitivity: "Cautious"
+        description: >
+          Cautious prevention for developer machines to avoid blocking
+          legitimate unsigned binaries during development.
+
+      process_blocking:
+        enabled: true
+        intelligence_sourced_threats: true
+        known_malware: true
+        suspicious_processes: false
+        description: "Detect-only for suspicious; prevent known-bad"
+
+      script_control:
+        enabled: true
+        osascript_monitoring: true
+        python_monitoring: true
+        command_line_logging: true
+
+    exclusions:
+      process_exclusions:
+        - path: "/Applications/Xcode.app/*"
+          description: "Xcode and related tools"
+        - path: "/usr/local/bin/*"
+          description: "Homebrew binaries"
+        - path: "/opt/homebrew/bin/*"
+          description: "Homebrew (Apple Silicon)"
+        - path: "/Applications/Visual Studio Code.app/*"
+          description: "VS Code"
+        - path: "/Applications/iTerm.app/*"
+          description: "iTerm2 terminal"
+        - path: "/usr/local/Cellar/*"
+          description: "Homebrew packages"
+      directory_exclusions:
+        - "/Users/*/Developer/*"
+        - "/Users/*/Projects/*"
+        - "/Users/*/go/*"
+        - "/Users/*/.cargo/*"
+        - "/Users/*/node_modules/*"
+
+    response_policy:
+      real_time_response: true
+      network_containment: true
+      automated_containment_on_critical: false
+
+    update_policy:
+      sensor_update_channel: "N-1"
+      auto_update: true
+
+# =============================================================================
+# HOST GROUP DEFINITIONS
+# =============================================================================
+host_groups:
+
+  - group_name: "Windows Workstations"
+    group_id: "HG-WIN-WKS"
+    assignment_rule: "platform:'Windows' + product_type:'Workstation'"
+    assigned_policies:
+      prevention: "WIN-WKS-STD-001"
+      response: "Standard RTR"
+      update: "N-1 Auto Update"
+
+  - group_name: "Windows Servers"
+    group_id: "HG-WIN-SRV"
+    assignment_rule: "platform:'Windows' + product_type:'Server'"
+    assigned_policies:
+      prevention: "WIN-SRV-STD-001"
+      response: "Server RTR"
+      update: "N-2 Approved Update"
+
+  - group_name: "Domain Controllers"
+    group_id: "HG-WIN-DC"
+    assignment_rule: "platform:'Windows' + product_type:'Domain Controller'"
+    assigned_policies:
+      prevention: "WIN-DC-001"
+      response: "Critical Infrastructure RTR"
+      update: "N-2 CAB Approved"
+
+  - group_name: "Linux Servers"
+    group_id: "HG-LNX-SRV"
+    assignment_rule: "platform:'Linux' + product_type:'Server'"
+    assigned_policies:
+      prevention: "LNX-SRV-STD-001"
+      response: "Standard RTR"
+      update: "N-1 Auto Update"
+
+  - group_name: "Container Hosts"
+    group_id: "HG-LNX-CTR"
+    assignment_rule: "platform:'Linux' + tags:'container-host'"
+    assigned_policies:
+      prevention: "LNX-CTR-001"
+      response: "Container Host RTR"
+      update: "N-1 Auto Update"
+
+  - group_name: "Critical Linux Infrastructure"
+    group_id: "HG-LNX-CRIT"
+    assignment_rule: "platform:'Linux' + tags:'critical'"
+    assigned_policies:
+      prevention: "LNX-CRIT-001"
+      response: "Critical Infrastructure RTR"
+      update: "N-2 Approved Update"
+
+  - group_name: "macOS Workstations"
+    group_id: "HG-MAC-WKS"
+    assignment_rule: "platform:'Mac'"
+    assigned_policies:
+      prevention: "MAC-WKS-STD-001"
+      response: "Standard RTR"
+      update: "N-1 Auto Update"
+
+  - group_name: "macOS Executives/VIP"
+    group_id: "HG-MAC-VIP"
+    assignment_rule: "platform:'Mac' + tags:'vip'"
+    assigned_policies:
+      prevention: "MAC-VIP-001"
+      response: "VIP RTR"
+      update: "N-1 Auto Update"
+
+  - group_name: "macOS Developers"
+    group_id: "HG-MAC-DEV"
+    assignment_rule: "platform:'Mac' + tags:'developer'"
+    assigned_policies:
+      prevention: "MAC-DEV-001"
+      response: "Developer RTR"
+      update: "N-1 Auto Update"
+
+# =============================================================================
+# DEPLOYMENT STAGES
+# =============================================================================
+deployment_stages:
+
+  stage_1_monitor:
+    name: "Monitor Mode (Week 1-2)"
+    description: "Deploy with detect-only to establish baseline"
+    settings:
+      all_prevention: detect_only
+      all_machine_learning: detect_only
+      logging: verbose
+    success_criteria:
+      false_positive_rate_below: "5%"
+      detection_coverage: "All MITRE tactics detected"
+
+  stage_2_detect:
+    name: "Detection Mode (Week 3-4)"
+    description: "Enable detection alerts, refine exclusions"
+    settings:
+      known_malware_prevention: enabled
+      machine_learning_prevention: cautious
+      custom_ioa: detect_only
+    success_criteria:
+      false_positive_rate_below: "2%"
+      exclusions_validated: true
+
+  stage_3_prevent:
+    name: "Prevention Mode (Week 5+)"
+    description: "Enable full prevention with tuned exclusions"
+    settings:
+      all_prevention: enabled
+      machine_learning_prevention: moderate
+      custom_ioa: enabled
+    success_criteria:
+      false_positive_rate_below: "0.5%"
+      zero_production_impact: true
+
+  stage_4_aggressive:
+    name: "Aggressive Mode (Ongoing)"
+    description: "Maximum prevention for validated environments"
+    settings:
+      all_prevention: enabled
+      machine_learning_prevention: aggressive
+      custom_ioa: enabled
+      behavioral_prevention: enabled
+    success_criteria:
+      continuous_tuning: true
+      monthly_review: true

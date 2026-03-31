@@ -1,0 +1,758 @@
+---
+# CrowdStrike Falcon Custom IOA Rules - Linux Process-Based Detections
+# Version: 1.0
+# Last Updated: 2026-03-31
+# MITRE ATT&CK Version: 14.1
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Custom IOA rules for detecting Linux-specific process-based threats
+    including reverse shells, privilege escalation, container escapes,
+    cryptomining, and post-exploitation tooling.
+  platform: CrowdStrike Falcon
+  min_sensor_version: "6.40"
+
+rules:
+
+  # ============================================================================
+  # Rule 1: Reverse Shell Detection
+  # ============================================================================
+  - rule_name: "Linux Reverse Shell Execution"
+    rule_id: "CS-LNX-PROC-001"
+    description: >
+      Detects common reverse shell techniques on Linux including bash,
+      python, perl, netcat, and socat-based reverse shells used for
+      initial access and post-exploitation.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Execution
+      technique: T1059
+      technique_name: "Command and Scripting Interpreter"
+      additional_mappings:
+        - T1059.004  # Unix Shell
+        - T1071.001  # Web Protocols
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Bash Reverse Shell"
+          command_line_contains_any:
+            - "bash -i >& /dev/tcp/"
+            - "bash -c 'bash -i >& /dev/tcp/"
+            - "0<&196;exec 196<>/dev/tcp/"
+            - "/bin/sh -i >& /dev/tcp/"
+            - "exec 5<>/dev/tcp/"
+            - "bash -i >&/dev/tcp/"
+            - "sh -i >& /dev/udp/"
+
+        - name: "Python Reverse Shell"
+          command_line_contains_any:
+            - "python -c 'import socket,subprocess,os"
+            - "python3 -c 'import socket,subprocess,os"
+            - "socket.socket(socket.AF_INET"
+            - "subprocess.call([\"/bin/sh\""
+            - "pty.spawn(\"/bin/bash\")"
+            - "python -c 'import pty;pty.spawn"
+            - "python3 -c 'import pty;pty.spawn"
+
+        - name: "Perl Reverse Shell"
+          command_line_contains_any:
+            - "perl -e 'use Socket;"
+            - "perl -MIO -e"
+            - "IO::Socket::INET->new"
+
+        - name: "Netcat Reverse Shell"
+          process_name_any:
+            - "nc"
+            - "ncat"
+            - "netcat"
+            - "nc.traditional"
+            - "nc.openbsd"
+          command_line_contains_any:
+            - "-e /bin/sh"
+            - "-e /bin/bash"
+            - "-c /bin/sh"
+            - "-c /bin/bash"
+
+        - name: "Socat Reverse Shell"
+          process_name: "socat"
+          command_line_contains_any:
+            - "TCP:"
+            - "EXEC:/bin/sh"
+            - "EXEC:/bin/bash"
+            - "pty,stderr,setsid"
+
+        - name: "PHP Reverse Shell"
+          command_line_contains_any:
+            - "php -r '$sock=fsockopen"
+            - "exec(\"/bin/bash -c 'bash -i"
+            - "shell_exec("
+            - "php://input"
+
+        - name: "Ruby Reverse Shell"
+          command_line_contains_any:
+            - "ruby -rsocket -e"
+            - "TCPSocket.open"
+            - "exec \"/bin/sh\""
+
+    response_actions:
+      - action: prevent
+        description: Kill the reverse shell process immediately
+      - action: quarantine
+        description: Network-isolate the host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Active reverse shell detected on Linux host. Investigate initial
+          access vector, check for persistence mechanisms, and scope
+          lateral movement.
+      - action: collect_artifacts
+        description: >
+          Capture bash_history, process tree, active network connections,
+          open file descriptors, and /proc/*/cmdline for all processes.
+    false_positive_guidance: >
+      Penetration testing and red team exercises may use reverse shells.
+      System administrators occasionally use netcat for legitimate purposes.
+      Coordinate with security testing schedules.
+
+  # ============================================================================
+  # Rule 2: Privilege Escalation via SUID/SGID
+  # ============================================================================
+  - rule_name: "Linux SUID/SGID Privilege Escalation"
+    rule_id: "CS-LNX-PROC-002"
+    description: >
+      Detects privilege escalation attempts via SUID/SGID binary abuse,
+      including GTFOBins techniques and custom SUID binary creation.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Privilege Escalation
+      technique: T1548.001
+      technique_name: "Abuse Elevation Control Mechanism: Setuid and Setgid"
+      additional_mappings:
+        - T1068  # Exploitation for Privilege Escalation
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "SUID Binary Discovery"
+          command_line_contains_any:
+            - "find / -perm -4000"
+            - "find / -perm -u=s"
+            - "find / -perm -2000"
+            - "find / -perm -g=s"
+            - "find / -perm /6000"
+            - "find / -type f -perm -04000"
+
+        - name: "SUID Binary Creation"
+          command_line_contains_any:
+            - "chmod +s "
+            - "chmod u+s "
+            - "chmod 4755"
+            - "chmod 4777"
+            - "chmod 2755"
+            - "chmod 6755"
+          file_target_not:
+            - "/usr/bin/*"
+            - "/usr/sbin/*"
+
+        - name: "GTFOBins SUID Exploitation"
+          suid_binary_abuse:
+            - process: "find"
+              command_line_contains: "-exec /bin/sh"
+            - process: "vim"
+              command_line_contains: "-c ':!sh'"
+            - process: "nmap"
+              command_line_contains: "--interactive"
+            - process: "python"
+              command_line_contains: "os.execl('/bin/sh'"
+            - process: "python3"
+              command_line_contains: "os.execl('/bin/sh'"
+            - process: "less"
+              command_line_contains: "!/bin/sh"
+            - process: "awk"
+              command_line_contains: "system(\"/bin/sh\")"
+            - process: "env"
+              command_line_contains: "/bin/sh"
+
+        - name: "Sudo Misconfiguration Exploitation"
+          command_line_contains_any:
+            - "sudo -l"
+            - "sudo -u#-1"
+            - "sudo -u\\#$((0xffffffff))"
+            - "sudo NOPASSWD"
+
+    response_actions:
+      - action: detect
+        description: Generate high-severity alert with SUID binary details
+      - action: collect_artifacts
+        description: >
+          List all SUID/SGID binaries, capture sudoers file, check
+          /etc/passwd for anomalies, and enumerate user capabilities.
+    false_positive_guidance: >
+      SUID discovery commands may be part of security audits. Package
+      installations set SUID on legitimate binaries. Correlate with
+      user role and context.
+
+  # ============================================================================
+  # Rule 3: Container Escape Detection
+  # ============================================================================
+  - rule_name: "Container Escape and Breakout Detection"
+    rule_id: "CS-LNX-PROC-003"
+    description: >
+      Detects attempts to escape from containerized environments including
+      Docker, Kubernetes, and LXC containers via known escape techniques.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Privilege Escalation
+      technique: T1611
+      technique_name: "Escape to Host"
+      additional_mappings:
+        - T1610  # Deploy Container
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Docker Socket Access"
+          file_access:
+            - "/var/run/docker.sock"
+            - "/run/docker.sock"
+          process_not:
+            - "dockerd"
+            - "containerd"
+
+        - name: "cgroup Escape (CVE-2022-0492)"
+          command_line_contains_any:
+            - "mount -t cgroup"
+            - "release_agent"
+            - "notify_on_release"
+            - "echo 1 > /proc/sys/kernel/core_pattern"
+
+        - name: "nsenter Breakout"
+          process_name: "nsenter"
+          command_line_contains_any:
+            - "--target 1"
+            - "-t 1"
+            - "--mount=/proc/1/ns/mnt"
+
+        - name: "Privileged Container Abuse"
+          indicators:
+            - process_in_container: true
+            - mount_host_filesystem: true
+            - command_line_contains_any:
+                - "mount /dev/sda"
+                - "mount /dev/vda"
+                - "chroot /mnt"
+                - "nsenter -t 1 -m -u -i -n -p"
+
+        - name: "Kubernetes Service Account Token Access"
+          file_read:
+            - "/var/run/secrets/kubernetes.io/serviceaccount/token"
+            - "/run/secrets/kubernetes.io/serviceaccount/token"
+          process_not:
+            - "kubelet"
+            - "kube-proxy"
+
+    response_actions:
+      - action: prevent
+        description: Kill the escape process and alert immediately
+      - action: quarantine
+        description: Isolate the container host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Container escape attempt detected. Investigate container
+          configuration, check for other compromised containers, and
+          assess host-level compromise.
+    false_positive_guidance: >
+      Container management tools legitimately access Docker sockets.
+      Kubernetes operators may access service account tokens. Validate
+      against known management workflows.
+
+  # ============================================================================
+  # Rule 4: Cryptomining Detection
+  # ============================================================================
+  - rule_name: "Linux Cryptomining Activity Detection"
+    rule_id: "CS-LNX-PROC-004"
+    description: >
+      Detects cryptocurrency mining activity on Linux systems including
+      known mining tools, suspicious CPU usage patterns, and mining pool
+      connections.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Impact
+      technique: T1496
+      technique_name: "Resource Hijacking"
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Known Mining Binaries"
+          process_name_any:
+            - "xmrig"
+            - "xmr-stak"
+            - "cpuminer"
+            - "minerd"
+            - "minergate"
+            - "cgminer"
+            - "bfgminer"
+            - "ethminer"
+            - "t-rex"
+            - "phoenixminer"
+            - "nbminer"
+            - "gminer"
+            - "lolminer"
+            - "ccminer"
+
+        - name: "Mining Command-Line Arguments"
+          command_line_contains_any:
+            - "stratum+tcp://"
+            - "stratum+ssl://"
+            - "stratum2+tcp://"
+            - "--donate-level"
+            - "--coin monero"
+            - "--algo randomx"
+            - "--algo cryptonight"
+            - "--algo ethash"
+            - "-o pool."
+            - "--url pool."
+            - "--nicehash"
+            - "mining.pool"
+
+        - name: "Mining Pool Connections"
+          network_indicators:
+            destination_ports:
+              - 3333
+              - 4444
+              - 5555
+              - 7777
+              - 8888
+              - 9999
+              - 14444
+              - 14433
+            destination_domain_contains:
+              - "pool."
+              - "mining."
+              - "miner."
+              - "hashvault"
+              - "nanopool"
+              - "supportxmr"
+              - "minexmr"
+              - "f2pool"
+              - "nicehash"
+
+        - name: "Suspicious CPU Usage"
+          resource_indicators:
+            cpu_usage_above_percent: 90
+            duration_minutes_above: 30
+            process_not:
+              - "gcc"
+              - "make"
+              - "cargo"
+              - "javac"
+
+    response_actions:
+      - action: prevent
+        description: Kill the mining process
+      - action: detect
+        description: Alert with process details and mining pool information
+      - action: collect_artifacts
+        description: >
+          Capture the mining binary, check crontab for persistence,
+          inspect systemd services, and review bash_history.
+    false_positive_guidance: >
+      Legitimate compilation and scientific computing tasks can cause
+      high CPU usage. Some organizations run authorized mining operations.
+      Check organizational policy.
+
+  # ============================================================================
+  # Rule 5: Linux Credential Access
+  # ============================================================================
+  - rule_name: "Linux Credential Harvesting and Theft"
+    rule_id: "CS-LNX-PROC-005"
+    description: >
+      Detects credential access techniques on Linux including shadow file
+      access, SSH key theft, credential file enumeration, and keylogging.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Credential Access
+      technique: T1003.008
+      technique_name: "OS Credential Dumping: /etc/passwd and /etc/shadow"
+      additional_mappings:
+        - T1552.001  # Credentials In Files
+        - T1552.004  # Private Keys
+        - T1056.001  # Keylogging
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Shadow File Access"
+          file_read:
+            - "/etc/shadow"
+            - "/etc/gshadow"
+          process_not:
+            - "login"
+            - "sshd"
+            - "su"
+            - "sudo"
+            - "passwd"
+            - "chage"
+            - "useradd"
+            - "usermod"
+            - "groupadd"
+
+        - name: "SSH Key Theft"
+          file_access_pattern:
+            - "/home/*/.ssh/id_rsa"
+            - "/home/*/.ssh/id_ed25519"
+            - "/home/*/.ssh/id_ecdsa"
+            - "/root/.ssh/id_rsa"
+            - "/root/.ssh/authorized_keys"
+            - "/home/*/.ssh/id_dsa"
+          command_line_contains_any:
+            - "cat /root/.ssh"
+            - "cat /home/*/.ssh"
+            - "cp /home/*/.ssh"
+            - "tar -czf *.ssh"
+            - "find / -name id_rsa"
+            - "find / -name authorized_keys"
+
+        - name: "Credential File Enumeration"
+          command_line_contains_any:
+            - "cat /etc/passwd"
+            - "find / -name *.pem"
+            - "find / -name *.key"
+            - "find / -name *.pgp"
+            - "find / -name credentials"
+            - "find / -name .env"
+            - "cat ~/.aws/credentials"
+            - "cat ~/.azure/accessTokens.json"
+            - "cat ~/.config/gcloud/credentials.db"
+            - "cat ~/.kube/config"
+
+        - name: "Memory Credential Extraction"
+          command_line_contains_any:
+            - "strings /proc/*/maps"
+            - "gdb -p"
+            - "gcore"
+            - "/proc/*/mem"
+            - "mimipenguin"
+            - "LaZagne"
+            - "3snake"
+
+        - name: "Unshadow for Password Cracking"
+          command_line_contains_any:
+            - "unshadow"
+            - "john /etc/shadow"
+            - "hashcat -m 1800"
+
+    response_actions:
+      - action: detect
+        description: Generate high-severity alert with accessed files
+      - action: quarantine
+        description: Network-isolate if shadow file exfiltration detected
+      - action: collect_artifacts
+        description: >
+          Check auth.log for authentication anomalies, enumerate SSH
+          key modifications, and review recently accessed credential files.
+    false_positive_guidance: >
+      System administration tasks like user management access shadow files.
+      Backup scripts may access SSH keys. Validate against admin activities.
+
+  # ============================================================================
+  # Rule 6: Linux Persistence Mechanisms
+  # ============================================================================
+  - rule_name: "Linux Persistence Installation Detection"
+    rule_id: "CS-LNX-PROC-006"
+    description: >
+      Detects installation of persistence mechanisms on Linux including
+      cron jobs, systemd services, init scripts, shell profile modifications,
+      and SSH authorized_keys backdoors.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Persistence
+      technique: T1053.003
+      technique_name: "Scheduled Task/Job: Cron"
+      additional_mappings:
+        - T1543.002  # Create or Modify System Process: Systemd Service
+        - T1546.004  # Unix Shell Configuration Modification
+        - T1098.004  # Account Manipulation: SSH Authorized Keys
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Suspicious Cron Job Creation"
+          file_modification:
+            - "/etc/crontab"
+            - "/etc/cron.d/*"
+            - "/var/spool/cron/crontabs/*"
+            - "/var/spool/cron/*"
+          command_line_contains_any:
+            - "crontab -e"
+            - "crontab -l"
+            - "echo * * * *"
+          suspicious_cron_content:
+            - "curl"
+            - "wget"
+            - "bash -i"
+            - "/dev/tcp/"
+            - "python -c"
+            - "base64 -d"
+            - "nohup"
+
+        - name: "Malicious Systemd Service"
+          file_creation:
+            - "/etc/systemd/system/*.service"
+            - "/usr/lib/systemd/system/*.service"
+            - "/lib/systemd/system/*.service"
+            - "/home/*/.config/systemd/user/*.service"
+          command_line_contains_any:
+            - "systemctl enable"
+            - "systemctl daemon-reload"
+          suspicious_service_content:
+            - "ExecStart=/tmp/"
+            - "ExecStart=/dev/shm/"
+            - "ExecStart=/var/tmp/"
+            - "Restart=always"
+            - "WantedBy=multi-user.target"
+
+        - name: "Shell Profile Modification"
+          file_modification:
+            - "/etc/profile"
+            - "/etc/profile.d/*"
+            - "/etc/bash.bashrc"
+            - "/home/*/.bashrc"
+            - "/home/*/.bash_profile"
+            - "/home/*/.profile"
+            - "/root/.bashrc"
+            - "/root/.bash_profile"
+          suspicious_content:
+            - "curl"
+            - "wget"
+            - "/dev/tcp/"
+            - "python -c"
+            - "base64"
+            - "eval"
+            - "nohup"
+
+        - name: "SSH Authorized Keys Backdoor"
+          file_modification:
+            - "/root/.ssh/authorized_keys"
+            - "/home/*/.ssh/authorized_keys"
+          process_not:
+            - "sshd"
+            - "ssh-copy-id"
+
+        - name: "Init Script Persistence"
+          file_creation:
+            - "/etc/init.d/*"
+            - "/etc/rc.local"
+            - "/etc/rc*.d/*"
+          command_line_contains_any:
+            - "update-rc.d"
+            - "chkconfig --add"
+
+        - name: "LD_PRELOAD Hijacking"
+          indicators:
+            - file_modification:
+                - "/etc/ld.so.preload"
+            - environment_variable:
+                - "LD_PRELOAD="
+            - command_line_contains_any:
+                - "LD_PRELOAD="
+
+    response_actions:
+      - action: detect
+        description: Alert with persistence mechanism details and installed payload
+      - action: collect_artifacts
+        description: >
+          Enumerate all cron jobs, systemd services, init scripts,
+          shell profiles, and authorized_keys across the system.
+    false_positive_guidance: >
+      System administration regularly creates cron jobs and systemd services.
+      Package installations modify init scripts. Validate against change
+      management records.
+
+  # ============================================================================
+  # Rule 7: Linux Defense Evasion
+  # ============================================================================
+  - rule_name: "Linux Defense Evasion Techniques"
+    rule_id: "CS-LNX-PROC-007"
+    description: >
+      Detects defense evasion techniques on Linux including log tampering,
+      timestomping, process hiding, firewall manipulation, and security
+      tool disabling.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Defense Evasion
+      technique: T1070
+      technique_name: "Indicator Removal"
+      additional_mappings:
+        - T1070.002  # Clear Linux or Mac System Logs
+        - T1070.003  # Clear Command History
+        - T1070.004  # File Deletion
+        - T1070.006  # Timestomp
+        - T1562.001  # Impair Defenses: Disable or Modify Tools
+        - T1562.004  # Disable or Modify System Firewall
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "Log Tampering"
+          command_line_contains_any:
+            - "truncate -s 0 /var/log/"
+            - "> /var/log/auth.log"
+            - "> /var/log/syslog"
+            - "> /var/log/messages"
+            - "> /var/log/secure"
+            - "rm -f /var/log/"
+            - "shred /var/log/"
+            - "journalctl --vacuum-size=0"
+            - "journalctl --rotate --vacuum-time=1s"
+
+        - name: "Command History Clearing"
+          command_line_contains_any:
+            - "history -c"
+            - "history -w /dev/null"
+            - "export HISTSIZE=0"
+            - "export HISTFILESIZE=0"
+            - "unset HISTFILE"
+            - "rm ~/.bash_history"
+            - "cat /dev/null > ~/.bash_history"
+            - "ln -sf /dev/null ~/.bash_history"
+            - "set +o history"
+
+        - name: "Timestomping"
+          command_line_contains_any:
+            - "touch -t "
+            - "touch -r "
+            - "touch -d "
+            - "timestamp"
+
+        - name: "Process Hiding"
+          indicators:
+            - command_line_contains_any:
+                - "mount --bind /tmp/"
+                - "mount -o bind"
+                - "ld.so.preload"
+            - process_name_starts_with:
+                - "."
+                - " "
+            - binary_path_contains:
+                - "/dev/shm/"
+                - "/tmp/."
+                - "/var/tmp/."
+
+        - name: "Firewall Manipulation"
+          command_line_contains_any:
+            - "iptables -F"
+            - "iptables -X"
+            - "iptables -P INPUT ACCEPT"
+            - "iptables -P FORWARD ACCEPT"
+            - "ufw disable"
+            - "systemctl stop firewalld"
+            - "systemctl disable firewalld"
+            - "nft flush ruleset"
+            - "firewall-cmd --panic-off"
+
+        - name: "Security Tool Disabling"
+          command_line_contains_any:
+            - "systemctl stop falcon-sensor"
+            - "systemctl disable falcon-sensor"
+            - "service falcon-sensor stop"
+            - "setenforce 0"
+            - "echo 0 > /selinux/enforce"
+            - "systemctl stop apparmor"
+            - "systemctl stop auditd"
+            - "aa-teardown"
+            - "/opt/CrowdStrike/falconctl -s --aid"
+            - "kill -9 $(pgrep falcon)"
+
+    response_actions:
+      - action: prevent
+        description: Block attempts to disable security tools
+      - action: detect
+        description: Alert with evasion technique details
+      - action: alert_soc
+        priority: P1
+        description: >
+          Defense evasion detected on Linux host. Assume active compromise
+          and investigate for additional post-exploitation activity.
+      - action: collect_artifacts
+        description: >
+          Capture current log states, compare timestamps, enumerate
+          running security tools, and check firewall configuration.
+    false_positive_guidance: >
+      Log rotation may appear as log tampering. System administrators
+      manage firewalls and security tools. Validate against maintenance windows.
+
+  # ============================================================================
+  # Rule 8: Linux Lateral Movement
+  # ============================================================================
+  - rule_name: "Linux Lateral Movement Detection"
+    rule_id: "CS-LNX-PROC-008"
+    description: >
+      Detects lateral movement techniques on Linux including SSH pivoting,
+      SSH tunneling, and remote command execution.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Lateral Movement
+      technique: T1021.004
+      technique_name: "Remote Services: SSH"
+      additional_mappings:
+        - T1572  # Protocol Tunneling
+        - T1570  # Lateral Tool Transfer
+    platform:
+      - Linux
+    detection_logic:
+      indicators:
+        - name: "SSH Tunneling"
+          process_name: "ssh"
+          command_line_contains_any:
+            - "-L "
+            - "-R "
+            - "-D "
+            - "-N -f"
+            - "DynamicForward"
+            - "LocalForward"
+            - "RemoteForward"
+            - "ProxyJump"
+            - "-J "
+            - "-o StrictHostKeyChecking=no"
+            - "-o UserKnownHostsFile=/dev/null"
+
+        - name: "Mass SSH Scanning"
+          indicators:
+            ssh_connections_per_minute_above: 10
+            unique_destinations_above: 5
+            time_window_minutes: 5
+
+        - name: "Remote Tool Transfer"
+          command_line_contains_any:
+            - "scp -o StrictHostKeyChecking=no"
+            - "rsync -e ssh"
+            - "sftp -o StrictHostKeyChecking=no"
+            - "curl -o /tmp/ http"
+            - "wget -O /tmp/ http"
+            - "python -m http.server"
+            - "python3 -m http.server"
+
+    response_actions:
+      - action: detect
+        description: Alert with SSH connection details and destination hosts
+      - action: collect_artifacts
+        description: >
+          Capture SSH config, known_hosts, auth.log entries, and
+          active SSH sessions on the host.
+    false_positive_guidance: >
+      System administrators use SSH tunneling for legitimate management.
+      Automated deployment tools use SCP/rsync. Validate against
+      known admin workflows.

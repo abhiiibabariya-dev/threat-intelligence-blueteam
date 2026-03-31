@@ -1,0 +1,602 @@
+---
+# CrowdStrike Falcon Custom IOA Rules - macOS Process-Based Detections
+# Version: 1.0
+# Last Updated: 2026-03-31
+# MITRE ATT&CK Version: 14.1
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Custom IOA rules for detecting macOS-specific process-based threats
+    including AppleScript abuse, Launch Agent/Daemon persistence,
+    Gatekeeper bypasses, keychain access, and macOS-specific malware.
+  platform: CrowdStrike Falcon
+  min_sensor_version: "6.40"
+
+rules:
+
+  # ============================================================================
+  # Rule 1: macOS Reverse Shell and Remote Access
+  # ============================================================================
+  - rule_name: "macOS Reverse Shell and Remote Access Execution"
+    rule_id: "CS-MAC-PROC-001"
+    description: >
+      Detects reverse shell techniques on macOS including bash, python, ruby,
+      osascript-based shells, and abuse of macOS-native remote access tools.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Execution
+      technique: T1059
+      technique_name: "Command and Scripting Interpreter"
+      additional_mappings:
+        - T1059.002  # AppleScript
+        - T1059.004  # Unix Shell
+        - T1059.006  # Python
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Bash/Zsh Reverse Shell"
+          command_line_contains_any:
+            - "bash -i >& /dev/tcp/"
+            - "zsh -c 'zmodload zsh/net/tcp"
+            - "/bin/sh -i >& /dev/tcp/"
+            - "exec 5<>/dev/tcp/"
+            - "0<&196;exec 196<>/dev/tcp/"
+
+        - name: "Python Reverse Shell"
+          command_line_contains_any:
+            - "python -c 'import socket,subprocess,os"
+            - "python3 -c 'import socket,subprocess,os"
+            - "pty.spawn(\"/bin/zsh\")"
+            - "pty.spawn(\"/bin/bash\")"
+
+        - name: "AppleScript Remote Access"
+          process_name: "osascript"
+          command_line_contains_any:
+            - "do shell script"
+            - "with administrator privileges"
+            - "curl"
+            - "wget"
+            - "bash -c"
+            - "System Events"
+
+        - name: "macOS Remote Desktop Abuse"
+          indicators:
+            - process_name: "screensharingd"
+              unexpected_activation: true
+            - command_line_contains_any:
+                - "kickstart -activate"
+                - "ARDAgent"
+                - "VNC"
+                - "sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart"
+
+        - name: "Netcat/Socat Reverse Shell"
+          process_name_any:
+            - "nc"
+            - "ncat"
+            - "socat"
+          command_line_contains_any:
+            - "-e /bin/sh"
+            - "-e /bin/bash"
+            - "-e /bin/zsh"
+            - "EXEC:/bin/zsh"
+
+    response_actions:
+      - action: prevent
+        description: Kill the reverse shell process immediately
+      - action: quarantine
+        description: Network-isolate the macOS host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Active reverse shell detected on macOS host. Investigate
+          initial access vector and check for persistence.
+    false_positive_guidance: >
+      Developers may use osascript for automation. Remote Desktop is
+      legitimately used. Validate against known admin activities.
+
+  # ============================================================================
+  # Rule 2: macOS Persistence Mechanisms
+  # ============================================================================
+  - rule_name: "macOS Persistence Installation Detection"
+    rule_id: "CS-MAC-PROC-002"
+    description: >
+      Detects installation of persistence mechanisms on macOS including
+      Launch Agents, Launch Daemons, Login Items, kernel extensions,
+      and Authorization Plugins.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Persistence
+      technique: T1543.001
+      technique_name: "Create or Modify System Process: Launch Agent"
+      additional_mappings:
+        - T1543.004  # Launch Daemon
+        - T1547.011  # Plist Modification
+        - T1547.015  # Login Items
+        - T1547.006  # Kernel Modules and Extensions
+        - T1556.003  # Pluggable Authentication Modules
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Suspicious Launch Agent Creation"
+          file_creation:
+            - "/Library/LaunchAgents/*.plist"
+            - "/Users/*/Library/LaunchAgents/*.plist"
+            - "~/Library/LaunchAgents/*.plist"
+          suspicious_plist_content:
+            - "ProgramArguments"
+            - "RunAtLoad"
+            - "KeepAlive"
+            - "/tmp/"
+            - "/var/tmp/"
+            - "curl"
+            - "python"
+            - "bash -c"
+
+        - name: "Suspicious Launch Daemon Creation"
+          file_creation:
+            - "/Library/LaunchDaemons/*.plist"
+            - "/System/Library/LaunchDaemons/*.plist"
+          process_not:
+            - "installer"
+            - "packagekit"
+
+        - name: "Login Item Registration"
+          command_line_contains_any:
+            - "osascript -e 'tell application \"System Events\" to make login item"
+            - "LSSharedFileListInsertItemURL"
+            - "SMLoginItemSetEnabled"
+            - "loginwindow"
+          file_creation:
+            - "/Users/*/Library/Application Support/com.apple.backgroundtaskmanagementagent/*"
+
+        - name: "Kernel Extension Loading"
+          command_line_contains_any:
+            - "kextload"
+            - "kextutil"
+            - "kmutil load"
+          file_creation:
+            - "/Library/Extensions/*.kext"
+            - "/System/Library/Extensions/*.kext"
+
+        - name: "Authorization Plugin Installation"
+          file_creation:
+            - "/Library/Security/SecurityAgentPlugins/*.bundle"
+          file_modification:
+            - "/etc/authorization"
+
+        - name: "Cron Job Persistence"
+          file_modification:
+            - "/var/at/tabs/*"
+            - "/usr/lib/cron/tabs/*"
+          command_line_contains_any:
+            - "crontab -e"
+            - "crontab -l"
+
+        - name: "Periodic Script Installation"
+          file_creation:
+            - "/etc/periodic/daily/*"
+            - "/etc/periodic/weekly/*"
+            - "/etc/periodic/monthly/*"
+            - "/usr/local/etc/periodic/*"
+
+    response_actions:
+      - action: detect
+        description: Alert with persistence type and installed payload details
+      - action: collect_artifacts
+        description: >
+          Enumerate all Launch Agents/Daemons, Login Items, kernel
+          extensions, cron jobs, and periodic scripts. Capture plist
+          contents for suspicious entries.
+    false_positive_guidance: >
+      Software installation legitimately creates Launch Agents/Daemons.
+      macOS updates modify system plists. Validate against known
+      application installations.
+
+  # ============================================================================
+  # Rule 3: macOS Credential Access
+  # ============================================================================
+  - rule_name: "macOS Credential Theft and Keychain Access"
+    rule_id: "CS-MAC-PROC-003"
+    description: >
+      Detects credential theft techniques on macOS including Keychain
+      dumping, password prompting via osascript, credential file access,
+      and browser credential extraction.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Credential Access
+      technique: T1555.001
+      technique_name: "Credentials from Password Stores: Keychain"
+      additional_mappings:
+        - T1555.003  # Credentials from Web Browsers
+        - T1056.002  # GUI Input Capture
+        - T1552.001  # Credentials In Files
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Keychain Dumping"
+          command_line_contains_any:
+            - "security find-generic-password"
+            - "security find-internet-password"
+            - "security dump-keychain"
+            - "security export -k"
+            - "security unlock-keychain"
+            - "security find-certificate -a -p"
+            - "security list-keychains"
+            - "chainbreaker"
+            - "keychaindump"
+            - "KeychainStealer"
+
+        - name: "Fake Password Prompt via osascript"
+          process_name: "osascript"
+          command_line_contains_any:
+            - "display dialog"
+            - "default answer"
+            - "with hidden answer"
+            - "password"
+            - "credentials"
+            - "System Preferences"
+
+        - name: "Browser Credential Extraction"
+          file_access:
+            - "/Users/*/Library/Application Support/Google/Chrome/Default/Login Data"
+            - "/Users/*/Library/Application Support/Google/Chrome/Default/Cookies"
+            - "/Users/*/Library/Application Support/Firefox/Profiles/*/logins.json"
+            - "/Users/*/Library/Application Support/Firefox/Profiles/*/key4.db"
+            - "/Users/*/Library/Safari/Bookmarks.plist"
+            - "/Users/*/Library/Cookies/Cookies.binarycookies"
+          process_not:
+            - "Google Chrome"
+            - "firefox"
+            - "Safari"
+
+        - name: "SSH Key and Cloud Credential Theft"
+          command_line_contains_any:
+            - "cat ~/.ssh/id_rsa"
+            - "cat ~/.ssh/id_ed25519"
+            - "cat ~/.aws/credentials"
+            - "cat ~/.azure/accessTokens.json"
+            - "cat ~/.config/gcloud/credentials.db"
+            - "find / -name id_rsa"
+            - "find / -name *.pem"
+
+        - name: "Hashdump and Password Extraction"
+          command_line_contains_any:
+            - "dscl . -read /Users/"
+            - "dscl . -list /Users"
+            - "dscacheutil -q user"
+            - "Directory Service"
+            - "dsexport"
+            - "mkpassdb"
+
+    response_actions:
+      - action: prevent
+        description: Block keychain access from unauthorized processes
+      - action: quarantine
+        description: Network-isolate the macOS host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Credential theft detected on macOS. Assume all keychain
+          credentials and stored passwords are compromised. Initiate
+          password resets for affected accounts.
+    false_positive_guidance: >
+      Legitimate applications access Keychain for stored credentials.
+      Security audit tools may query keychain entries. Validate against
+      application identity and code signing.
+
+  # ============================================================================
+  # Rule 4: macOS Defense Evasion
+  # ============================================================================
+  - rule_name: "macOS Defense Evasion and Gatekeeper Bypass"
+    rule_id: "CS-MAC-PROC-004"
+    description: >
+      Detects defense evasion techniques on macOS including Gatekeeper
+      bypasses, SIP disabling, quarantine attribute removal, TCC database
+      manipulation, and security tool disabling.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Defense Evasion
+      technique: T1553.001
+      technique_name: "Subvert Trust Controls: Gatekeeper Bypass"
+      additional_mappings:
+        - T1553.005  # Mark-of-the-Web Bypass
+        - T1562.001  # Impair Defenses: Disable or Modify Tools
+        - T1222.002  # Linux and Mac File and Directory Permissions Modification
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Gatekeeper Bypass"
+          command_line_contains_any:
+            - "spctl --master-disable"
+            - "spctl --add"
+            - "spctl --disable"
+            - "defaults write com.apple.LaunchServices LSQuarantine -bool NO"
+            - "xattr -d com.apple.quarantine"
+            - "xattr -r -d com.apple.quarantine"
+            - "xattr -c"
+
+        - name: "SIP Status Check/Bypass"
+          command_line_contains_any:
+            - "csrutil status"
+            - "csrutil disable"
+            - "csrutil authenticated-root disable"
+            - "nvram csr-active-config"
+
+        - name: "TCC Database Manipulation"
+          file_access:
+            - "/Library/Application Support/com.apple.TCC/TCC.db"
+            - "/Users/*/Library/Application Support/com.apple.TCC/TCC.db"
+          command_line_contains_any:
+            - "tccutil reset"
+            - "sqlite3 TCC.db"
+            - "INSERT INTO access"
+
+        - name: "macOS Firewall Disabling"
+          command_line_contains_any:
+            - "defaults write /Library/Preferences/com.apple.alf globalstate -int 0"
+            - "socketfilterfw --setglobalstate off"
+            - "pfctl -d"
+            - "pfctl -F all"
+
+        - name: "Falcon Sensor Tampering (macOS)"
+          command_line_contains_any:
+            - "sudo launchctl unload /Library/LaunchDaemons/com.crowdstrike"
+            - "sudo kextunload -b com.crowdstrike"
+            - "sudo systemextensionsctl uninstall"
+            - "falconctl uninstall"
+            - "kill -9 $(pgrep falcon"
+
+        - name: "Log Clearing"
+          command_line_contains_any:
+            - "log erase"
+            - "rm -rf /var/log/*"
+            - "rm ~/Library/Logs/*"
+            - "sudo log erase --all"
+            - "sqlite3 ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2 'delete from LSQuarantineEvent'"
+
+        - name: "Code Signing Bypass"
+          command_line_contains_any:
+            - "codesign --force --deep --sign -"
+            - "codesign -fs-"
+            - "codesign --remove-signature"
+
+    response_actions:
+      - action: prevent
+        description: Block Gatekeeper bypass and security tool tampering
+      - action: detect
+        description: Alert with defense evasion technique details
+      - action: alert_soc
+        priority: P1
+        description: >
+          Defense evasion detected on macOS. Assume active compromise
+          and investigate for additional post-exploitation activity.
+    false_positive_guidance: >
+      Developers may use xattr to clear quarantine on trusted downloads.
+      Application signing during development uses codesign. Validate
+      against developer workflows.
+
+  # ============================================================================
+  # Rule 5: macOS Privilege Escalation
+  # ============================================================================
+  - rule_name: "macOS Privilege Escalation Detection"
+    rule_id: "CS-MAC-PROC-005"
+    description: >
+      Detects privilege escalation techniques on macOS including sudo abuse,
+      authorization bypass, dylib injection, and exploitation of macOS
+      entitlement vulnerabilities.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Privilege Escalation
+      technique: T1548.003
+      technique_name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching"
+      additional_mappings:
+        - T1574.004  # Hijack Execution Flow: Dylib Hijacking
+        - T1548.004  # Elevated Execution with Prompt
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Sudo Abuse"
+          command_line_contains_any:
+            - "sudo -l"
+            - "sudo bash"
+            - "sudo su"
+            - "sudo -s"
+            - "echo '' | sudo -S"
+            - "sudo NOPASSWD"
+            - "sudo -k"
+            - "Defaults !tty_tickets"
+
+        - name: "Dylib Injection"
+          command_line_contains_any:
+            - "DYLD_INSERT_LIBRARIES="
+            - "DYLD_LIBRARY_PATH="
+            - "DYLD_FRAMEWORK_PATH="
+          environment_variable:
+            - "DYLD_INSERT_LIBRARIES"
+            - "DYLD_FORCE_FLAT_NAMESPACE"
+
+        - name: "Authorization Exploitation"
+          command_line_contains_any:
+            - "AuthorizationExecuteWithPrivileges"
+            - "security authorizationdb write"
+            - "security authorize"
+
+        - name: "Installer Package Abuse"
+          indicators:
+            - process_name: "installer"
+              command_line_contains_any:
+                - "-pkg /tmp/"
+                - "-pkg /var/tmp/"
+                - "-target /"
+            - file_creation:
+                - "/tmp/*.pkg"
+                - "/tmp/*.mpkg"
+
+    response_actions:
+      - action: detect
+        description: Alert with privilege escalation technique details
+      - action: collect_artifacts
+        description: >
+          Check sudoers file, enumerate installed authorization plugins,
+          list loaded dylibs, and review installer logs.
+    false_positive_guidance: >
+      System administration frequently uses sudo. Package installations
+      require elevated privileges. Validate against admin context.
+
+  # ============================================================================
+  # Rule 6: macOS Lateral Movement
+  # ============================================================================
+  - rule_name: "macOS Lateral Movement Detection"
+    rule_id: "CS-MAC-PROC-006"
+    description: >
+      Detects lateral movement techniques targeting or originating from macOS
+      including SSH pivoting, Apple Remote Desktop abuse, and AirDrop abuse.
+    severity: high
+    enabled: true
+    mitre_attack:
+      tactic: Lateral Movement
+      technique: T1021.004
+      technique_name: "Remote Services: SSH"
+      additional_mappings:
+        - T1021.006  # Windows Remote Management (ARD equivalent)
+        - T1572  # Protocol Tunneling
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "SSH Tunneling and Pivoting"
+          process_name: "ssh"
+          command_line_contains_any:
+            - "-L "
+            - "-R "
+            - "-D "
+            - "-N -f"
+            - "-o StrictHostKeyChecking=no"
+            - "-o UserKnownHostsFile=/dev/null"
+            - "ProxyJump"
+            - "-J "
+
+        - name: "Apple Remote Desktop Abuse"
+          command_line_contains_any:
+            - "kickstart -activate"
+            - "-configure -allowAccessFor -allUsers"
+            - "-configure -access -on"
+            - "ARDAgent"
+            - "VNCServer"
+
+        - name: "Mass SSH Activity"
+          indicators:
+            ssh_connections_per_minute_above: 10
+            unique_destinations_above: 5
+            time_window_minutes: 5
+
+    response_actions:
+      - action: detect
+        description: Alert with lateral movement details and destination hosts
+      - action: collect_artifacts
+        description: >
+          Capture SSH sessions, ARD configuration, and network connections.
+    false_positive_guidance: >
+      IT uses ARD and SSH for legitimate management. Validate against
+      known admin workflows.
+
+  # ============================================================================
+  # Rule 7: macOS-Specific Malware Indicators
+  # ============================================================================
+  - rule_name: "macOS Malware Family Detection"
+    rule_id: "CS-MAC-PROC-007"
+    description: >
+      Detects known macOS malware families and their behavioral indicators
+      including adware, backdoors, ransomware, and information stealers
+      targeting macOS.
+    severity: critical
+    enabled: true
+    mitre_attack:
+      tactic: Execution
+      technique: T1204.002
+      technique_name: "User Execution: Malicious File"
+      additional_mappings:
+        - T1059.002  # AppleScript
+        - T1036.005  # Match Legitimate Name or Location
+    platform:
+      - macOS
+    detection_logic:
+      indicators:
+        - name: "Known macOS Malware Behaviors"
+          behavioral_patterns:
+            - name: "XCSSET"
+              indicators:
+                - file_creation_in: "/Users/*/Library/Group Containers/"
+                - xcode_project_modification: true
+                - browser_cookie_theft: true
+
+            - name: "Silver Sparrow"
+              indicators:
+                - javascript_execution_from_pkg: true
+                - s3_bucket_callback: true
+                - process_name: "PlistBuddy"
+                  command_line_contains: "LaunchAgents"
+
+            - name: "Shlayer"
+              indicators:
+                - fake_flash_installer: true
+                - dmg_mount_with_hidden_app: true
+                - process_name: "bash"
+                  command_line_contains: "curl -s0"
+
+            - name: "macOS.Macma (APT)"
+              indicators:
+                - keylogging_via_cgevent: true
+                - screen_capture: true
+                - device_fingerprinting: true
+
+            - name: "Atomic Stealer (AMOS)"
+              indicators:
+                - command_line_contains_any:
+                    - "osascript -e 'display dialog"
+                    - "security find-generic-password"
+                    - "sqlite3 ~/Library/Application Support/Google/Chrome"
+                - file_exfiltration:
+                    targets:
+                      - "Cookies"
+                      - "Login Data"
+                      - "Web Data"
+
+        - name: "Suspicious DMG/PKG Behavior"
+          indicators:
+            - unsigned_dmg_execution: true
+            - pkg_preinstall_script_contains:
+                - "curl"
+                - "wget"
+                - "bash -c"
+                - "python"
+                - "osascript"
+            - app_bundle_from_temp:
+                - "/tmp/*.app"
+                - "/private/tmp/*.app"
+
+    response_actions:
+      - action: prevent
+        description: Kill malware process and quarantine binary
+      - action: quarantine
+        description: Network-isolate the macOS host
+      - action: alert_soc
+        priority: P1
+        description: >
+          Known macOS malware detected. Initiate IR investigation,
+          check for data exfiltration, and scope the infection.
+    false_positive_guidance: >
+      Some legitimate applications use similar techniques (e.g., osascript
+      dialogs). Validate against known software inventory and code
+      signing certificates.

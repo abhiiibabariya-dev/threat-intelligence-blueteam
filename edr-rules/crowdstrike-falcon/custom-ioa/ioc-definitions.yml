@@ -1,0 +1,770 @@
+---
+# CrowdStrike Falcon IOC (Indicators of Compromise) Definitions
+# Version: 1.0
+# Last Updated: 2026-03-31
+# MITRE ATT&CK Version: 14.1
+
+metadata:
+  author: Blue Team Threat Intelligence
+  description: >
+    Comprehensive Indicators of Compromise (IOC) definitions for CrowdStrike
+    Falcon covering hash-based, network-based, file-based, and behavioral
+    IOCs across Windows, Linux, and macOS platforms.
+  platform: CrowdStrike Falcon
+  ioc_management: Falcon Intelligence & Custom IOC API
+
+# =============================================================================
+# IOC Type 1: Hash-Based IOCs (File Hashes)
+# =============================================================================
+hash_iocs:
+
+  # --- Windows Malware Hashes ---
+  windows:
+    - category: "Credential Theft Tools"
+      description: "Known credential harvesting tool hashes"
+      severity: critical
+      action: prevent_and_detect
+      platform: Windows
+      hashes:
+        - type: sha256
+          description: "Mimikatz x64"
+          values:
+            - "PLACEHOLDER_HASH_1 # Replace with actual IOC feed hashes"
+          tags: ["mimikatz", "credential-theft", "T1003"]
+        - type: sha256
+          description: "LaZagne credential harvester"
+          values:
+            - "PLACEHOLDER_HASH_2"
+          tags: ["lazagne", "credential-theft", "T1555"]
+        - type: sha256
+          description: "Rubeus Kerberos toolkit"
+          values:
+            - "PLACEHOLDER_HASH_3"
+          tags: ["rubeus", "kerberoasting", "T1558"]
+        - type: imphash
+          description: "Known Mimikatz import hashes"
+          values:
+            - "3EB3B5B05FB5C4B1E69ECC8F91F60C7A"
+          tags: ["mimikatz", "imphash"]
+
+    - category: "C2 Frameworks"
+      description: "Known C2 framework binaries and stagers"
+      severity: critical
+      action: prevent_and_detect
+      platform: Windows
+      hashes:
+        - type: sha256
+          description: "Cobalt Strike beacon variants"
+          values:
+            - "PLACEHOLDER_CS_HASH_1"
+            - "PLACEHOLDER_CS_HASH_2"
+          tags: ["cobalt-strike", "beacon", "T1071"]
+        - type: sha256
+          description: "Sliver C2 implant"
+          values:
+            - "PLACEHOLDER_SLIVER_HASH_1"
+          tags: ["sliver", "c2", "T1071"]
+        - type: sha256
+          description: "Brute Ratel C4"
+          values:
+            - "PLACEHOLDER_BRC4_HASH_1"
+          tags: ["brute-ratel", "c2", "T1071"]
+
+    - category: "Ransomware"
+      description: "Known ransomware binary hashes"
+      severity: critical
+      action: prevent_and_detect
+      platform: Windows
+      hashes:
+        - type: sha256
+          description: "LockBit 3.0 variants"
+          values:
+            - "PLACEHOLDER_LOCKBIT_1"
+          tags: ["lockbit", "ransomware", "T1486"]
+        - type: sha256
+          description: "BlackCat/ALPHV variants"
+          values:
+            - "PLACEHOLDER_ALPHV_1"
+          tags: ["blackcat", "alphv", "ransomware", "T1486"]
+        - type: sha256
+          description: "Royal ransomware"
+          values:
+            - "PLACEHOLDER_ROYAL_1"
+          tags: ["royal", "ransomware", "T1486"]
+        - type: sha256
+          description: "Cl0p ransomware"
+          values:
+            - "PLACEHOLDER_CLOP_1"
+          tags: ["clop", "ransomware", "T1486"]
+
+    - category: "Remote Access Tools"
+      description: "Unauthorized RAT binaries"
+      severity: high
+      action: detect
+      platform: Windows
+      hashes:
+        - type: sha256
+          description: "AsyncRAT variants"
+          values:
+            - "PLACEHOLDER_ASYNCRAT_1"
+          tags: ["asyncrat", "rat", "T1219"]
+        - type: sha256
+          description: "Quasar RAT"
+          values:
+            - "PLACEHOLDER_QUASAR_1"
+          tags: ["quasar", "rat", "T1219"]
+
+  # --- Linux Malware Hashes ---
+  linux:
+    - category: "Linux Backdoors"
+      description: "Known Linux backdoor and rootkit hashes"
+      severity: critical
+      action: prevent_and_detect
+      platform: Linux
+      hashes:
+        - type: sha256
+          description: "BPFDoor backdoor"
+          values:
+            - "PLACEHOLDER_BPFDOOR_1"
+          tags: ["bpfdoor", "backdoor", "T1205"]
+        - type: sha256
+          description: "Symbiote rootkit"
+          values:
+            - "PLACEHOLDER_SYMBIOTE_1"
+          tags: ["symbiote", "rootkit", "T1014"]
+        - type: sha256
+          description: "OrBit malware"
+          values:
+            - "PLACEHOLDER_ORBIT_1"
+          tags: ["orbit", "rootkit", "T1014"]
+        - type: sha256
+          description: "Reptile rootkit"
+          values:
+            - "PLACEHOLDER_REPTILE_1"
+          tags: ["reptile", "rootkit", "T1014"]
+
+    - category: "Linux Cryptominers"
+      description: "Known cryptominer hashes for Linux"
+      severity: high
+      action: prevent_and_detect
+      platform: Linux
+      hashes:
+        - type: sha256
+          description: "XMRig variants"
+          values:
+            - "PLACEHOLDER_XMRIG_1"
+          tags: ["xmrig", "cryptominer", "T1496"]
+        - type: sha256
+          description: "Kinsing miner"
+          values:
+            - "PLACEHOLDER_KINSING_1"
+          tags: ["kinsing", "cryptominer", "T1496"]
+        - type: sha256
+          description: "TeamTNT miner"
+          values:
+            - "PLACEHOLDER_TEAMTNT_1"
+          tags: ["teamtnt", "cryptominer", "T1496"]
+
+    - category: "Linux C2 Implants"
+      description: "Known Linux C2 implant hashes"
+      severity: critical
+      action: prevent_and_detect
+      platform: Linux
+      hashes:
+        - type: sha256
+          description: "Cobalt Strike beacon (Linux ELF)"
+          values:
+            - "PLACEHOLDER_CS_LINUX_1"
+          tags: ["cobalt-strike", "linux", "T1071"]
+        - type: sha256
+          description: "Sliver C2 (Linux)"
+          values:
+            - "PLACEHOLDER_SLIVER_LINUX_1"
+          tags: ["sliver", "linux", "T1071"]
+        - type: sha256
+          description: "Merlin C2 agent"
+          values:
+            - "PLACEHOLDER_MERLIN_1"
+          tags: ["merlin", "c2", "T1071"]
+
+    - category: "Linux Ransomware"
+      description: "Known Linux ransomware binaries"
+      severity: critical
+      action: prevent_and_detect
+      platform: Linux
+      hashes:
+        - type: sha256
+          description: "ESXiArgs ransomware"
+          values:
+            - "PLACEHOLDER_ESXIARGS_1"
+          tags: ["esxiargs", "ransomware", "T1486"]
+        - type: sha256
+          description: "BlackCat/ALPHV (Linux)"
+          values:
+            - "PLACEHOLDER_ALPHV_LINUX_1"
+          tags: ["blackcat", "linux", "ransomware", "T1486"]
+        - type: sha256
+          description: "LockBit (Linux/ESXi)"
+          values:
+            - "PLACEHOLDER_LOCKBIT_LINUX_1"
+          tags: ["lockbit", "linux", "ransomware", "T1486"]
+
+  # --- macOS Malware Hashes ---
+  macos:
+    - category: "macOS Malware"
+      description: "Known macOS malware hashes"
+      severity: critical
+      action: prevent_and_detect
+      platform: macOS
+      hashes:
+        - type: sha256
+          description: "Atomic Stealer (AMOS)"
+          values:
+            - "PLACEHOLDER_AMOS_1"
+          tags: ["amos", "stealer", "macos", "T1555"]
+        - type: sha256
+          description: "Silver Sparrow"
+          values:
+            - "PLACEHOLDER_SPARROW_1"
+          tags: ["silver-sparrow", "macos", "T1059"]
+        - type: sha256
+          description: "XCSSET"
+          values:
+            - "PLACEHOLDER_XCSSET_1"
+          tags: ["xcsset", "macos", "T1195"]
+        - type: sha256
+          description: "Shlayer adware/dropper"
+          values:
+            - "PLACEHOLDER_SHLAYER_1"
+          tags: ["shlayer", "macos", "T1204"]
+        - type: sha256
+          description: "macOS.Macma APT backdoor"
+          values:
+            - "PLACEHOLDER_MACMA_1"
+          tags: ["macma", "apt", "macos", "T1059"]
+        - type: sha256
+          description: "CloudMensis spyware"
+          values:
+            - "PLACEHOLDER_CLOUDMENSIS_1"
+          tags: ["cloudmensis", "spyware", "macos", "T1113"]
+        - type: sha256
+          description: "RustBucket (DPRK)"
+          values:
+            - "PLACEHOLDER_RUSTBUCKET_1"
+          tags: ["rustbucket", "dprk", "macos", "T1059"]
+
+    - category: "macOS Adware/PUP"
+      description: "Potentially unwanted programs targeting macOS"
+      severity: medium
+      action: detect
+      platform: macOS
+      hashes:
+        - type: sha256
+          description: "Bundlore adware"
+          values:
+            - "PLACEHOLDER_BUNDLORE_1"
+          tags: ["bundlore", "adware", "macos"]
+        - type: sha256
+          description: "Pirrit adware"
+          values:
+            - "PLACEHOLDER_PIRRIT_1"
+          tags: ["pirrit", "adware", "macos"]
+
+# =============================================================================
+# IOC Type 2: Network-Based IOCs
+# =============================================================================
+network_iocs:
+
+  # --- Malicious IP Addresses ---
+  ip_addresses:
+    - category: "C2 Infrastructure"
+      description: "Known command and control server IPs"
+      severity: critical
+      action: detect_and_block
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "CrowdStrike Falcon X Intelligence"
+        - "Abuse.ch Feodo Tracker"
+        - "CISA Known Exploited Infrastructure"
+      update_frequency: "Every 4 hours"
+      ioc_feed_integration:
+        falcon_x: true
+        custom_api_endpoint: "/indicators/entities/iocs/v1"
+        api_parameters:
+          type: "ipv4"
+          action: "detect"
+          severity: "critical"
+          applied_globally: true
+
+    - category: "Tor Exit Nodes"
+      description: "Active Tor exit node IP addresses"
+      severity: medium
+      action: detect
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "TorProject exit list"
+        - "dan.me.uk Tor list"
+      update_frequency: "Every 1 hour"
+
+    - category: "Cryptomining Pools"
+      description: "Known cryptocurrency mining pool IPs"
+      severity: high
+      action: detect_and_block
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "Internal threat intelligence"
+      common_pools:
+        - "pool.minexmr.com"
+        - "pool.supportxmr.com"
+        - "xmr.nanopool.org"
+        - "monerohash.com"
+        - "pool.hashvault.pro"
+
+  # --- Malicious Domains ---
+  domains:
+    - category: "C2 Domains"
+      description: "Known C2 infrastructure domains"
+      severity: critical
+      action: detect_and_block
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "CrowdStrike Falcon X Intelligence"
+        - "URLhaus"
+        - "PhishTank"
+      update_frequency: "Every 4 hours"
+      ioc_feed_integration:
+        falcon_x: true
+        custom_api_endpoint: "/indicators/entities/iocs/v1"
+        api_parameters:
+          type: "domain"
+          action: "detect"
+
+    - category: "DGA Domains"
+      description: "Domain Generation Algorithm detected domains"
+      severity: high
+      action: detect
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      detection_criteria:
+        entropy_threshold: 3.5
+        random_character_ratio_above: 0.6
+        newly_registered_within_days: 30
+
+    - category: "Phishing Domains"
+      description: "Known phishing and credential harvesting domains"
+      severity: high
+      action: detect_and_block
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "PhishTank"
+        - "OpenPhish"
+        - "Internal phishing reports"
+
+  # --- Malicious URLs ---
+  urls:
+    - category: "Malware Distribution"
+      description: "URLs serving malware payloads"
+      severity: critical
+      action: detect_and_block
+      platform:
+        - Windows
+        - Linux
+        - macOS
+      sources:
+        - "URLhaus"
+        - "CrowdStrike Falcon X"
+      update_frequency: "Every 1 hour"
+
+    - category: "Exploit Kit Landing Pages"
+      description: "URLs associated with exploit kit infrastructure"
+      severity: critical
+      action: detect_and_block
+      platform:
+        - Windows
+        - macOS
+      sources:
+        - "CrowdStrike Falcon X"
+
+# =============================================================================
+# IOC Type 3: File-Based IOCs (Paths & Artifacts)
+# =============================================================================
+file_iocs:
+
+  # --- Windows File IOCs ---
+  windows:
+    - category: "Suspicious File Locations"
+      description: "Files in suspicious locations commonly used by malware"
+      severity: high
+      action: detect
+      platform: Windows
+      paths:
+        - "C:\\Users\\*\\AppData\\Local\\Temp\\*.exe"
+        - "C:\\Users\\*\\AppData\\Roaming\\*.exe"
+        - "C:\\Windows\\Temp\\*.dll"
+        - "C:\\Windows\\Temp\\*.exe"
+        - "C:\\ProgramData\\*.exe"
+        - "C:\\Users\\Public\\*.exe"
+        - "C:\\Users\\Public\\*.dll"
+        - "C:\\Windows\\System32\\Tasks\\*.exe"
+        - "C:\\Recovery\\*.exe"
+
+    - category: "Web Shell Indicators"
+      description: "Web shell files in web server directories"
+      severity: critical
+      action: detect_and_block
+      platform: Windows
+      paths:
+        - "C:\\inetpub\\wwwroot\\*.aspx"
+        - "C:\\inetpub\\wwwroot\\*.ashx"
+        - "C:\\inetpub\\wwwroot\\*.asmx"
+        - "C:\\inetpub\\wwwroot\\*.jsp"
+      file_characteristics:
+        - contains_eval: true
+        - contains_exec: true
+        - recently_created: true
+        - size_below_kb: 50
+
+    - category: "Ransomware Artifacts"
+      description: "File patterns associated with ransomware"
+      severity: critical
+      action: detect
+      platform: Windows
+      patterns:
+        ransom_notes:
+          - "README*.txt"
+          - "DECRYPT*.txt"
+          - "RECOVER*.txt"
+          - "HOW_TO_DECRYPT*"
+          - "*RANSOM*"
+          - "*PAYMENT*"
+          - "_readme.txt"
+          - "HELP_RESTORE*"
+        encrypted_file_extensions:
+          - ".encrypted"
+          - ".locked"
+          - ".crypto"
+          - ".enc"
+          - ".crypt"
+          - ".locky"
+          - ".cerber"
+          - ".ryuk"
+          - ".lockbit"
+          - ".blackcat"
+          - ".royal"
+
+    - category: "Persistence Artifacts"
+      description: "Registry and file-based persistence indicators"
+      severity: medium
+      action: detect
+      platform: Windows
+      registry_keys:
+        - "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+        - "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+        - "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+        - "HKLM\\SYSTEM\\CurrentControlSet\\Services"
+        - "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell"
+        - "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit"
+        - "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders"
+
+  # --- Linux File IOCs ---
+  linux:
+    - category: "Suspicious File Locations"
+      description: "Files in suspicious Linux locations"
+      severity: high
+      action: detect
+      platform: Linux
+      paths:
+        - "/tmp/.??*"
+        - "/dev/shm/.??*"
+        - "/var/tmp/.??*"
+        - "/tmp/*.elf"
+        - "/dev/shm/*.elf"
+        - "/var/run/.??*"
+        - "/boot/.??*"
+
+    - category: "Web Shell Indicators (Linux)"
+      description: "Web shells in Linux web server directories"
+      severity: critical
+      action: detect_and_block
+      platform: Linux
+      paths:
+        - "/var/www/html/*.php"
+        - "/var/www/html/*.jsp"
+        - "/opt/*/webapps/*.jsp"
+        - "/usr/share/nginx/html/*.php"
+      file_characteristics:
+        - contains_eval: true
+        - contains_exec: true
+        - contains_system: true
+        - recently_created: true
+
+    - category: "Rootkit Indicators"
+      description: "File artifacts indicating rootkit presence"
+      severity: critical
+      action: detect
+      platform: Linux
+      paths:
+        - "/etc/ld.so.preload"
+        - "/lib/modules/*/kernel/drivers/.??*"
+        - "/usr/lib/.??*"
+      indicators:
+        - hidden_kernel_module: true
+        - modified_system_binary: true
+        - suspicious_shared_library: true
+
+    - category: "Persistence Artifacts (Linux)"
+      description: "Linux persistence file indicators"
+      severity: high
+      action: detect
+      platform: Linux
+      paths:
+        - "/etc/cron.d/.??*"
+        - "/var/spool/cron/crontabs/.??*"
+        - "/etc/systemd/system/*.service"
+        - "/etc/init.d/.??*"
+        - "/etc/rc.local"
+        - "/home/*/.ssh/authorized_keys"
+        - "/root/.ssh/authorized_keys"
+
+    - category: "Container Escape Indicators"
+      description: "Files indicating container breakout attempts"
+      severity: critical
+      action: detect
+      platform: Linux
+      paths:
+        - "/var/run/docker.sock"
+        - "/run/containerd/containerd.sock"
+        - "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+  # --- macOS File IOCs ---
+  macos:
+    - category: "Suspicious File Locations"
+      description: "Files in suspicious macOS locations"
+      severity: high
+      action: detect
+      platform: macOS
+      paths:
+        - "/tmp/.??*"
+        - "/private/tmp/.??*"
+        - "/var/tmp/.??*"
+        - "/Users/Shared/.??*"
+        - "/Library/Application Support/.??*"
+
+    - category: "Persistence Artifacts (macOS)"
+      description: "macOS persistence file indicators"
+      severity: high
+      action: detect
+      platform: macOS
+      paths:
+        - "/Library/LaunchAgents/*.plist"
+        - "/Library/LaunchDaemons/*.plist"
+        - "/Users/*/Library/LaunchAgents/*.plist"
+        - "/Library/Security/SecurityAgentPlugins/*.bundle"
+        - "/Library/Extensions/*.kext"
+      suspicious_characteristics:
+        - unsigned_plist: true
+        - recently_created: true
+        - points_to_temp_directory: true
+
+    - category: "macOS Malware Artifacts"
+      description: "Known macOS malware file artifacts"
+      severity: critical
+      action: detect
+      platform: macOS
+      paths:
+        - "/Users/*/Library/Group Containers/*.cachefile"
+        - "/tmp/*.dmg"
+        - "/private/tmp/*.app"
+        - "/Users/*/Library/Application Support/.??*/*.plist"
+
+# =============================================================================
+# IOC Type 4: Behavioral IOCs
+# =============================================================================
+behavioral_iocs:
+
+  windows:
+    - category: "Lateral Movement Indicators"
+      description: "Behavioral patterns indicating lateral movement"
+      severity: high
+      action: detect
+      platform: Windows
+      indicators:
+        - multiple_failed_logons_then_success:
+            threshold: 5
+            window_minutes: 10
+        - admin_share_access_from_non_admin_workstation: true
+        - rapid_service_installation_across_hosts:
+            threshold: 3
+            window_minutes: 5
+        - pass_the_hash_indicators:
+            ntlm_logon_type_9: true
+            source_not_domain_controller: true
+
+    - category: "Data Exfiltration Indicators"
+      description: "Behavioral patterns indicating data theft"
+      severity: high
+      action: detect
+      platform: Windows
+      indicators:
+        - large_file_upload:
+            size_mb_above: 100
+            destination_external: true
+        - archive_creation_before_upload:
+            file_extensions: [".zip", ".rar", ".7z", ".tar.gz"]
+        - cloud_storage_upload_spike:
+            services: ["OneDrive", "Dropbox", "Google Drive", "Box"]
+            volume_increase_percent: 500
+
+  linux:
+    - category: "Post-Exploitation Indicators"
+      description: "Behavioral patterns indicating active Linux compromise"
+      severity: high
+      action: detect
+      platform: Linux
+      indicators:
+        - unusual_outbound_connections:
+            from_server_role: true
+            to_external_ip: true
+            on_non_standard_port: true
+        - rapid_process_creation:
+            threshold: 50
+            window_seconds: 10
+        - data_staging:
+            tar_or_zip_creation_in_tmp: true
+            followed_by_network_transfer: true
+
+  macos:
+    - category: "macOS Post-Exploitation Indicators"
+      description: "Behavioral patterns indicating active macOS compromise"
+      severity: high
+      action: detect
+      platform: macOS
+      indicators:
+        - keychain_access_spike:
+            queries_per_minute_above: 10
+            from_unsigned_process: true
+        - screen_capture_activity:
+            screencapture_command: true
+            from_background_process: true
+        - clipboard_monitoring:
+            pbpaste_frequency_above: 5
+            window_minutes: 1
+
+# =============================================================================
+# IOC Management & Automation
+# =============================================================================
+ioc_management:
+
+  api_integration:
+    description: "CrowdStrike IOC API endpoints for automated IOC management"
+
+    upload_iocs:
+      endpoint: "POST /indicators/entities/iocs/v1"
+      description: "Upload new IOCs to Falcon"
+      example_payload:
+        type: "sha256"
+        value: "HASH_VALUE"
+        action: "detect"
+        severity: "critical"
+        description: "Malware family X variant"
+        platforms: ["windows", "linux", "mac"]
+        tags: ["malware-family-x", "T1059"]
+        expiration: "2026-06-30T00:00:00Z"
+        applied_globally: true
+
+    search_iocs:
+      endpoint: "GET /indicators/queries/iocs/v1"
+      description: "Search existing IOCs"
+      filters:
+        - "type:'sha256'"
+        - "severity:'critical'"
+        - "platforms:'windows'"
+        - "action:'detect'"
+
+    update_iocs:
+      endpoint: "PATCH /indicators/entities/iocs/v1"
+      description: "Update existing IOC properties"
+
+    delete_iocs:
+      endpoint: "DELETE /indicators/entities/iocs/v1"
+      description: "Remove expired or false positive IOCs"
+
+  feed_integration:
+    description: "Automated threat intelligence feed integration"
+    feeds:
+      - name: "CrowdStrike Falcon X"
+        type: "native"
+        auto_ingest: true
+        platforms: ["windows", "linux", "mac"]
+
+      - name: "MISP"
+        type: "external"
+        api_integration: true
+        sync_frequency: "Every 6 hours"
+        platforms: ["windows", "linux", "mac"]
+
+      - name: "AlienVault OTX"
+        type: "external"
+        api_integration: true
+        sync_frequency: "Every 12 hours"
+        platforms: ["windows", "linux", "mac"]
+
+      - name: "Abuse.ch"
+        type: "external"
+        feeds:
+          - "URLhaus"
+          - "MalwareBazaar"
+          - "Feodo Tracker"
+          - "ThreatFox"
+        sync_frequency: "Every 4 hours"
+        platforms: ["windows", "linux", "mac"]
+
+  lifecycle_management:
+    description: "IOC lifecycle and expiration policies"
+    policies:
+      - ioc_type: "hash"
+        default_expiration_days: 180
+        review_frequency: "Monthly"
+        auto_expire: true
+
+      - ioc_type: "ip"
+        default_expiration_days: 30
+        review_frequency: "Weekly"
+        auto_expire: true
+        reason: "IP addresses are frequently recycled"
+
+      - ioc_type: "domain"
+        default_expiration_days: 90
+        review_frequency: "Monthly"
+        auto_expire: true
+
+      - ioc_type: "url"
+        default_expiration_days: 30
+        review_frequency: "Weekly"
+        auto_expire: true
+
+    false_positive_handling:
+      process: >
+        1. Analyst flags IOC as potential false positive
+        2. IOC moved to review queue with detect-only action
+        3. Threat intel team validates within 24 hours
+        4. If confirmed FP: remove IOC and add to exclusion list
+        5. If confirmed TP: restore prevent action and document
+      api_endpoint: "PATCH /indicators/entities/iocs/v1"
