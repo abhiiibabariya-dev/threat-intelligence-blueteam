@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrowdStrike Falcon POC Command Center</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23060a10' stroke='%23f97316' stroke-width='2'/><circle cx='16' cy='16' r='5' fill='%23f97316'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#060a10;--card:#0f1a2e;--card-hover:#162240;--accent:#f97316;--cyan:#06b6d4;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--border:#1e293b;--card-alt:#0c1525}
+html{scroll-behavior:smooth}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+h1,h2,h3,h4{font-family:'Syne',sans-serif}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+/* Navigation */
+.nav{position:sticky;top:0;z-index:100;background:rgba(6,10,16,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0}
+.nav-inner{max-width:1400px;margin:0 auto;display:flex;overflow-x:auto;scrollbar-width:none}
+.nav-inner::-webkit-scrollbar{display:none}
+.nav-tab{padding:14px 18px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .25s;letter-spacing:.5px;text-transform:uppercase}
+.nav-tab:hover{color:var(--text);background:rgba(249,115,22,.05)}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(249,115,22,.08)}
+
+/* Main */
+.main{max-width:1400px;margin:0 auto;padding:24px 20px 60px}
+.tab-content{display:none;animation:fadeIn .35s ease}
+.tab-content.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px;transition:border-color .2s}
+.card:hover{border-color:rgba(249,115,22,.3)}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+
+/* Stat Cards */
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--cyan))}
+.stat-val{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-label{color:var(--muted);font-size:.8rem;margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.65rem;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.badge-critical{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.badge-high{background:rgba(249,115,22,.15);color:var(--accent);border:1px solid rgba(249,115,22,.3)}
+.badge-medium{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
+.badge-mitre{background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+
+/* Buttons */
+.btn{padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:.78rem;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#ea6c0a;transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 12px;font-size:.7rem}
+.btn-cyan{background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+.btn-cyan:hover{background:rgba(6,182,212,.25)}
+.btn-copy{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);padding:5px 12px;font-size:.68rem;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .2s}
+.btn-copy:hover{background:rgba(249,115,22,.2)}
+
+/* Code blocks */
+.code-block{background:#070d18;border:1px solid var(--border);border-radius:8px;padding:16px;font-size:.78rem;overflow-x:auto;position:relative;line-height:1.7;color:#a5b4c8}
+.code-block .kw{color:var(--accent)}
+.code-block .str{color:var(--green)}
+.code-block .cmt{color:var(--muted)}
+.code-block-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.code-block-title{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:1px}
+
+/* Progress bar */
+.progress-wrap{background:var(--card-alt);border-radius:8px;height:10px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .5s ease;width:0}
+
+/* Checklist */
+.checklist-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;cursor:pointer;transition:background .2s;border:1px solid transparent}
+.checklist-item:hover{background:rgba(249,115,22,.05);border-color:rgba(249,115,22,.1)}
+.check-box{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all .25s;flex-shrink:0}
+.checklist-item.checked .check-box{background:var(--accent);border-color:var(--accent)}
+.checklist-item.checked .check-box::after{content:'✓';color:#fff;font-size:.75rem;font-weight:700}
+.checklist-item.checked .check-label{color:var(--muted);text-decoration:line-through}
+.check-label{font-size:.85rem}
+
+/* Quick actions */
+.quick-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.quick-btn{padding:8px 16px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.72rem;cursor:pointer;transition:all .2s}
+.quick-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(249,115,22,.05)}
+
+/* Search */
+.search-input{width:100%;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.85rem;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--muted)}
+
+/* Filter buttons */
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.filter-btn{padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:.7rem;cursor:pointer;transition:all .2s}
+.filter-btn:hover,.filter-btn.active{background:rgba(249,115,22,.1);border-color:var(--accent);color:var(--accent)}
+
+/* Toggle */
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info{flex:1;margin-right:16px}
+.toggle-name{font-size:.85rem;font-weight:600;margin-bottom:4px}
+.toggle-desc{font-size:.72rem;color:var(--muted);line-height:1.5}
+.toggle-switch{width:48px;height:26px;background:var(--border);border-radius:13px;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
+.toggle-switch.on{background:var(--accent)}
+.toggle-switch::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .3s}
+.toggle-switch.on::after{transform:translateX(22px)}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:.78rem}
+.tbl th{text-align:left;padding:12px 16px;background:var(--card-alt);color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl tr:hover td{background:rgba(249,115,22,.03)}
+.tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+
+/* Coverage bar */
+.cov-bar{height:8px;background:var(--card-alt);border-radius:4px;overflow:hidden;min-width:80px}
+.cov-fill{height:100%;border-radius:4px;transition:width 1.5s ease}
+
+/* Steps */
+.step{margin-bottom:24px}
+.step-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.step-num{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:#fff;flex-shrink:0}
+.step-title{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:700}
+
+/* Terminal */
+.terminal{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;overflow:hidden;font-size:.82rem}
+.terminal-bar{background:#111;padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a1a1a}
+.terminal-dot{width:10px;height:10px;border-radius:50%}
+.terminal-body{padding:16px;height:500px;overflow-y:auto;line-height:1.8}
+.terminal-line{color:var(--green);white-space:pre-wrap;word-break:break-all}
+.terminal-line.output{color:#8892a4}
+.terminal-line.error{color:var(--red)}
+.terminal-prompt{display:flex;align-items:center;gap:0;margin-top:4px}
+.terminal-prompt span{color:var(--accent);margin-right:8px}
+.terminal-input{background:transparent;border:none;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:.82rem;outline:none;flex:1;caret-color:var(--green)}
+
+/* Report */
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.form-input{width:100%;padding:10px 14px;background:var(--card-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.85rem;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--muted)}
+.checkbox-grid{display:flex;flex-wrap:wrap;gap:10px}
+.checkbox-item{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--card-alt);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s;font-size:.8rem}
+.checkbox-item:hover{border-color:var(--accent)}
+.checkbox-item.selected{border-color:var(--accent);background:rgba(249,115,22,.08)}
+.checkbox-item input{display:none}
+.slider-wrap{position:relative;margin-top:8px}
+.slider-wrap input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:var(--border);outline:none}
+.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
+.slider-val{text-align:center;font-size:1.5rem;font-weight:700;color:var(--accent);margin-top:8px}
+.report-output{background:var(--card-alt);border:1px solid var(--border);border-radius:12px;padding:24px;font-size:.82rem;line-height:1.8;white-space:pre-wrap;display:none}
+
+/* Prompt cards */
+.prompt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s}
+.prompt-card:hover{border-color:rgba(249,115,22,.3)}
+.prompt-header{padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.prompt-title{font-weight:600;font-size:.9rem}
+.prompt-body{padding:0 20px 16px;font-size:.78rem;color:var(--muted);line-height:1.7;background:var(--card-alt);margin:0 12px 12px;border-radius:8px;padding:14px}
+
+/* Section heading */
+.section-head{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.section-sub{color:var(--muted);font-size:.82rem;margin-bottom:24px;line-height:1.6}
+
+/* Responsive */
+@media(max-width:768px){
+  .nav-tab{padding:12px 14px;font-size:.68rem}
+  .main{padding:16px 12px 40px}
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+  .stat-val{font-size:1.6rem}
+  .section-head{font-size:1.3rem}
+  .terminal-body{height:350px}
+}
+@media(max-width:480px){
+  .grid-4{grid-template-columns:1fr 1fr}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .nav-tab{padding:10px 10px;font-size:.62rem}
+}
+
+/* Fade toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;padding:10px 20px;border-radius:8px;font-size:.8rem;z-index:999;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Animated background grid */
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 20% 50%,rgba(249,115,22,.03) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(6,182,212,.03) 0%,transparent 50%);pointer-events:none;z-index:-1}
+
+/* Stat card glow on hover */
+.stat-card{transition:all .3s}
+.stat-card:hover{border-color:rgba(249,115,22,.3);box-shadow:0 0 30px rgba(249,115,22,.08)}
+
+/* Animated counter */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.status-pulse{display:inline-block;width:10px;height:10px;background:var(--green);border-radius:50%;margin-right:6px;animation:pulse 2s ease-in-out infinite;box-shadow:0 0 8px rgba(34,197,94,.5)}
+
+/* Footer */
+.footer{max-width:1400px;margin:0 auto;padding:24px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.footer-text{font-size:.7rem;color:var(--muted)}
+.footer-links{display:flex;gap:16px}
+.footer-links a{font-size:.7rem;color:var(--muted);transition:color .2s}
+.footer-links a:hover{color:var(--accent);text-decoration:none}
+
+/* Keyboard hint */
+.kbd{display:inline-block;padding:2px 6px;background:var(--card-alt);border:1px solid var(--border);border-radius:4px;font-size:.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
+
+/* Smooth card entrance */
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.card,.stat-card,.prompt-card{animation:cardIn .4s ease backwards}
+.grid-4 > :nth-child(2){animation-delay:.05s}
+.grid-4 > :nth-child(3){animation-delay:.1s}
+.grid-4 > :nth-child(4){animation-delay:.15s}
+
+/* Print styles */
+@media print{
+  .nav,.toast,.footer,.terminal,.quick-actions,.filter-bar,.search-input,.btn-copy,.toggle-switch{display:none!important}
+  body{background:#fff;color:#000}
+  .card,.stat-card{border:1px solid #ddd;background:#f9f9f9;break-inside:avoid}
+  .section-head{-webkit-text-fill-color:#000;color:#000}
+  .report-output{border:1px solid #ddd;background:#fff;color:#000;display:block!important}
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav">
+<div class="nav-inner" id="navInner">
+  <div class="nav-tab active" data-tab="dashboard">Dashboard</div>
+  <div class="nav-tab" data-tab="pocguide">POC Guide</div>
+  <div class="nav-tab" data-tab="ioarules">IOA Rules</div>
+  <div class="nav-tab" data-tab="ioc">IOC</div>
+  <div class="nav-tab" data-tab="policies">Policies</div>
+  <div class="nav-tab" data-tab="integration">Integration</div>
+  <div class="nav-tab" data-tab="mitre">MITRE</div>
+  <div class="nav-tab" data-tab="prompts">Claude Prompts</div>
+  <div class="nav-tab" data-tab="terminal">Terminal</div>
+  <div class="nav-tab" data-tab="report">Report</div>
+</div>
+</nav>
+
+<div class="main">
+
+<!-- ==================== TAB 1: DASHBOARD ==================== -->
+<div class="tab-content active" id="tab-dashboard">
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap">
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" stroke="#f97316" stroke-width="2"/><path d="M14 24c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="4" fill="#f97316"/><path d="M24 14v-4M24 38v-4M14 24h-4M38 24h-4" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <div>
+      <h1 class="section-head" style="margin-bottom:0">CrowdStrike POC Command Center</h1>
+      <p style="color:var(--muted);font-size:.78rem">Falcon EDR/XDR Platform — Proof of Concept Toolkit</p>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:24px">
+    <div class="stat-card"><div class="stat-val">25+</div><div class="stat-label">IOA Rules</div></div>
+    <div class="stat-card"><div class="stat-val">8</div><div class="stat-label">Policies</div></div>
+    <div class="stat-card"><div class="stat-val">14</div><div class="stat-label">MITRE Tactics</div></div>
+    <div class="stat-card"><div class="stat-val" style="font-size:1.6rem"><span class="status-pulse"></span>Active</div><div class="stat-label">POC Status</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:6px">POC Checklist</h3>
+      <p style="color:var(--muted);font-size:.75rem;margin-bottom:12px">Track your deployment progress</p>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:16px"><span id="progressText">0</span> / 7 completed</p>
+      <div id="checklistContainer">
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Falcon Sensor Installed</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Prevention Policy Configured</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">IOA Rules Created</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">IOC Integrated</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Detection Test Done</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Prevention Test Done</span></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Report Generated</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:16px">Quick Actions</h3>
+      <div class="quick-actions" id="quickActions">
+        <button class="quick-btn" onclick="switchTab('pocguide')">&#9654; POC Guide</button>
+        <button class="quick-btn" onclick="switchTab('ioarules')">&#128737; IOA Rules</button>
+        <button class="quick-btn" onclick="switchTab('ioc')">&#128270; IOC Management</button>
+        <button class="quick-btn" onclick="switchTab('policies')">&#128736; Policies</button>
+        <button class="quick-btn" onclick="switchTab('integration')">&#128279; Integrations</button>
+        <button class="quick-btn" onclick="switchTab('mitre')">&#127919; MITRE ATT&CK</button>
+        <button class="quick-btn" onclick="switchTab('prompts')">&#129302; Claude Prompts</button>
+        <button class="quick-btn" onclick="switchTab('terminal')">&#128421; Terminal</button>
+        <button class="quick-btn" onclick="switchTab('report')">&#128196; Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 2: POC GUIDE ==================== -->
+<div class="tab-content" id="tab-pocguide">
+  <h2 class="section-head">POC Deployment Guide</h2>
+  <p class="section-sub">Complete step-by-step guide for deploying and demonstrating CrowdStrike Falcon to enterprise clients.</p>
+
+  <div class="step"><div class="step-header"><div class="step-num">1</div><h3 class="step-title">What is CrowdStrike Falcon?</h3></div>
+  <div class="card">
+    <p style="line-height:1.8;font-size:.85rem;margin-bottom:16px">CrowdStrike Falcon is a cloud-native endpoint protection platform combining <strong style="color:var(--accent)">EDR</strong> (Endpoint Detection & Response) and <strong style="color:var(--cyan)">XDR</strong> (Extended Detection & Response) capabilities. Unlike legacy AV, it uses a single lightweight agent (sensor) that streams telemetry to the Falcon cloud for real-time analysis.</p>
+    <div class="grid-3" style="margin-bottom:16px">
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.8rem">Falcon Prevent</strong><p style="font-size:.75rem;color:var(--muted);margin-top:4px">Next-Gen Antivirus — ML-based prevention, exploit blocking, ransomware protection</p></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.8rem">Falcon Insight</strong><p style="font-size:.75rem;color:var(--muted);margin-top:4px">EDR — Full endpoint visibility, threat hunting, incident investigation</p></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.8rem">Falcon OverWatch</strong><p style="font-size:.75rem;color:var(--muted);margin-top:4px">Managed Threat Hunting — 24/7 expert threat hunters augmenting your SOC</p></div>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);line-height:1.7"><strong style="color:var(--text)">How the Sensor Works:</strong> The Falcon sensor is a kernel-level agent (~25MB) that hooks into OS internals to monitor process creation, file writes, network connections, and registry changes. All telemetry streams to the CrowdStrike Threat Graph for cloud-based behavioral analysis. Detections happen in <strong style="color:var(--cyan)">&lt;1 second</strong> — no signature updates required.</p>
+  </div></div>
+
+  <div class="step"><div class="step-header"><div class="step-num">2</div><h3 class="step-title">Sensor Installation</h3></div>
+  <div class="card">
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">Download the sensor from <strong style="color:var(--text)">Host Setup > Sensor Downloads</strong> in the Falcon console. Each installer requires your unique Customer ID (CID).</p>
+    <div style="margin-bottom:16px">
+      <div class="code-block-header"><span class="code-block-title">Windows Installation (Admin PowerShell)</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="code-block"><span class="cmt"># Download sensor from Falcon Console > Host Setup > Sensor Downloads</span>
+<span class="kw">.\WindowsSensor.exe</span> /install /quiet /norestart CID=<span class="str">&lt;YOUR_CID&gt;</span>
+
+<span class="cmt"># Verify sensor is running</span>
+<span class="kw">sc query</span> csagent
+<span class="kw">Get-Service</span> CSFalconService</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div class="code-block-header"><span class="code-block-title">Linux Installation (Root)</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="code-block"><span class="cmt"># RPM-based (RHEL, CentOS, Amazon Linux)</span>
+<span class="kw">sudo yum install</span> falcon-sensor-*.rpm
+<span class="kw">sudo /opt/CrowdStrike/falconctl</span> -s -f --cid=<span class="str">&lt;YOUR_CID&gt;</span>
+<span class="kw">sudo systemctl start</span> falcon-sensor
+
+<span class="cmt"># DEB-based (Ubuntu, Debian)</span>
+<span class="kw">sudo dpkg -i</span> falcon-sensor_*.deb
+<span class="kw">sudo /opt/CrowdStrike/falconctl</span> -s -f --cid=<span class="str">&lt;YOUR_CID&gt;</span>
+<span class="kw">sudo systemctl start</span> falcon-sensor
+
+<span class="cmt"># Verify</span>
+<span class="kw">sudo systemctl status</span> falcon-sensor
+<span class="kw">ps aux | grep</span> falcon</div>
+    </div>
+    <div>
+      <div class="code-block-header"><span class="code-block-title">macOS Installation</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="code-block"><span class="cmt"># Install PKG from Falcon Console</span>
+<span class="kw">sudo installer -pkg</span> FalconSensorMacOS.pkg <span class="kw">-target</span> /
+<span class="kw">sudo /Applications/Falcon.app/Contents/Resources/falconctl</span> license <span class="str">&lt;YOUR_CID&gt;</span>
+
+<span class="cmt"># Verify</span>
+<span class="kw">sudo /Applications/Falcon.app/Contents/Resources/falconctl</span> stats</div>
+    </div>
+  </div></div>
+
+  <div class="step"><div class="step-header"><div class="step-num">3</div><h3 class="step-title">Prevention Policy Configuration</h3></div>
+  <div class="card">
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">Navigate to <strong style="color:var(--text)">Configuration > Prevention Policies</strong>. Create a new policy or modify the default. Enable the following for the POC:</p>
+    <div class="grid-2">
+      <div><p style="font-size:.82rem;font-weight:600;color:var(--accent);margin-bottom:8px">Must Enable:</p>
+        <ul style="font-size:.8rem;color:var(--muted);line-height:2;list-style:none">
+          <li>&#9745; Cloud Machine Learning — Aggressive</li>
+          <li>&#9745; Sensor Machine Learning — Aggressive</li>
+          <li>&#9745; Exploit Protection — All categories</li>
+          <li>&#9745; Ransomware Protection — Enabled</li>
+          <li>&#9745; Script-Based Execution Monitoring</li>
+          <li>&#9745; Suspicious Process Blocking</li>
+          <li>&#9745; Sensor Anti-Tampering</li>
+        </ul>
+      </div>
+      <div><p style="font-size:.82rem;font-weight:600;color:var(--cyan);margin-bottom:8px">Show Client During Demo:</p>
+        <ul style="font-size:.8rem;color:var(--muted);line-height:2;list-style:none">
+          <li>&#8594; Policy applied in real-time, no reboot</li>
+          <li>&#8594; Granular control per host group</li>
+          <li>&#8594; Detection vs Prevention slider</li>
+          <li>&#8594; Exclusion paths for LOB apps</li>
+          <li>&#8594; Policy precedence and inheritance</li>
+          <li>&#8594; Update rings for sensor versions</li>
+        </ul>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="step"><div class="step-header"><div class="step-num">4</div><h3 class="step-title">Detection Testing</h3></div>
+  <div class="card">
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">Test detection capabilities using safe, controlled methods:</p>
+    <div style="margin-bottom:16px">
+      <div class="code-block-header"><span class="code-block-title">EICAR Test File (Safe malware test string)</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="code-block"><span class="cmt"># PowerShell — download EICAR test file</span>
+<span class="kw">Invoke-WebRequest</span> -Uri <span class="str">"https://secure.eicar.org/eicar.com.txt"</span> -OutFile <span class="str">"C:\temp\eicar.com"</span>
+
+<span class="cmt"># What to show client:</span>
+<span class="cmt"># 1. Detection appears in Activity > Detections within seconds</span>
+<span class="cmt"># 2. Process tree shows full execution chain</span>
+<span class="cmt"># 3. Severity classification and MITRE mapping automatic</span></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div class="code-block-header"><span class="code-block-title">Behavioral Detection Test</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="code-block"><span class="cmt"># Simulate suspicious PowerShell behavior (safe)</span>
+<span class="kw">powershell.exe</span> -NoProfile -Command <span class="str">"[System.Net.WebClient]::new()"</span>
+
+<span class="cmt"># Simulate credential access pattern</span>
+<span class="kw">rundll32.exe</span> keymgr.dll, KRShowKeyMgr
+
+<span class="cmt"># These trigger behavioral IOAs without actual malicious activity</span></div>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);line-height:1.7"><strong style="color:var(--text)">Expected alerts:</strong> Falcon will generate detections showing process tree, command line arguments, parent process, network connections, and file modifications. Walk the client through the detection detail view — this is where Falcon's value is most visible.</p>
+  </div></div>
+
+  <div class="step"><div class="step-header"><div class="step-num">5</div><h3 class="step-title">Prevention Demonstration</h3></div>
+  <div class="card">
+    <p style="font-size:.82rem;color:var(--muted);line-height:1.7;margin-bottom:12px">With Prevention Policy active, demonstrate real-time blocking. Show the client the Falcon Console at <strong style="color:var(--text)">Activity > Detections</strong>, filtering by <strong style="color:var(--accent)">Prevention</strong> action type. Key console navigation:</p>
+    <ul style="font-size:.82rem;color:var(--muted);line-height:2.2;list-style:none;margin-bottom:12px">
+      <li><span style="color:var(--accent)">&#9656;</span> <strong style="color:var(--text)">Endpoint Detections</strong> — Activity > Detections (filter: Action = Prevented)</li>
+      <li><span style="color:var(--accent)">&#9656;</span> <strong style="color:var(--text)">Process Explorer</strong> — Click any detection > Execution Details > Full process tree</li>
+      <li><span style="color:var(--accent)">&#9656;</span> <strong style="color:var(--text)">Host Timeline</strong> — Investigate > Host Search > Select host > Timeline</li>
+      <li><span style="color:var(--accent)">&#9656;</span> <strong style="color:var(--text)">Real Time Response</strong> — Host > Actions > Connect (RTR shell)</li>
+    </ul>
+    <p style="font-size:.82rem;color:var(--cyan)">Tip: Open the console on a projector during live testing so the client sees the detection appear in real-time.</p>
+  </div></div>
+
+  <div class="step"><div class="step-header"><div class="step-num">6</div><h3 class="step-title">Client Presentation & ROI</h3></div>
+  <div class="card">
+    <div class="grid-2">
+      <div><p style="font-size:.82rem;font-weight:600;color:var(--accent);margin-bottom:8px">Key Talking Points:</p>
+        <ul style="font-size:.8rem;color:var(--muted);line-height:2;list-style:none">
+          <li>&#9656; Single lightweight agent — no performance impact</li>
+          <li>&#9656; Cloud-native — no on-prem infrastructure</li>
+          <li>&#9656; Sub-second detection — Threat Graph AI</li>
+          <li>&#9656; 24/7 managed hunting with OverWatch</li>
+          <li>&#9656; Integrated threat intelligence</li>
+          <li>&#9656; 15+ modules from one agent</li>
+        </ul>
+      </div>
+      <div><p style="font-size:.82rem;font-weight:600;color:var(--cyan);margin-bottom:8px">ROI Arguments:</p>
+        <ul style="font-size:.8rem;color:var(--muted);line-height:2;list-style:none">
+          <li>&#9656; Avg breach cost: $4.45M (IBM 2023)</li>
+          <li>&#9656; MTTD reduced from 207 days to minutes</li>
+          <li>&#9656; Consolidation: replace 5-8 point products</li>
+          <li>&#9656; 97% detection rate in MITRE evaluations</li>
+          <li>&#9656; FedRAMP authorized — gov ready</li>
+          <li>&#9656; Leader in Gartner MQ 10+ years</li>
+        </ul>
+      </div>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:12px"><strong style="color:var(--text)">Reports:</strong> Export from Falcon > Reports. Key reports: Executive Summary, Threat Landscape, Detection & Prevention Summary. Use the Report tab in this tool to generate a custom POC report.</p>
+  </div></div>
+</div>
+
+<!-- ==================== TAB 3: IOA RULES ==================== -->
+<div class="tab-content" id="tab-ioarules">
+  <h2 class="section-head">IOA Custom Rules</h2>
+  <p class="section-sub">Indicator of Attack rules for behavioral detection. These rules trigger on adversary tradecraft patterns, not just static signatures.</p>
+
+  <input type="text" class="search-input" placeholder="Search IOA rules..." id="ioaSearch" oninput="filterIOA()">
+  <div class="filter-bar" id="ioaFilters">
+    <button class="filter-btn active" data-filter="all" onclick="setIOAFilter(this,'all')">All</button>
+    <button class="filter-btn" data-filter="critical" onclick="setIOAFilter(this,'critical')">Critical</button>
+    <button class="filter-btn" data-filter="high" onclick="setIOAFilter(this,'high')">High</button>
+    <button class="filter-btn" data-filter="medium" onclick="setIOAFilter(this,'medium')">Medium</button>
+    <button class="filter-btn" data-filter="lateral-movement" onclick="setIOAFilter(this,'lateral-movement')">Lateral Movement</button>
+    <button class="filter-btn" data-filter="persistence" onclick="setIOAFilter(this,'persistence')">Persistence</button>
+    <button class="filter-btn" data-filter="execution" onclick="setIOAFilter(this,'execution')">Execution</button>
+  </div>
+
+  <div class="grid-2" id="ioaGrid"></div>
+</div>
+
+<!-- ==================== TAB 4: IOC ==================== -->
+<div class="tab-content" id="tab-ioc">
+  <h2 class="section-head">Indicators of Compromise</h2>
+  <p class="section-sub">IOC management, integration steps, and free threat intelligence sources for your Falcon deployment.</p>
+
+  <div class="card" style="margin-bottom:24px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px">IOA vs IOC — What's the Difference?</h3>
+    <div class="grid-2">
+      <div style="padding:16px;background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.15);border-radius:8px">
+        <p style="color:var(--accent);font-weight:700;margin-bottom:8px;font-size:.9rem">IOA — Indicator of Attack</p>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">Behavioral patterns that indicate an active attack is happening. IOAs detect the <strong style="color:var(--text)">technique</strong> regardless of the specific tool used. Example: Any process accessing LSASS memory is suspicious, not just Mimikatz specifically. IOAs catch zero-days and novel attacks because they focus on behavior, not signatures.</p>
+      </div>
+      <div style="padding:16px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:8px">
+        <p style="color:var(--cyan);font-weight:700;margin-bottom:8px;font-size:.9rem">IOC — Indicator of Compromise</p>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">Static artifacts that indicate a compromise has occurred. IOCs are <strong style="color:var(--text)">reactive</strong> — they identify known-bad indicators like file hashes, malicious IPs, or C2 domains. Essential for blocking known threats and hunting for past compromises. Require continuous updates from threat intel feeds.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:16px">IOC Types & Examples</h3>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Type</th><th>Description</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--accent);font-weight:600">SHA256 Hash</td><td>File hash — uniquely identifies malicious file</td><td style="font-size:.72rem;word-break:break-all">e99a18c428cb38d5f260853678922e03abd8344fcba34ab7bc78...</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">MD5 Hash</td><td>Legacy hash format — still widely used in feeds</td><td style="font-size:.72rem">44d88612fea8a8f36de82e1278abb02f</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">IP Address</td><td>Malicious C2 server or infrastructure IP</td><td style="font-size:.72rem">185.220.101.42</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">Domain</td><td>C2 domain, phishing, or malware distribution</td><td style="font-size:.72rem">evil-update.malwaredomain.com</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">URL</td><td>Specific malicious URL path</td><td style="font-size:.72rem">hxxp://evil.com/payload/stage2.exe</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">Registry Key</td><td>Persistence or config modification indicator</td><td style="font-size:.72rem">HKLM\Software\Microsoft\Windows\CurrentVersion\Run\malware</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">File Path</td><td>Known malware drop locations</td><td style="font-size:.72rem">C:\Users\Public\Documents\svchost.exe</td></tr>
+          <tr><td style="color:var(--accent);font-weight:600">Email Address</td><td>Phishing sender or attacker email</td><td style="font-size:.72rem">admin@fake-microsoft-alert.com</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:16px">IOC Integration Steps in Falcon</h3>
+    <div class="step"><div class="step-header"><div class="step-num">1</div><div><strong>Navigate to Threat Intelligence > Indicators</strong><p style="font-size:.78rem;color:var(--muted)">From the Falcon console sidebar, expand Threat Intelligence and click on Custom Indicators</p></div></div></div>
+    <div class="step"><div class="step-header"><div class="step-num">2</div><div><strong>Click "Add Indicator" or "Upload CSV"</strong><p style="font-size:.78rem;color:var(--muted)">Single indicators can be added manually. For bulk import, use the CSV upload feature</p></div></div></div>
+    <div class="step"><div class="step-header"><div class="step-num">3</div><div><strong>Select Indicator Type and Enter Value</strong><p style="font-size:.78rem;color:var(--muted)">Choose: SHA256, MD5, Domain, IPv4, IPv6. Enter the indicator value</p></div></div></div>
+    <div class="step"><div class="step-header"><div class="step-num">4</div><div><strong>Set Action: Detect, Detect & Prevent, or No Action</strong><p style="font-size:.78rem;color:var(--muted)">Detect = alert only. Detect & Prevent = block execution/connection. No Action = monitor silently</p></div></div></div>
+    <div class="step"><div class="step-header"><div class="step-num">5</div><div><strong>Configure Severity and Expiration</strong><p style="font-size:.78rem;color:var(--muted)">Set severity (Critical/High/Medium/Low) and optional expiration date for time-sensitive IOCs</p></div></div></div>
+    <div class="step"><div class="step-header"><div class="step-num">6</div><div><strong>Apply to Host Groups and Save</strong><p style="font-size:.78rem;color:var(--muted)">Assign the IOC to specific host groups or apply globally. IOC is active immediately</p></div></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px">Sample IOC CSV</h3>
+    <div class="code-block-header"><span class="code-block-title">ioc_import.csv</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+    <div class="code-block">type,value,action,severity,description,tags,expiration
+sha256,e99a18c428cb38d5f260853678922e03abd834f0a2b4c59166c22a0ce145b853,prevent,critical,Ransomware payload - LockBit,ransomware;lockbit,2026-06-30
+domain,evil-update.malwaredomain.com,prevent,high,C2 domain - Cobalt Strike,c2;cobaltstrike,2026-06-30
+ipv4,185.220.101.42,detect,high,Known C2 infrastructure,c2;apt,2026-04-30
+sha256,44d88612fea8a8f36de82e1278abb02f72a7bed46cbc52a2f72a7bed46cbc52a,prevent,critical,Mimikatz variant,credential-theft;mimikatz,2026-12-31
+domain,phishing-login.microsoft-verify.com,prevent,high,Phishing domain,phishing;credential-harvest,2026-05-15
+ipv4,91.215.85.100,detect,medium,Suspicious scanning IP,scanning;recon,2026-04-15</div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:16px">Free IOC Intelligence Sources</h3>
+    <div class="grid-3">
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.85rem">AlienVault OTX</strong><p style="font-size:.75rem;color:var(--muted);margin:4px 0">Open Threat Exchange — Community-driven threat intel with pulse subscriptions</p><a href="https://otx.alienvault.com" style="font-size:.72rem" target="_blank">otx.alienvault.com</a></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.85rem">VirusTotal</strong><p style="font-size:.75rem;color:var(--muted);margin:4px 0">Multi-engine file/URL scanning and threat graph analysis</p><a href="https://www.virustotal.com" style="font-size:.72rem" target="_blank">virustotal.com</a></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.85rem">Abuse.ch</strong><p style="font-size:.75rem;color:var(--muted);margin:4px 0">MalwareBazaar, URLhaus, ThreatFox — free malware & IOC feeds</p><a href="https://abuse.ch" style="font-size:.72rem" target="_blank">abuse.ch</a></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.85rem">MISP</strong><p style="font-size:.75rem;color:var(--muted);margin:4px 0">Open source threat intelligence platform with automated sharing</p><a href="https://www.misp-project.org" style="font-size:.72rem" target="_blank">misp-project.org</a></div>
+      <div style="padding:14px;background:var(--card-alt);border-radius:8px"><strong style="color:var(--accent);font-size:.85rem">OpenCTI</strong><p style="font-size:.75rem;color:var(--muted);margin:4px 0">Open cyber threat intelligence platform with STIX2 support</p><a href="https://www.opencti.io" style="font-size:.72rem" target="_blank">opencti.io</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 5: POLICIES ==================== -->
+<div class="tab-content" id="tab-policies">
+  <h2 class="section-head">Policy Configuration</h2>
+  <p class="section-sub">Configure prevention, detection, and response policies for the POC environment. Toggle switches to visualize recommended settings.</p>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:4px;color:var(--accent)">Prevention Policy</h3>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Core endpoint protection — all recommended ON for POC</p>
+    <div id="preventionToggles"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:4px;color:var(--cyan)">Detection Policy</h3>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Visibility and detection capabilities</p>
+    <div id="detectionToggles"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:4px;color:var(--green)">Response Policy</h3>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Incident response and containment capabilities</p>
+    <div id="responseToggles"></div>
+  </div>
+</div>
+
+<!-- ==================== TAB 6: INTEGRATION ==================== -->
+<div class="tab-content" id="tab-integration">
+  <h2 class="section-head">SIEM & SOAR Integration</h2>
+  <p class="section-sub">Step-by-step integration guides for connecting CrowdStrike Falcon to your security stack.</p>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px;color:var(--accent)">Splunk Integration</h3>
+    <div class="code-block-header"><span class="code-block-title">Splunk + CrowdStrike Setup</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+    <div class="code-block"><span class="cmt"># Step 1: Install CrowdStrike App for Splunk</span>
+<span class="cmt"># Download from Splunkbase: "CrowdStrike Falcon Event Streams"</span>
+<span class="cmt"># Install via Splunk Web > Manage Apps > Install from File</span>
+
+<span class="cmt"># Step 2: Configure HEC (HTTP Event Collector) Token</span>
+<span class="cmt"># Settings > Data Inputs > HTTP Event Collector > New Token</span>
+<span class="kw">Token Name:</span> <span class="str">crowdstrike-falcon</span>
+<span class="kw">Source Type:</span> <span class="str">crowdstrike:events</span>
+<span class="kw">Index:</span>        <span class="str">crowdstrike</span>
+
+<span class="cmt"># Step 3: Configure Event Streaming API in Falcon</span>
+<span class="cmt"># Falcon Console > Support > API Clients > Add New Client</span>
+<span class="cmt"># Scopes: Event Streams (Read), Detections (Read), Incidents (Read)</span>
+
+<span class="cmt"># Step 4: Configure Falcon SIEM Connector</span>
+<span class="kw">./falcon_siem_connector</span> \
+  --client-id <span class="str">&lt;API_CLIENT_ID&gt;</span> \
+  --client-secret <span class="str">&lt;API_SECRET&gt;</span> \
+  --base-url <span class="str">https://api.crowdstrike.com</span> \
+  --output <span class="str">splunk</span> \
+  --hec-url <span class="str">https://splunk-hec:8088</span> \
+  --hec-token <span class="str">&lt;HEC_TOKEN&gt;</span>
+
+<span class="cmt"># Step 5: Verify data in Splunk</span>
+<span class="kw">index=crowdstrike</span> sourcetype=crowdstrike:events | stats count by event_simpleName
+
+<span class="cmt"># Step 6: Import pre-built dashboards from CrowdStrike App</span></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px;color:var(--cyan)">Microsoft Sentinel Integration</h3>
+    <div class="code-block-header"><span class="code-block-title">Sentinel + CrowdStrike Setup</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+    <div class="code-block"><span class="cmt"># Step 1: Navigate to Microsoft Sentinel > Data Connectors</span>
+<span class="cmt"># Search for "CrowdStrike Falcon" connector</span>
+
+<span class="cmt"># Step 2: Create API credentials in Falcon Console</span>
+<span class="cmt"># Support > API Clients > Add New Client</span>
+<span class="kw">Scopes Required:</span>
+  - Event Streams (Read)
+  - Detections (Read)
+  - Incidents (Read)
+  - Hosts (Read)
+
+<span class="cmt"># Step 3: Configure the Sentinel connector</span>
+<span class="kw">Client ID:</span>     <span class="str">&lt;FALCON_CLIENT_ID&gt;</span>
+<span class="kw">Client Secret:</span> <span class="str">&lt;FALCON_CLIENT_SECRET&gt;</span>
+<span class="kw">Base URL:</span>      <span class="str">https://api.crowdstrike.com</span>
+
+<span class="cmt"># Step 4: Log types ingested</span>
+<span class="kw">CrowdStrikeFalconEventStream_CL</span>  <span class="cmt">// Event stream data</span>
+<span class="kw">CrowdStrike_Detection_CL</span>         <span class="cmt">// Detection events</span>
+<span class="kw">CrowdStrike_Incident_CL</span>          <span class="cmt">// Incident data</span>
+
+<span class="cmt"># Step 5: Verify in Log Analytics</span>
+<span class="kw">CrowdStrikeFalconEventStream_CL</span>
+| <span class="kw">summarize</span> count() <span class="kw">by</span> EventType_s
+| <span class="kw">sort by</span> count_ desc</div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px;color:var(--green)">Elastic SIEM Integration</h3>
+    <div class="code-block-header"><span class="code-block-title">Elastic + CrowdStrike Setup</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+    <div class="code-block"><span class="cmt"># Step 1: Add CrowdStrike module via Fleet</span>
+<span class="cmt"># Kibana > Fleet > Agent Policies > Add Integration > CrowdStrike</span>
+
+<span class="cmt"># Step 2: Configure SIEM Connector</span>
+<span class="kw">Client ID:</span>        <span class="str">&lt;FALCON_CLIENT_ID&gt;</span>
+<span class="kw">Client Secret:</span>    <span class="str">&lt;FALCON_CLIENT_SECRET&gt;</span>
+<span class="kw">API URL:</span>          <span class="str">https://api.crowdstrike.com</span>
+
+<span class="cmt"># Step 3: Configure Elasticsearch endpoint</span>
+<span class="kw">ES Host:</span>          <span class="str">https://elasticsearch:9200</span>
+<span class="kw">Index Pattern:</span>    <span class="str">logs-crowdstrike.*</span>
+
+<span class="cmt"># Step 4: Enable CrowdStrike detection rules</span>
+<span class="cmt"># Security > Rules > Load Elastic prebuilt rules</span>
+<span class="cmt"># Filter by "CrowdStrike" integration tag</span>
+<span class="cmt"># Enable all detection and prevention rules</span>
+
+<span class="cmt"># Step 5: Verify data flow</span>
+<span class="cmt"># Discover > Index pattern: logs-crowdstrike.*</span></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-family:'Syne';font-size:1.1rem;font-weight:700;margin-bottom:12px">IBM QRadar Integration</h3>
+    <div class="code-block-header"><span class="code-block-title">QRadar + CrowdStrike Setup</span><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+    <div class="code-block"><span class="cmt"># Step 1: Install CrowdStrike DSM</span>
+<span class="cmt"># Admin > DSM Editor > Search "CrowdStrike" > Install</span>
+
+<span class="cmt"># Step 2: Create API credentials in Falcon</span>
+<span class="kw">Scopes:</span> Event Streams (Read), Detections (Read)
+
+<span class="cmt"># Step 3: Add Log Source</span>
+<span class="kw">Admin > Log Sources > Add</span>
+<span class="kw">Log Source Type:</span>    <span class="str">CrowdStrike Falcon</span>
+<span class="kw">Protocol:</span>          <span class="str">CrowdStrike Falcon Streaming API</span>
+<span class="kw">Client ID/Secret:</span>  <span class="str">&lt;from Falcon Console&gt;</span>
+
+<span class="cmt"># Step 4: Verify events flowing</span>
+<span class="cmt"># Log Activity > Filter: Log Source = CrowdStrike Falcon</span></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1.05rem;font-weight:700;margin-bottom:12px;color:var(--accent)">SOAR Integrations</h3>
+      <div style="margin-bottom:12px;padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">Palo Alto XSOAR</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Settings > Integrations > Search "CrowdStrike Falcon". Configure with API Client ID/Secret. Enables automated containment, IOC push, and detection triage playbooks.</p>
+      </div>
+      <div style="margin-bottom:12px;padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">Splunk SOAR</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Apps > CrowdStrike Falcon > Configure asset with API keys. Run actions: contain host, list detections, get device info, quarantine file.</p>
+      </div>
+      <div style="padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">Microsoft Sentinel Playbooks</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Use Logic Apps with CrowdStrike connector. Automate: isolate host on critical detection, enrich incidents with Falcon data, sync IOCs bidirectionally.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1.05rem;font-weight:700;margin-bottom:12px;color:var(--cyan)">Ticketing & Alerting</h3>
+      <div style="margin-bottom:12px;padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">ServiceNow</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Install CrowdStrike app from ServiceNow Store. Configure OAuth 2.0 with Falcon API. Auto-create incidents from Critical/High detections. Bidirectional status sync.</p>
+      </div>
+      <div style="margin-bottom:12px;padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">Jira</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Use Falcon Fusion workflows or SOAR integration to auto-create Jira tickets. Map severity to priority, include detection details and host info in ticket body.</p>
+      </div>
+      <div style="padding:12px;background:var(--card-alt);border-radius:8px">
+        <strong style="font-size:.85rem">PagerDuty</strong>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:4px">Configure Falcon Notification workflows to trigger PagerDuty incidents via Events API v2. Route by severity: Critical = P1, High = P2. Include runbook links.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 7: MITRE ==================== -->
+<div class="tab-content" id="tab-mitre">
+  <h2 class="section-head">MITRE ATT&CK Coverage</h2>
+  <p class="section-sub">CrowdStrike Falcon coverage mapped across all 14 MITRE ATT&CK Enterprise tactics.</p>
+
+  <div class="tbl-wrap" style="margin-bottom:24px">
+    <table class="tbl" id="mitreTable">
+      <thead><tr><th>Tactic</th><th>ID</th><th>Key Technique</th><th>CS Rule</th><th>Severity</th><th style="min-width:140px">Coverage</th></tr></thead>
+      <tbody id="mitreBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== TAB 8: CLAUDE PROMPTS ==================== -->
+<div class="tab-content" id="tab-prompts">
+  <h2 class="section-head">Claude AI Prompts</h2>
+  <p class="section-sub">Ready-to-use prompts for leveraging Claude AI across your CrowdStrike POC workflow. Click copy and paste directly into Claude.</p>
+
+  <div class="filter-bar" id="promptFilters">
+    <button class="filter-btn active" data-filter="all" onclick="setPromptFilter(this,'all')">All</button>
+    <button class="filter-btn" data-filter="ioa" onclick="setPromptFilter(this,'ioa')">IOA Rules</button>
+    <button class="filter-btn" data-filter="ioc" onclick="setPromptFilter(this,'ioc')">IOC</button>
+    <button class="filter-btn" data-filter="policies" onclick="setPromptFilter(this,'policies')">Policies</button>
+    <button class="filter-btn" data-filter="reports" onclick="setPromptFilter(this,'reports')">Reports</button>
+    <button class="filter-btn" data-filter="analysis" onclick="setPromptFilter(this,'analysis')">Analysis</button>
+    <button class="filter-btn" data-filter="hunting" onclick="setPromptFilter(this,'hunting')">Hunting</button>
+  </div>
+
+  <div class="grid-2" id="promptGrid"></div>
+</div>
+
+<!-- ==================== TAB 9: TERMINAL ==================== -->
+<div class="tab-content" id="tab-terminal">
+  <h2 class="section-head">POC Terminal</h2>
+  <p class="section-sub">Simulated command terminal for quick reference. Type <span style="color:var(--accent)">help</span> to see available commands.</p>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="terminal-dot" style="background:#ef4444"></div>
+      <div class="terminal-dot" style="background:#eab308"></div>
+      <div class="terminal-dot" style="background:#22c55e"></div>
+      <span style="color:var(--muted);font-size:.75rem;margin-left:8px">CrowdStrike POC Terminal v1.0</span>
+    </div>
+    <div class="terminal-body" id="terminalBody">
+      <div class="terminal-line output">CrowdStrike Falcon POC Terminal v1.0</div>
+      <div class="terminal-line output">Type 'help' for available commands.</div>
+      <div class="terminal-line output">---</div>
+      <div class="terminal-prompt">
+        <span>falcon &gt;</span>
+        <input type="text" class="terminal-input" id="terminalInput" autofocus spellcheck="false">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 10: REPORT ==================== -->
+<div class="tab-content" id="tab-report">
+  <h2 class="section-head">POC Report Generator</h2>
+  <p class="section-sub">Generate a professional POC executive report from your evaluation data.</p>
+
+  <div class="grid-2" style="margin-bottom:24px">
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1rem;font-weight:700;margin-bottom:16px">Client Information</h3>
+      <div class="form-group"><label class="form-label">Client Name</label><input type="text" class="form-input" id="rptClient" placeholder="Acme Corporation"></div>
+      <div class="form-group"><label class="form-label">Industry</label><input type="text" class="form-input" id="rptIndustry" placeholder="Financial Services"></div>
+      <div class="form-group"><label class="form-label">POC Duration</label><input type="text" class="form-input" id="rptDuration" placeholder="14 days"></div>
+      <div class="form-group"><label class="form-label">Endpoints Evaluated</label><input type="number" class="form-input" id="rptEndpoints" placeholder="250"></div>
+    </div>
+    <div class="card">
+      <h3 style="font-family:'Syne';font-size:1rem;font-weight:700;margin-bottom:16px">Threats Demonstrated</h3>
+      <div class="checkbox-grid" id="threatCheckboxes">
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="Ransomware">Ransomware</label>
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="Mimikatz / Credential Theft">Mimikatz</label>
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="C2 Beaconing">C2 Beacon</label>
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="Lateral Movement">Lateral Movement</label>
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="Phishing Payload Execution">Phishing</label>
+        <label class="checkbox-item" onclick="this.classList.toggle('selected')"><input type="checkbox" value="Privilege Escalation">Privilege Escalation</label>
+      </div>
+      <div class="form-group" style="margin-top:20px">
+        <label class="form-label">Prevention Rate: <span id="rateDisplay">95</span>%</label>
+        <div class="slider-wrap">
+          <input type="range" min="0" max="100" value="95" id="rptRate" oninput="document.getElementById('rateDisplay').textContent=this.value">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-bottom:24px">
+    <button class="btn btn-primary" onclick="generateReport()" style="font-size:.9rem;padding:14px 32px">Generate Report</button>
+  </div>
+
+  <div class="report-output" id="reportOutput"></div>
+
+  <div id="reportActions" style="display:none;text-align:center;margin-top:16px;gap:12px;justify-content:center;flex-wrap:wrap">
+    <button class="btn btn-outline" onclick="copyReport()">Copy Report</button>
+    <button class="btn btn-outline" onclick="window.print()">Print Report</button>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<footer class="footer">
+  <div class="footer-text">CrowdStrike Falcon POC Command Center v1.0 &mdash; Built for enterprise client presentations</div>
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <span class="footer-text">Navigate: <kbd class="kbd">1</kbd>-<kbd class="kbd">0</kbd> tabs &bull; <kbd class="kbd">?</kbd> help</span>
+    <div class="footer-links">
+      <a href="#" onclick="switchTab('dashboard');return false">Dashboard</a>
+      <a href="#" onclick="switchTab('report');return false">Report</a>
+      <a href="#" onclick="switchTab('terminal');return false">Terminal</a>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+/* ========== TAB SWITCHING ========== */
+const tabs = document.querySelectorAll('.nav-tab');
+const contents = document.querySelectorAll('.tab-content');
+function switchTab(id) {
+  tabs.forEach(t => t.classList.remove('active'));
+  contents.forEach(c => c.classList.remove('active'));
+  const tab = document.querySelector(`.nav-tab[data-tab="${id}"]`);
+  const content = document.getElementById('tab-' + id);
+  if (tab) tab.classList.add('active');
+  if (content) content.classList.add('active');
+  if (tab) tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+/* ========== TOAST ========== */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg || 'Copied!';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ========== COPY HELPERS ========== */
+function copyCode(btn) {
+  const block = btn.closest('.card, .prompt-card, div').querySelector('.code-block, .prompt-body');
+  if (block) { navigator.clipboard.writeText(block.textContent.trim()); showToast('Copied to clipboard!'); }
+}
+function copyText(text) {
+  navigator.clipboard.writeText(text);
+  showToast('Copied to clipboard!');
+}
+
+/* ========== CHECKLIST ========== */
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  updateProgress();
+}
+function updateProgress() {
+  const items = document.querySelectorAll('#checklistContainer .checklist-item');
+  const checked = document.querySelectorAll('#checklistContainer .checklist-item.checked').length;
+  const pct = Math.round((checked / items.length) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = checked;
+}
+
+/* ========== IOA RULES DATA ========== */
+const ioaRules = [
+  { name: 'Mimikatz Detection', severity: 'critical', mitre: 'T1003', category: ['all','critical'], desc: 'Detects Mimikatz credential dumping tool execution or command line usage patterns.', query: 'ImageFileName=*mimikatz* OR CommandLine=*sekurlsa* OR CommandLine=*logonpasswords*' },
+  { name: 'Ransomware File Encryption', severity: 'critical', mitre: 'T1486', category: ['all','critical'], desc: 'Detects rapid file encryption behavior indicative of ransomware activity.', query: 'FileWrittenCount > 100 AND FileExtensionChanged = true AND TimeWindow < 60sec' },
+  { name: 'PowerShell Obfuscation', severity: 'high', mitre: 'T1059.001', category: ['all','high','execution'], desc: 'Detects encoded or obfuscated PowerShell commands commonly used to evade detection.', query: 'ProcessName=powershell.exe AND (CommandLine=*-enc* OR CommandLine=*-encodedcommand* OR CommandLine=*iex*)' },
+  { name: 'Pass The Hash', severity: 'critical', mitre: 'T1550.002', category: ['all','critical','lateral-movement'], desc: 'Detects lateral movement using stolen NTLM hash credentials without cracking passwords.', query: 'LogonType=3 AND AuthenticationPackage=NTLM AND SourceHost!=TargetHost AND SamePasswordHash=true' },
+  { name: 'Kerberoasting', severity: 'high', mitre: 'T1558.003', category: ['all','high'], desc: 'Detects Kerberos TGS ticket requests using weak RC4 encryption for offline cracking.', query: 'EventID=4769 AND TicketEncryptionType=0x17 AND ServiceName!=krbtgt' },
+  { name: 'C2 Beacon Detection', severity: 'critical', mitre: 'T1071', category: ['all','critical'], desc: 'Detects regular beaconing intervals to external IPs typical of C2 frameworks like Cobalt Strike.', query: 'BeaconInterval < 60sec AND ExternalIP=true AND ConnectionCount > 10 AND JitterRatio < 0.2' },
+  { name: 'LSASS Memory Access', severity: 'critical', mitre: 'T1003.001', category: ['all','critical'], desc: 'Detects direct memory access to LSASS process for credential extraction.', query: 'TargetProcess=lsass.exe AND AccessMask=PROCESS_VM_READ AND SourceProcess!=csrss.exe' },
+  { name: 'Scheduled Task Persistence', severity: 'high', mitre: 'T1053.005', category: ['all','high','persistence'], desc: 'Detects scheduled task creation with suspicious payloads for persistence.', query: 'ProcessName=schtasks.exe AND CommandLine=*/create* AND (CommandLine=*http* OR CommandLine=*powershell*)' },
+  { name: 'WMI Persistence', severity: 'high', mitre: 'T1047', category: ['all','high','persistence'], desc: 'Detects WMI event subscription-based persistence mechanisms.', query: 'EventType=WmiCreateEventSubscription AND ConsumerType=ActiveScriptEventConsumer' },
+  { name: 'DNS Tunneling', severity: 'high', mitre: 'T1071.004', category: ['all','high'], desc: 'Detects data exfiltration or C2 communication over DNS queries.', query: 'DNSQueryLength > 100 AND DNSQueryCount > 50/min AND SubdomainEntropy > 3.5' },
+  { name: 'PsExec Lateral Movement', severity: 'high', mitre: 'T1570', category: ['all','high','lateral-movement'], desc: 'Detects PsExec or remote service creation used for lateral movement.', query: 'ServiceName=PSEXESVC OR (RemoteServiceCreation=true AND ServiceBinary=*cmd* OR ServiceBinary=*powershell*)' },
+  { name: 'UAC Bypass', severity: 'high', mitre: 'T1548.002', category: ['all','high','execution'], desc: 'Detects UAC bypass via eventvwr.exe or similar auto-elevating binaries.', query: 'ParentProcess=eventvwr.exe AND ChildProcess=cmd.exe AND IntegrityLevel=High' },
+];
+
+function renderIOA(filter='all', search='') {
+  const grid = document.getElementById('ioaGrid');
+  grid.innerHTML = '';
+  const s = search.toLowerCase();
+  ioaRules.filter(r => r.category.includes(filter) && (!s || r.name.toLowerCase().includes(s) || r.desc.toLowerCase().includes(s) || r.mitre.toLowerCase().includes(s)))
+    .forEach(r => {
+      const sevClass = r.severity === 'critical' ? 'badge-critical' : r.severity === 'high' ? 'badge-high' : 'badge-medium';
+      grid.innerHTML += `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <h4 style="font-size:.95rem;font-weight:700">${r.name}</h4>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge ${sevClass}">${r.severity}</span><span class="badge badge-mitre">${r.mitre}</span></div>
+        </div>
+        <p style="font-size:.78rem;color:var(--muted);line-height:1.6;margin-bottom:12px">${r.desc}</p>
+        <div class="code-block-header"><span class="code-block-title">IOA Logic</span><button class="btn-copy" onclick="copyText(\`${r.query.replace(/`/g,"\\`")}\`)">Copy</button></div>
+        <div class="code-block" style="font-size:.73rem">${r.query}</div>
+      </div>`;
+    });
+}
+let activeIOAFilter = 'all';
+function setIOAFilter(btn, f) {
+  document.querySelectorAll('#ioaFilters .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeIOAFilter = f;
+  filterIOA();
+}
+function filterIOA() {
+  renderIOA(activeIOAFilter, document.getElementById('ioaSearch').value);
+}
+renderIOA();
+
+/* ========== POLICIES TOGGLES ========== */
+const preventionPolicies = [
+  { name: 'Malware Prevention', desc: 'Cloud and sensor-based ML models detect and prevent known and unknown malware. Recommended: Aggressive mode for maximum protection.', on: true },
+  { name: 'Exploit Prevention', desc: 'Blocks memory-based exploits including buffer overflows, ROP chains, and process injection techniques used by advanced attackers.', on: true },
+  { name: 'Ransomware Protection', desc: 'Behavioral detection of file encryption patterns. Blocks rapid file modification and known ransomware techniques including volume shadow deletion.', on: true },
+  { name: 'Suspicious Process Blocking', desc: 'Prevents execution of processes exhibiting suspicious behavior such as process hollowing, DLL side-loading, and masquerading.', on: true },
+  { name: 'Script Execution Monitoring', desc: 'Monitors and can block PowerShell, VBScript, JScript, and WMI script execution. Captures full script content for forensic analysis.', on: true },
+  { name: 'Sensor Anti-Tampering', desc: 'Prevents unauthorized attempts to disable, uninstall, or modify the Falcon sensor. Critical for maintaining protection continuity.', on: true },
+  { name: 'Enhanced Visibility', desc: 'Increases telemetry collection for deeper threat hunting. Captures additional process, file, network, and registry events.', on: true },
+];
+const detectionPolicies = [
+  { name: 'Cloud ML Detection', desc: 'Leverages CrowdStrike cloud ML models for file analysis. Files are analyzed in the cloud for unknown threats not caught by local models.', on: true },
+  { name: 'Behavioral Detection (IOA)', desc: 'Enables Indicator of Attack behavioral detection engine. Detects attack patterns regardless of the specific tools used by adversaries.', on: true },
+  { name: 'IOC Scanning', desc: 'Scans endpoints against custom and CrowdStrike threat intelligence IOCs including hashes, IPs, and domains.', on: true },
+  { name: 'Custom IOA Rules', desc: 'Enables custom IOA rules created in the Falcon console. Required for organization-specific detection logic.', on: true },
+  { name: 'USB Device Control', desc: 'Monitors and controls USB device connections. Can block unauthorized USB storage devices to prevent data exfiltration.', on: false },
+  { name: 'Network Containment', desc: 'Enables ability to isolate hosts from the network while maintaining Falcon cloud connectivity for investigation and remediation.', on: true },
+];
+const responsePolicies = [
+  { name: 'Real Time Response (RTR)', desc: 'Enables remote shell access to endpoints for live investigation and remediation. Supports file collection, process management, and script execution.', on: true },
+  { name: 'Host Containment', desc: 'Allows analysts to network-isolate compromised hosts with one click. Host maintains Falcon connectivity for remote investigation via RTR.', on: true },
+  { name: 'File Collection', desc: 'Enables remote file collection from endpoints for forensic analysis. Collected files are stored in the Falcon cloud for download.', on: true },
+  { name: 'Remote Process Kill', desc: 'Allows analysts to remotely terminate malicious processes on endpoints without requiring physical access or local admin credentials.', on: true },
+];
+
+function renderToggles(policies, containerId) {
+  const c = document.getElementById(containerId);
+  policies.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'toggle-row';
+    div.innerHTML = `<div class="toggle-info"><div class="toggle-name">${p.name}</div><div class="toggle-desc">${p.desc}</div></div>
+      <div class="toggle-switch ${p.on ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>`;
+    c.appendChild(div);
+  });
+}
+renderToggles(preventionPolicies, 'preventionToggles');
+renderToggles(detectionPolicies, 'detectionToggles');
+renderToggles(responsePolicies, 'responseToggles');
+
+/* ========== MITRE TABLE ========== */
+const mitreData = [
+  { tactic: 'Initial Access', id: 'TA0001', technique: 'Phishing / Drive-by Compromise', rule: 'Email Attachment Analysis', severity: 'high', coverage: 85 },
+  { tactic: 'Execution', id: 'TA0002', technique: 'Command & Script Interpreter', rule: 'PowerShell Obfuscation', severity: 'high', coverage: 92 },
+  { tactic: 'Persistence', id: 'TA0003', technique: 'Scheduled Task / WMI Event', rule: 'Scheduled Task Persistence', severity: 'high', coverage: 88 },
+  { tactic: 'Privilege Escalation', id: 'TA0004', technique: 'UAC Bypass / Token Manipulation', rule: 'UAC Bypass', severity: 'high', coverage: 82 },
+  { tactic: 'Defense Evasion', id: 'TA0005', technique: 'Obfuscation / Process Injection', rule: 'PowerShell Obfuscation', severity: 'high', coverage: 78 },
+  { tactic: 'Credential Access', id: 'TA0006', technique: 'LSASS Dump / Kerberoasting', rule: 'Mimikatz Detection', severity: 'critical', coverage: 95 },
+  { tactic: 'Discovery', id: 'TA0007', technique: 'Network / Account Discovery', rule: 'Recon Command Monitoring', severity: 'medium', coverage: 75 },
+  { tactic: 'Lateral Movement', id: 'TA0008', technique: 'PsExec / Pass The Hash', rule: 'PsExec Lateral Movement', severity: 'high', coverage: 90 },
+  { tactic: 'Collection', id: 'TA0009', technique: 'Screen Capture / Keylogging', rule: 'Data Collection Monitor', severity: 'medium', coverage: 70 },
+  { tactic: 'Command & Control', id: 'TA0011', technique: 'Beaconing / DNS Tunnel', rule: 'C2 Beacon Detection', severity: 'critical', coverage: 88 },
+  { tactic: 'Exfiltration', id: 'TA0010', technique: 'Exfil Over C2 / Alt Protocol', rule: 'DNS Tunneling', severity: 'high', coverage: 80 },
+  { tactic: 'Impact', id: 'TA0040', technique: 'Data Encryption / Destruction', rule: 'Ransomware File Encryption', severity: 'critical', coverage: 94 },
+  { tactic: 'Reconnaissance', id: 'TA0043', technique: 'Active Scanning / Gathering Info', rule: 'External Scanning Detection', severity: 'medium', coverage: 65 },
+  { tactic: 'Resource Development', id: 'TA0042', technique: 'Acquire Infrastructure / Develop Capabilities', rule: 'Threat Intel Correlation', severity: 'medium', coverage: 60 },
+];
+
+function renderMitre() {
+  const body = document.getElementById('mitreBody');
+  mitreData.forEach(m => {
+    const sevClass = m.severity === 'critical' ? 'badge-critical' : m.severity === 'high' ? 'badge-high' : 'badge-medium';
+    const barColor = m.coverage >= 90 ? 'var(--green)' : m.coverage >= 75 ? 'var(--cyan)' : m.coverage >= 60 ? 'var(--yellow)' : 'var(--red)';
+    body.innerHTML += `<tr>
+      <td><strong>${m.tactic}</strong></td>
+      <td><span class="badge badge-mitre">${m.id}</span></td>
+      <td style="font-size:.78rem;color:var(--muted)">${m.technique}</td>
+      <td style="font-size:.78rem">${m.rule}</td>
+      <td><span class="badge ${sevClass}">${m.severity}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="cov-bar" style="flex:1"><div class="cov-fill" style="width:0;background:${barColor}" data-width="${m.coverage}%"></div></div><span style="font-size:.75rem;color:var(--muted);min-width:32px">${m.coverage}%</span></div></td>
+    </tr>`;
+  });
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.cov-fill').forEach(el => { el.style.width = el.dataset.width; });
+  }, 300);
+}
+renderMitre();
+
+/* ========== PROMPTS ========== */
+const prompts = [
+  { title: 'Create IOA Rule', cat: 'ioa', body: `You are a CrowdStrike Falcon security engineer. I need you to create a custom IOA (Indicator of Attack) rule for the following threat:\n\n[DESCRIBE THREAT HERE]\n\nPlease provide:\n1. Rule name and description\n2. Platform (Windows/Linux/Mac)\n3. Rule type (Process Creation / Network / File / Registry)\n4. IOA query logic using Falcon Event Search syntax\n5. MITRE ATT&CK mapping (Tactic, Technique ID)\n6. Severity recommendation (Critical/High/Medium/Low)\n7. False positive considerations\n8. Testing methodology to validate the rule` },
+  { title: 'Analyze Alert', cat: 'analysis', body: `You are a SOC analyst using CrowdStrike Falcon. I have the following detection alert that needs analysis:\n\n[PASTE ALERT DETAILS HERE]\n\nPlease provide:\n1. Alert severity assessment and priority\n2. MITRE ATT&CK technique identification\n3. Process tree analysis — what is the execution chain?\n4. Is this likely a true positive or false positive? Why?\n5. Recommended immediate response actions\n6. IOCs to extract for further hunting\n7. Suggested Falcon Event Search queries for scoping\n8. Escalation criteria — when to involve IR team` },
+  { title: 'IOC Hunt', cat: 'ioc', body: `You are a threat hunter using CrowdStrike Falcon. I need to hunt for the following IOCs across our environment:\n\n[PASTE IOCs HERE - hashes, IPs, domains, etc.]\n\nPlease provide:\n1. Falcon Event Search queries for each IOC type\n2. Bulk IOC upload CSV format for Falcon Custom IOCs\n3. Recommended action for each IOC (Detect vs Prevent)\n4. Severity classification rationale\n5. Related IOCs to also search for (pivoting strategy)\n6. OSINT enrichment sources for these indicators\n7. Scope assessment queries — how many hosts affected?\n8. Containment recommendations if hits are found` },
+  { title: 'Policy Review', cat: 'policies', body: `You are a CrowdStrike Falcon architect. Review the following prevention policy configuration for a [INDUSTRY TYPE] organization with [NUMBER] endpoints:\n\n[PASTE CURRENT POLICY SETTINGS OR DESCRIBE ENVIRONMENT]\n\nPlease provide:\n1. Gap analysis — what protections are missing?\n2. Recommended policy settings for this industry\n3. Risk assessment of current configuration\n4. Exclusion recommendations for common LOB applications\n5. Host group strategy (servers vs workstations vs VDI)\n6. Detection vs Prevention balance recommendation\n7. Sensor update ring strategy\n8. Compliance mapping (relevant frameworks for industry)` },
+  { title: 'POC Executive Report', cat: 'reports', body: `You are creating a CrowdStrike Falcon POC executive report for a prospective client. Generate a professional report using the following POC data:\n\nClient: [CLIENT NAME]\nIndustry: [INDUSTRY]\nPOC Duration: [DURATION]\nEndpoints: [COUNT]\nThreats Tested: [LIST]\nPrevention Rate: [PERCENTAGE]\n\nPlease generate:\n1. Executive Summary (2-3 paragraphs)\n2. POC Objectives and Methodology\n3. Detection Summary with threat-by-threat breakdown\n4. Prevention Effectiveness metrics\n5. MITRE ATT&CK coverage achieved\n6. ROI Analysis (cost of breach vs platform cost)\n7. Competitive advantages observed\n8. Purchase recommendation with licensing guidance\n9. Proposed next steps and deployment timeline` },
+  { title: 'SIEM Integration Guide', cat: 'analysis', body: `You are a CrowdStrike integration specialist. I need to integrate CrowdStrike Falcon with our SIEM platform:\n\nSIEM: [Splunk / Sentinel / Elastic / QRadar]\nCurrent Setup: [DESCRIBE ENVIRONMENT]\nRequirements: [WHAT DATA NEEDS TO FLOW]\n\nPlease provide:\n1. Step-by-step integration guide\n2. API configuration and required scopes\n3. Data mapping — Falcon events to SIEM schema\n4. Recommended indexes/tables and retention settings\n5. Pre-built detection rules for the SIEM\n6. Dashboard recommendations\n7. Alert correlation between Falcon and SIEM\n8. Troubleshooting common integration issues` },
+  { title: 'Threat Hunting Query', cat: 'hunting', body: `You are a threat hunter using CrowdStrike Falcon Event Search. Generate hunting queries for the following scenario:\n\nHunt Hypothesis: [DESCRIBE WHAT YOU'RE LOOKING FOR]\nEnvironment: [Windows/Linux/Mixed]\nTimeframe: [LAST 7 DAYS / 30 DAYS / etc.]\n\nPlease provide:\n1. Primary Event Search query with explanation of each filter\n2. Supporting queries to narrow results\n3. Expected results and what to look for\n4. False positive filtering techniques\n5. Pivoting queries if initial results are found\n6. MITRE ATT&CK mapping for the hunt\n7. Automated hunt schedule recommendation\n8. Reporting template for hunt findings` },
+  { title: 'Incident Response Walkthrough', cat: 'analysis', body: `You are an incident responder using CrowdStrike Falcon. Walk me through the complete IR process for the following incident:\n\nIncident Type: [Ransomware / Data Breach / APT / Insider Threat]\nInitial Indicator: [WHAT TRIGGERED THE INVESTIGATION]\nAffected Systems: [DESCRIBE SCOPE]\n\nPlease provide a complete IR walkthrough:\n1. Initial triage steps in Falcon console\n2. Containment actions (network isolation, process kill)\n3. Evidence collection via RTR commands\n4. Scope assessment — identifying all affected hosts\n5. Root cause analysis methodology\n6. Eradication steps\n7. Recovery and monitoring plan\n8. Post-incident reporting template\n9. Lessons learned framework\n10. IOC extraction for future prevention` },
+];
+
+function renderPrompts(filter='all') {
+  const grid = document.getElementById('promptGrid');
+  grid.innerHTML = '';
+  prompts.filter(p => filter === 'all' || p.cat === filter).forEach((p, i) => {
+    grid.innerHTML += `<div class="prompt-card" data-cat="${p.cat}">
+      <div class="prompt-header"><div class="prompt-title">${p.title}</div><button class="btn-copy" onclick="copyText(\`${p.body.replace(/`/g,"'").replace(/\\/g,"\\\\")}\`)">Copy</button></div>
+      <div class="prompt-body">${p.body.replace(/\n/g,'<br>')}</div>
+    </div>`;
+  });
+}
+function setPromptFilter(btn, f) {
+  document.querySelectorAll('#promptFilters .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPrompts(f);
+}
+renderPrompts();
+
+/* ========== TERMINAL ========== */
+const termHistory = [];
+let histIdx = -1;
+const termBody = document.getElementById('terminalBody');
+const termInput = document.getElementById('terminalInput');
+
+const termCommands = {
+  help: `Available commands:
+  help          — Show this help message
+  poc-steps     — Show POC deployment steps
+  rules         — List all IOA rules
+  policies      — Show policy recommendations
+  mitre         — MITRE ATT&CK coverage summary
+  ioc-format    — Show IOC CSV format
+  integrations  — List SIEM integrations
+  report        — Generate quick report summary
+  prompts       — List available Claude prompts
+  cs-commands   — Falcon RTR command reference
+  hunt [tech]   — Hunt for a MITRE technique
+  clear         — Clear terminal`,
+
+  'poc-steps': `CrowdStrike Falcon POC Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Install Falcon Sensor on test endpoints
+  2. Configure Prevention Policy (Aggressive)
+  3. Create Custom IOA Rules
+  4. Import IOC threat intelligence
+  5. Run detection tests (EICAR, behavioral)
+  6. Run prevention tests (blocked execution)
+  7. Generate POC report for client`,
+
+  rules: ioaRules.map((r, i) => `  ${i+1}. [${r.severity.toUpperCase()}] ${r.name} (${r.mitre})`).join('\n'),
+
+  policies: `Policy Recommendations:
+━━━━━━━━━━━━━━━━━━━━━
+Prevention: ALL toggles ON (Malware, Exploit, Ransomware, Script Monitoring, Anti-Tampering)
+Detection:  Cloud ML ON, Behavioral IOA ON, IOC Scanning ON, Custom IOA ON
+Response:   RTR ON, Host Containment ON, File Collection ON, Remote Kill ON
+USB:        Enable for environments with data exfil concerns`,
+
+  mitre: mitreData.map(m => `  ${m.id} ${m.tactic.padEnd(22)} ${m.coverage}% ${'█'.repeat(Math.round(m.coverage/5))}${'░'.repeat(20-Math.round(m.coverage/5))}`).join('\n'),
+
+  'ioc-format': `IOC CSV Format for Falcon Import:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+type,value,action,severity,description,tags,expiration
+sha256,<hash>,prevent,critical,<desc>,<tags>,YYYY-MM-DD
+domain,<domain>,prevent,high,<desc>,<tags>,YYYY-MM-DD
+ipv4,<ip>,detect,medium,<desc>,<tags>,YYYY-MM-DD`,
+
+  integrations: `SIEM Integrations:
+  • Splunk      — CrowdStrike App + HEC + Event Streaming API
+  • Sentinel    — Data Connector + API + CrowdStrikeFalconEventStream_CL
+  • Elastic     — Fleet Module + SIEM Connector + Detection Rules
+  • QRadar      — DSM + Streaming API + Log Source
+
+SOAR: XSOAR, Splunk SOAR, Sentinel Playbooks
+Ticketing: ServiceNow, Jira, PagerDuty`,
+
+  report: `POC Quick Report:
+━━━━━━━━━━━━━━━━━
+  IOA Rules Configured:   12 custom rules
+  MITRE Tactics Covered:  14/14
+  Prevention Policies:    7 enabled
+  Detection Policies:     6 enabled
+  Response Capabilities:  4 enabled
+  Integrations Ready:     Splunk, Sentinel, Elastic, QRadar
+
+  → Use the Report tab for full client-ready report generation`,
+
+  prompts: prompts.map((p, i) => `  ${i+1}. ${p.title} [${p.cat}]`).join('\n'),
+
+  'cs-commands': `Falcon Real Time Response (RTR) Commands:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  netstat          — Display network connections
+  ps               — List running processes
+  ls <path>        — List directory contents
+  get <file>       — Download file from host
+  put <file>       — Upload file to host
+  run <script>     — Execute RTR script
+  contain          — Network-isolate the host
+  ifconfig         — Display network interfaces
+  reg query <key>  — Query registry key
+  eventlog list    — List event log channels
+  eventlog view    — View event log entries
+  filehash <path>  — Get file hash
+  kill <pid>       — Terminate process
+  mkdir <path>     — Create directory
+  rm <path>        — Remove file (use with caution)
+  zip <path>       — Compress files for collection`,
+};
+
+function termOutput(text, cls='output') {
+  const promptDiv = termBody.querySelector('.terminal-prompt');
+  const div = document.createElement('div');
+  div.className = 'terminal-line ' + cls;
+  div.textContent = text;
+  termBody.insertBefore(div, promptDiv);
+}
+
+function handleTermCommand(cmd) {
+  cmd = cmd.trim();
+  if (!cmd) return;
+  termHistory.unshift(cmd);
+  histIdx = -1;
+
+  // Echo command
+  termOutput('falcon > ' + cmd);
+
+  if (cmd === 'clear') {
+    const lines = termBody.querySelectorAll('.terminal-line');
+    lines.forEach(l => l.remove());
+    return;
+  }
+
+  if (cmd.startsWith('hunt ')) {
+    const tech = cmd.slice(5).trim().toUpperCase();
+    const match = mitreData.find(m => m.id.includes(tech) || m.tactic.toLowerCase().includes(tech.toLowerCase()));
+    if (match) {
+      termOutput(`Hunting: ${match.tactic} (${match.id})\nTechnique: ${match.technique}\nCS Rule: ${match.rule}\nCoverage: ${match.coverage}%\n\nSuggested Falcon Event Search:\nevent_simpleName=ProcessRollup2\n| where Tactic="${match.id}"\n| stats count by ComputerName, FileName, CommandLine\n| sort -count`);
+    } else {
+      termOutput(`No matching technique found for "${tech}". Try: hunt T1003 or hunt lateral`, 'error');
+    }
+    return;
+  }
+
+  if (termCommands[cmd]) {
+    termOutput(termCommands[cmd]);
+  } else {
+    termOutput(`Unknown command: ${cmd}. Type 'help' for available commands.`, 'error');
+  }
+}
+
+termInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    handleTermCommand(termInput.value);
+    termInput.value = '';
+    termBody.scrollTop = termBody.scrollHeight;
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx < termHistory.length - 1) {
+      histIdx++;
+      termInput.value = termHistory[histIdx];
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx > 0) {
+      histIdx--;
+      termInput.value = termHistory[histIdx];
+    } else {
+      histIdx = -1;
+      termInput.value = '';
+    }
+  }
+});
+
+// Focus terminal input when clicking terminal body
+termBody.addEventListener('click', () => termInput.focus());
+
+/* ========== REPORT GENERATOR ========== */
+function generateReport() {
+  const client = document.getElementById('rptClient').value || 'Client Organization';
+  const industry = document.getElementById('rptIndustry').value || 'Enterprise';
+  const duration = document.getElementById('rptDuration').value || '14 days';
+  const endpoints = document.getElementById('rptEndpoints').value || '100';
+  const rate = document.getElementById('rptRate').value;
+  const threats = [];
+  document.querySelectorAll('#threatCheckboxes .checkbox-item.selected input').forEach(cb => threats.push(cb.value));
+  if (threats.length === 0) threats.push('Ransomware', 'Mimikatz / Credential Theft', 'C2 Beaconing');
+
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const report = `════════════════════════════════════════════════════════════════
+         CROWDSTRIKE FALCON — PROOF OF CONCEPT REPORT
+════════════════════════════════════════════════════════════════
+
+Client:         ${client}
+Industry:       ${industry}
+POC Duration:   ${duration}
+Endpoints:      ${endpoints}
+Date:           ${today}
+Prepared by:    CrowdStrike Falcon SE Team
+
+────────────────────────────────────────────────────────────────
+1. EXECUTIVE SUMMARY
+────────────────────────────────────────────────────────────────
+
+During the ${duration} proof of concept evaluation, CrowdStrike Falcon was deployed across ${endpoints} endpoints in ${client}'s ${industry} environment. The platform demonstrated a ${rate}% prevention rate against ${threats.length} distinct threat categories, including ${threats.join(', ')}.
+
+The Falcon sensor's lightweight architecture showed zero measurable performance impact on end-user productivity. Real-time detection capabilities identified threats within seconds of execution, with automated prevention blocking malicious activity before damage could occur. The cloud-native architecture eliminated the need for on-premises infrastructure, reducing operational overhead.
+
+Based on the POC results, CrowdStrike Falcon meets and exceeds ${client}'s endpoint security requirements and is recommended for full production deployment.
+
+────────────────────────────────────────────────────────────────
+2. DETECTION SUMMARY
+────────────────────────────────────────────────────────────────
+
+  Threat Category              Status        Action
+  ─────────────────────────────────────────────────────────
+${threats.map(t => `  ${t.padEnd(30)} DETECTED      PREVENTED`).join('\n')}
+
+  Total Threats Tested:        ${threats.length}
+  Total Detected:              ${threats.length} (100%)
+  Total Prevented:             ${Math.round(threats.length * rate / 100)} (${rate}%)
+  Mean Time to Detect:         < 3 seconds
+  Mean Time to Prevent:        < 1 second
+
+────────────────────────────────────────────────────────────────
+3. PREVENTION EFFECTIVENESS
+────────────────────────────────────────────────────────────────
+
+  Prevention Rate:             ${rate}%
+  ${'█'.repeat(Math.round(rate / 2))}${'░'.repeat(50 - Math.round(rate / 2))}
+
+  • Cloud ML Detection:        Active — Aggressive mode
+  • Behavioral IOA Engine:     Active — All categories
+  • Exploit Prevention:        Active — Memory protection enabled
+  • Ransomware Protection:     Active — File encryption blocked
+  • Script Monitoring:         Active — Obfuscated scripts detected
+
+────────────────────────────────────────────────────────────────
+4. MITRE ATT&CK COVERAGE
+────────────────────────────────────────────────────────────────
+
+  Tactics Covered:             14 / 14 (100%)
+  Average Coverage:            ${Math.round(mitreData.reduce((a,b) => a + b.coverage, 0) / mitreData.length)}%
+
+${mitreData.map(m => `  ${m.id}  ${m.tactic.padEnd(24)} ${m.coverage}%`).join('\n')}
+
+────────────────────────────────────────────────────────────────
+5. ROI ANALYSIS
+────────────────────────────────────────────────────────────────
+
+  Average cost of data breach (IBM 2023):     $4.45M
+  Average ransomware payment:                 $1.54M
+  Mean time to identify breach (industry):    207 days
+  Mean time to identify with Falcon:          < 1 minute
+
+  Estimated Annual Risk Reduction:
+  • Breach prevention value:    $${(4.45 * rate / 100).toFixed(2)}M
+  • Operational efficiency:     ~40% SOC time savings
+  • Tool consolidation:         Replace 5-8 point products
+  • Compliance readiness:       FedRAMP, SOC2, HIPAA, PCI-DSS
+
+────────────────────────────────────────────────────────────────
+6. PURCHASE RECOMMENDATION
+────────────────────────────────────────────────────────────────
+
+  Recommended Bundle:          Falcon Enterprise
+  Modules:
+  • Falcon Prevent              (NGAV)
+  • Falcon Insight              (EDR)
+  • Falcon OverWatch            (Managed Threat Hunting)
+  • Falcon Device Control       (USB Management)
+  • Falcon Spotlight            (Vulnerability Management)
+
+  Licensing:                   ${endpoints} endpoints × annual subscription
+
+────────────────────────────────────────────────────────────────
+7. NEXT STEPS
+────────────────────────────────────────────────────────────────
+
+  1. Review POC findings with ${client} security leadership
+  2. Finalize licensing agreement and module selection
+  3. Plan phased production rollout (pilot → full deployment)
+  4. Configure SIEM integration (Splunk/Sentinel/Elastic)
+  5. Establish SOC workflows and runbooks
+  6. Schedule CrowdStrike University training for SOC team
+  7. Set up quarterly business reviews with CS TAM
+
+════════════════════════════════════════════════════════════════
+              Generated by CrowdStrike POC Command Center
+════════════════════════════════════════════════════════════════`;
+
+  const output = document.getElementById('reportOutput');
+  output.textContent = report;
+  output.style.display = 'block';
+  document.getElementById('reportActions').style.display = 'flex';
+  output.scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyReport() {
+  const text = document.getElementById('reportOutput').textContent;
+  navigator.clipboard.writeText(text);
+  showToast('Report copied!');
+}
+
+/* ========== INIT ========== */
+// Re-animate MITRE bars on tab switch
+const observer = new MutationObserver(() => {
+  if (document.getElementById('tab-mitre').classList.contains('active')) {
+    document.querySelectorAll('.cov-fill').forEach(el => {
+      el.style.width = '0';
+      setTimeout(() => { el.style.width = el.dataset.width; }, 50);
+    });
+  }
+});
+observer.observe(document.getElementById('tab-mitre'), { attributes: true, attributeFilter: ['class'] });
+
+/* ========== KEYBOARD NAVIGATION ========== */
+const tabKeys = ['dashboard','pocguide','ioarules','ioc','policies','integration','mitre','prompts','terminal','report'];
+document.addEventListener('keydown', e => {
+  // Don't intercept when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const k = e.key;
+  if (k >= '1' && k <= '9') { e.preventDefault(); switchTab(tabKeys[parseInt(k)-1]); }
+  if (k === '0') { e.preventDefault(); switchTab(tabKeys[9]); }
+  if (k === '?') { showToast('Keys: 1-0 = tabs, ? = help'); }
+});
+
+/* ========== ANIMATED STAT COUNTERS ========== */
+function animateValue(el, start, end, suffix, duration) {
+  const range = end - start;
+  const startTime = performance.now();
+  function update(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(start + range * eased);
+    el.textContent = current + suffix;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+// Animate dashboard stats on first load
+const statEls = document.querySelectorAll('.stat-val');
+if (statEls.length >= 3) {
+  animateValue(statEls[0], 0, 25, '+', 800);
+  animateValue(statEls[1], 0, 8, '', 600);
+  animateValue(statEls[2], 0, 14, '', 700);
+}
+
+/* ========== SAVE CHECKLIST TO LOCALSTORAGE ========== */
+function saveChecklist() {
+  const items = document.querySelectorAll('#checklistContainer .checklist-item');
+  const state = Array.from(items).map(i => i.classList.contains('checked'));
+  try { localStorage.setItem('cs-poc-checklist', JSON.stringify(state)); } catch(e) {}
+}
+function loadChecklist() {
+  try {
+    const state = JSON.parse(localStorage.getItem('cs-poc-checklist'));
+    if (!state) return;
+    const items = document.querySelectorAll('#checklistContainer .checklist-item');
+    state.forEach((checked, i) => { if (items[i] && checked) items[i].classList.add('checked'); });
+    updateProgress();
+  } catch(e) {}
+}
+// Patch toggleCheck to persist
+const _origToggle = window.toggleCheck;
+window.toggleCheck = function(el) { _origToggle(el); saveChecklist(); };
+loadChecklist();
+</script>
+</body>
+</html>
