@@ -76,17 +76,34 @@ body {
     display: grid;
     grid-template-columns: 270px 1fr;
     grid-template-rows: 56px 1fr;
+    grid-template-areas:
+        "topbar topbar"
+        "sidebar content";
     height: 100vh;
     position: relative;
     z-index: 1;
 }
 .hidden { display: none !important; }
 
+/* Grid area assignments for desktop */
+.top-bar { grid-area: topbar; }
+.sidebar { grid-area: sidebar; }
+.content { grid-area: content; }
+
+/* Sidebar overlay - hidden from grid flow on desktop */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 56px; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 49;
+}
+.sidebar-overlay.active { display: block; }
+
 /* ═══════════════════════════════════════
    TOP BAR
    ═══════════════════════════════════════ */
 .top-bar {
-    grid-column: 1 / -1;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -1289,6 +1306,18 @@ body {
 /* ═══════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════ */
+
+/* Desktop large screens */
+@media (min-width: 1400px) {
+    .stats-grid { grid-template-columns: repeat(6, 1fr); }
+    .card-grid { grid-template-columns: repeat(4, 1fr); }
+    .content { padding: 32px 48px; }
+}
+
+@media (min-width: 1800px) {
+    .content { padding: 36px 64px; max-width: 1600px; }
+}
+
 @media (max-width: 1200px) {
     .rb-container { grid-template-columns: 220px 1fr 280px; }
 }
@@ -1305,8 +1334,15 @@ body {
 }
 
 @media (max-width: 768px) {
-    .app { grid-template-columns: 1fr; }
+    .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 56px 1fr;
+        grid-template-areas:
+            "topbar"
+            "content";
+    }
     .sidebar {
+        grid-area: unset;
         position: fixed;
         top: 56px; left: 0; bottom: 0;
         width: 280px;
@@ -1316,14 +1352,6 @@ body {
         box-shadow: 4px 0 24px rgba(0,0,0,0.1);
     }
     .sidebar.sidebar-open { transform: translateX(0); }
-    .sidebar-overlay {
-        position: fixed;
-        top: 56px; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 49;
-        display: none;
-    }
-    .sidebar-overlay.active { display: block; }
     .mobile-menu-btn { display: block; }
     .status-bar { display: none; }
     .content { padding: 20px 16px; }
