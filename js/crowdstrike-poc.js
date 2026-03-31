@@ -3816,6 +3816,621 @@ function csCalcROI() {
     `;
 }
 
+// ─── TAB 13: IOC MANAGEMENT ──────────────────────────────────────
+
+function buildTab13_IOCManagement() {
+    return `
+<h2 class="cs-section-title">INDICATOR OF COMPROMISE (IOC) MANAGEMENT</h2>
+
+<h3>IOA vs IOC — Understanding the Difference</h3>
+<table class="cs-table">
+<tr><th>Aspect</th><th style="color:#0f0">IOA (Indicator of Attack)</th><th style="color:#ff6600">IOC (Indicator of Compromise)</th></tr>
+<tr><td>Nature</td><td>Behavioral — detects the attack technique</td><td>Static — identifies known-bad artifacts</td></tr>
+<tr><td>Timing</td><td>Real-time during attack execution</td><td>Reactive — after threat is known</td></tr>
+<tr><td>Zero-Day</td><td>Can detect novel/zero-day attacks</td><td>Cannot detect unknown threats</td></tr>
+<tr><td>Example</td><td>Any process accessing LSASS memory</td><td>Specific Mimikatz file hash</td></tr>
+<tr><td>Maintenance</td><td>Rule logic, less frequent updates</td><td>Requires continuous feed updates</td></tr>
+<tr><td>Falcon Feature</td><td>Custom IOA Rules engine</td><td>Custom Indicators / Threat Intel</td></tr>
+</table>
+
+<h3>IOC Types & Examples</h3>
+<table class="cs-table">
+<tr><th>Type</th><th>Description</th><th>Example</th></tr>
+<tr><td><strong>SHA256 Hash</strong></td><td>Unique file identifier</td><td><code>e99a18c428cb38d5f260853678922e03abd834...</code></td></tr>
+<tr><td><strong>MD5 Hash</strong></td><td>Legacy hash (still common in feeds)</td><td><code>44d88612fea8a8f36de82e1278abb02f</code></td></tr>
+<tr><td><strong>IP Address</strong></td><td>Malicious C2/infrastructure IP</td><td><code>185.220.101.42</code></td></tr>
+<tr><td><strong>Domain</strong></td><td>C2, phishing, or malware delivery</td><td><code>evil-update.malwaredomain.com</code></td></tr>
+<tr><td><strong>URL</strong></td><td>Specific malicious URL path</td><td><code>hxxp://evil.com/payload/stage2.exe</code></td></tr>
+<tr><td><strong>Registry Key</strong></td><td>Persistence or config indicators</td><td><code>HKLM\\Software\\...\\Run\\malware</code></td></tr>
+<tr><td><strong>File Path</strong></td><td>Known malware drop locations</td><td><code>C:\\Users\\Public\\Documents\\svchost.exe</code></td></tr>
+<tr><td><strong>Email</strong></td><td>Phishing sender addresses</td><td><code>admin@fake-microsoft-alert.com</code></td></tr>
+</table>
+
+${csCollapsible('IOC Integration Steps in Falcon Console', `
+<ol>
+<li><strong>Navigate to Threat Intelligence > Custom Indicators</strong><br><span style="color:#888">Falcon console sidebar > Threat Intelligence > Indicators</span></li>
+<li><strong>Click "Add Indicator" or "Upload CSV"</strong><br><span style="color:#888">Single = manual add. Bulk = CSV upload feature</span></li>
+<li><strong>Select Indicator Type and Enter Value</strong><br><span style="color:#888">Choose: SHA256, MD5, Domain, IPv4, IPv6</span></li>
+<li><strong>Set Action: Detect, Detect & Prevent, or No Action</strong><br><span style="color:#888">Detect = alert only. Prevent = block execution/connection</span></li>
+<li><strong>Configure Severity and Expiration</strong><br><span style="color:#888">Critical/High/Medium/Low + optional expiration date</span></li>
+<li><strong>Apply to Host Groups and Save</strong><br><span style="color:#888">Assign to specific groups or apply globally. Active immediately</span></li>
+</ol>
+`, true)}
+
+${csCollapsible('Sample IOC CSV for Bulk Import', `
+${csCode(`type,value,action,severity,description,tags,expiration
+sha256,e99a18c428cb38d5f260853678922e03abd834f0a2b4c59166c22a0ce145b853,prevent,critical,Ransomware payload - LockBit,ransomware;lockbit,2026-06-30
+domain,evil-update.malwaredomain.com,prevent,high,C2 domain - Cobalt Strike,c2;cobaltstrike,2026-06-30
+ipv4,185.220.101.42,detect,high,Known C2 infrastructure,c2;apt,2026-04-30
+sha256,44d88612fea8a8f36de82e1278abb02f72a7bed46cbc52a2f72a7bed46cbc52a,prevent,critical,Mimikatz variant,credential-theft;mimikatz,2026-12-31
+domain,phishing-login.microsoft-verify.com,prevent,high,Phishing domain,phishing;credential-harvest,2026-05-15
+ipv4,91.215.85.100,detect,medium,Suspicious scanning IP,scanning;recon,2026-04-15`, 'csv')}
+`, true)}
+
+${csCollapsible('IOC API Integration', `
+${csCode(`# Upload IOCs via API
+curl -X POST "https://api.crowdstrike.com/iocs/entities/indicators/v1" \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "indicators": [
+      {
+        "type": "domain",
+        "value": "evil-c2.malware.com",
+        "action": "prevent",
+        "severity": "high",
+        "description": "C2 domain - APT29",
+        "tags": ["c2", "apt29"],
+        "expiration": "2026-06-30T00:00:00Z",
+        "applied_globally": true
+      }
+    ]
+  }'
+
+# Query existing IOCs
+curl -X GET "https://api.crowdstrike.com/iocs/queries/indicators/v1?limit=100" \\
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete IOC
+curl -X DELETE "https://api.crowdstrike.com/iocs/entities/indicators/v1?ids=IOC_ID" \\
+  -H "Authorization: Bearer $TOKEN"`, 'bash')}
+`, true)}
+
+<h3>Free IOC Intelligence Sources</h3>
+<table class="cs-table">
+<tr><th>Source</th><th>Description</th><th>URL</th></tr>
+<tr><td><strong>AlienVault OTX</strong></td><td>Community-driven threat intel with pulse subscriptions</td><td><a href="https://otx.alienvault.com" target="_blank" style="color:#0f0">otx.alienvault.com</a></td></tr>
+<tr><td><strong>VirusTotal</strong></td><td>Multi-engine file/URL scanning and threat graph</td><td><a href="https://www.virustotal.com" target="_blank" style="color:#0f0">virustotal.com</a></td></tr>
+<tr><td><strong>Abuse.ch</strong></td><td>MalwareBazaar, URLhaus, ThreatFox — free feeds</td><td><a href="https://abuse.ch" target="_blank" style="color:#0f0">abuse.ch</a></td></tr>
+<tr><td><strong>MISP</strong></td><td>Open source threat intel platform with sharing</td><td><a href="https://www.misp-project.org" target="_blank" style="color:#0f0">misp-project.org</a></td></tr>
+<tr><td><strong>OpenCTI</strong></td><td>Open cyber threat intel platform with STIX2</td><td><a href="https://www.opencti.io" target="_blank" style="color:#0f0">opencti.io</a></td></tr>
+<tr><td><strong>PhishTank</strong></td><td>Community-driven phishing URL database</td><td><a href="https://phishtank.org" target="_blank" style="color:#0f0">phishtank.org</a></td></tr>
+<tr><td><strong>Feodo Tracker</strong></td><td>Botnet C2 IP tracking (Emotet, Dridex, etc)</td><td><a href="https://feodotracker.abuse.ch" target="_blank" style="color:#0f0">feodotracker.abuse.ch</a></td></tr>
+</table>
+`;
+}
+
+// ─── TAB 14: MITRE ATT&CK COVERAGE ──────────────────────────────
+
+function buildTab14_MITRECoverage() {
+    const mitreData = [
+        { tactic: 'Initial Access', id: 'TA0001', technique: 'Phishing / Drive-by Compromise', rule: 'Email Attachment Analysis', severity: 'HIGH', coverage: 85 },
+        { tactic: 'Execution', id: 'TA0002', technique: 'Command & Script Interpreter', rule: 'PowerShell Obfuscation Detection', severity: 'HIGH', coverage: 92 },
+        { tactic: 'Persistence', id: 'TA0003', technique: 'Scheduled Task / WMI Event', rule: 'Scheduled Task Persistence', severity: 'HIGH', coverage: 88 },
+        { tactic: 'Privilege Escalation', id: 'TA0004', technique: 'UAC Bypass / Token Manipulation', rule: 'UAC Bypass Detection', severity: 'HIGH', coverage: 82 },
+        { tactic: 'Defense Evasion', id: 'TA0005', technique: 'Obfuscation / Process Injection', rule: 'Process Injection Monitor', severity: 'HIGH', coverage: 78 },
+        { tactic: 'Credential Access', id: 'TA0006', technique: 'LSASS Dump / Kerberoasting', rule: 'Mimikatz / LSASS Detection', severity: 'CRITICAL', coverage: 95 },
+        { tactic: 'Discovery', id: 'TA0007', technique: 'Network / Account Discovery', rule: 'Recon Command Monitoring', severity: 'MEDIUM', coverage: 75 },
+        { tactic: 'Lateral Movement', id: 'TA0008', technique: 'PsExec / Pass The Hash', rule: 'PsExec Lateral Movement', severity: 'HIGH', coverage: 90 },
+        { tactic: 'Collection', id: 'TA0009', technique: 'Screen Capture / Keylogging', rule: 'Data Collection Monitor', severity: 'MEDIUM', coverage: 70 },
+        { tactic: 'Command & Control', id: 'TA0011', technique: 'Beaconing / DNS Tunnel', rule: 'C2 Beacon Detection', severity: 'CRITICAL', coverage: 88 },
+        { tactic: 'Exfiltration', id: 'TA0010', technique: 'Exfil Over C2 / Alt Protocol', rule: 'DNS Tunneling Detection', severity: 'HIGH', coverage: 80 },
+        { tactic: 'Impact', id: 'TA0040', technique: 'Data Encryption / Destruction', rule: 'Ransomware File Encryption', severity: 'CRITICAL', coverage: 94 },
+        { tactic: 'Reconnaissance', id: 'TA0043', technique: 'Active Scanning / Info Gathering', rule: 'External Scanning Detection', severity: 'MEDIUM', coverage: 65 },
+        { tactic: 'Resource Development', id: 'TA0042', technique: 'Acquire Infrastructure / Develop Capabilities', rule: 'Threat Intel Correlation', severity: 'MEDIUM', coverage: 60 },
+    ];
+
+    const avgCov = Math.round(mitreData.reduce((a, b) => a + b.coverage, 0) / mitreData.length);
+
+    let rows = mitreData.map(m => {
+        const barColor = m.coverage >= 90 ? '#0f0' : m.coverage >= 75 ? '#0ff' : m.coverage >= 60 ? '#ff0' : '#f00';
+        const sevColor = m.severity === 'CRITICAL' ? '#f00' : m.severity === 'HIGH' ? '#ff6600' : '#ff0';
+        const barWidth = m.coverage;
+        return `<tr>
+            <td><strong>${m.tactic}</strong></td>
+            <td style="color:#0ff">${m.id}</td>
+            <td>${m.technique}</td>
+            <td>${m.rule}</td>
+            <td style="color:${sevColor};font-weight:bold">${m.severity}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div style="flex:1;height:8px;background:#1a1a1a;border-radius:4px;overflow:hidden;min-width:80px">
+                        <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:4px;transition:width 1s"></div>
+                    </div>
+                    <span style="color:#888;font-size:0.8em;min-width:35px">${m.coverage}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    return `
+<h2 class="cs-section-title">MITRE ATT&CK COVERAGE MATRIX</h2>
+<p>CrowdStrike Falcon coverage across all 14 MITRE ATT&CK Enterprise tactics.</p>
+
+<div style="display:flex;gap:20px;margin:15px 0;flex-wrap:wrap">
+    <div style="background:#111;border:1px solid #333;padding:15px 25px;border-radius:4px;text-align:center">
+        <div style="color:#0f0;font-size:2em;font-weight:bold">14/14</div>
+        <div style="color:#888;font-size:0.8em">Tactics Covered</div>
+    </div>
+    <div style="background:#111;border:1px solid #333;padding:15px 25px;border-radius:4px;text-align:center">
+        <div style="color:#0f0;font-size:2em;font-weight:bold">${avgCov}%</div>
+        <div style="color:#888;font-size:0.8em">Average Coverage</div>
+    </div>
+    <div style="background:#111;border:1px solid #333;padding:15px 25px;border-radius:4px;text-align:center">
+        <div style="color:#0f0;font-size:2em;font-weight:bold">25+</div>
+        <div style="color:#888;font-size:0.8em">Custom IOA Rules</div>
+    </div>
+</div>
+
+<div style="overflow-x:auto">
+<table class="cs-table">
+<tr><th>Tactic</th><th>ID</th><th>Key Technique</th><th>CS Rule</th><th>Severity</th><th style="min-width:150px">Coverage</th></tr>
+${rows}
+</table>
+</div>
+
+<h3>Coverage Legend</h3>
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin:10px 0">
+    <span style="color:#0f0">&#9632; 90-100% Excellent</span>
+    <span style="color:#0ff">&#9632; 75-89% Good</span>
+    <span style="color:#ff0">&#9632; 60-74% Moderate</span>
+    <span style="color:#f00">&#9632; &lt;60% Needs Improvement</span>
+</div>
+`;
+}
+
+// ─── TAB 15: CLAUDE AI PROMPTS ───────────────────────────────────
+
+function buildTab15_ClaudePrompts() {
+    const prompts = [
+        { title: 'Create Custom IOA Rule', cat: 'IOA', prompt: `You are a CrowdStrike Falcon security engineer. Create a custom IOA rule for:\n\n[DESCRIBE THREAT HERE]\n\nProvide:\n1. Rule name and description\n2. Platform (Windows/Linux/Mac)\n3. Rule type (Process Creation / Network / File / Registry)\n4. IOA query logic using Falcon Event Search syntax\n5. MITRE ATT&CK mapping (Tactic, Technique ID)\n6. Severity recommendation\n7. False positive considerations\n8. Testing methodology` },
+        { title: 'Analyze Detection Alert', cat: 'Analysis', prompt: `You are a SOC analyst using CrowdStrike Falcon. Analyze this detection:\n\n[PASTE ALERT DETAILS]\n\nProvide:\n1. Severity assessment and priority\n2. MITRE ATT&CK technique identification\n3. Process tree analysis\n4. True positive vs false positive assessment\n5. Recommended response actions\n6. IOCs to extract for hunting\n7. Falcon Event Search queries for scoping\n8. Escalation criteria` },
+        { title: 'IOC Threat Hunt', cat: 'IOC', prompt: `You are a threat hunter using CrowdStrike Falcon. Hunt for these IOCs:\n\n[PASTE IOCs - hashes, IPs, domains]\n\nProvide:\n1. Falcon Event Search queries per IOC type\n2. Bulk IOC CSV format for import\n3. Recommended action (Detect vs Prevent)\n4. Related IOCs to pivot on\n5. OSINT enrichment sources\n6. Scope assessment queries\n7. Containment recommendations` },
+        { title: 'Policy Review & Hardening', cat: 'Policy', prompt: `You are a CrowdStrike architect. Review this prevention policy for a [INDUSTRY] organization with [N] endpoints:\n\n[DESCRIBE CURRENT SETTINGS]\n\nProvide:\n1. Gap analysis\n2. Recommended settings for this industry\n3. Risk assessment\n4. Exclusion recommendations for LOB apps\n5. Host group strategy\n6. Detection vs Prevention balance\n7. Sensor update ring strategy\n8. Compliance mapping` },
+        { title: 'POC Executive Report', cat: 'Report', prompt: `Generate a CrowdStrike Falcon POC executive report:\n\nClient: [NAME]\nIndustry: [INDUSTRY]\nDuration: [DAYS]\nEndpoints: [COUNT]\nThreats Tested: [LIST]\nPrevention Rate: [%]\n\nGenerate:\n1. Executive Summary (2-3 paragraphs)\n2. POC Objectives and Methodology\n3. Detection Summary with breakdown\n4. Prevention Effectiveness metrics\n5. MITRE ATT&CK coverage\n6. ROI Analysis\n7. Purchase recommendation\n8. Next steps and deployment timeline` },
+        { title: 'SIEM Integration Guide', cat: 'Integration', prompt: `You are a CrowdStrike integration specialist. Integrate Falcon with:\n\nSIEM: [Splunk/Sentinel/Elastic/QRadar]\nEnvironment: [DESCRIBE]\nRequirements: [DATA NEEDS]\n\nProvide:\n1. Step-by-step integration guide\n2. API configuration and scopes\n3. Data mapping — Falcon events to SIEM schema\n4. Index/table and retention settings\n5. Pre-built detection rules\n6. Dashboard recommendations\n7. Alert correlation\n8. Troubleshooting guide` },
+        { title: 'Threat Hunting Query Builder', cat: 'Hunting', prompt: `You are a threat hunter using Falcon Event Search. Build hunting queries for:\n\nHypothesis: [WHAT YOU'RE LOOKING FOR]\nEnvironment: [Windows/Linux/Mixed]\nTimeframe: [PERIOD]\n\nProvide:\n1. Primary Event Search query with filter explanations\n2. Supporting queries to narrow results\n3. Expected results and indicators\n4. False positive filtering\n5. Pivoting queries\n6. MITRE mapping\n7. Automated hunt schedule\n8. Findings report template` },
+        { title: 'Incident Response Walkthrough', cat: 'IR', prompt: `You are an IR responder using CrowdStrike Falcon. Walk through complete IR for:\n\nIncident: [Ransomware/Breach/APT/Insider]\nInitial Indicator: [TRIGGER]\nAffected Systems: [SCOPE]\n\nProvide:\n1. Initial triage steps in Falcon\n2. Containment actions\n3. Evidence collection via RTR\n4. Scope assessment\n5. Root cause analysis\n6. Eradication steps\n7. Recovery plan\n8. Post-incident report template\n9. Lessons learned framework\n10. IOC extraction for prevention` },
+    ];
+
+    let cards = prompts.map((p, i) => `
+        <div style="background:#111;border:1px solid #333;border-radius:4px;margin:10px 0;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 15px;background:#1a1a1a;border-bottom:1px solid #333">
+                <div>
+                    <strong style="color:#0f0">${i+1}. ${p.title}</strong>
+                    <span style="color:#ff6600;font-size:0.75em;margin-left:8px;border:1px solid #ff6600;padding:1px 6px;border-radius:3px">${p.cat}</span>
+                </div>
+                <button class="cs-btn-sm" onclick="navigator.clipboard.writeText(this.closest('[data-prompt]').dataset.prompt);this.textContent='COPIED!';this.style.color='#0f0';setTimeout(()=>{this.textContent='&#128203; Copy';this.style.color=''},1500)">&#128203; Copy</button>
+            </div>
+            <div style="padding:12px 15px;font-size:0.82em;color:#888;line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto" data-prompt="${p.prompt.replace(/"/g,'&quot;')}">${p.prompt}</div>
+        </div>
+    `).join('');
+
+    return `
+<h2 class="cs-section-title">CLAUDE AI PROMPTS FOR CROWDSTRIKE</h2>
+<p>Ready-to-use prompts for leveraging Claude AI across your CrowdStrike POC workflow. Click Copy and paste directly into Claude.</p>
+
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin:15px 0">
+    <button class="cs-btn-sm" onclick="csFilterPrompts('all')" style="border-color:#0f0;color:#0f0">All</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('IOA')">IOA</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('IOC')">IOC</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('Policy')">Policy</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('Report')">Report</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('Analysis')">Analysis</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('Hunting')">Hunting</button>
+    <button class="cs-btn-sm" onclick="csFilterPrompts('IR')">IR</button>
+</div>
+
+<div id="cs-prompts-container">${cards}</div>
+`;
+}
+
+function csFilterPrompts(cat) {
+    const cards = document.querySelectorAll('#cs-prompts-container > div');
+    cards.forEach(c => {
+        const badge = c.querySelector('span[style*="ff6600"]');
+        if (badge) {
+            const cardCat = badge.textContent.trim();
+            c.style.display = (cat === 'all' || cardCat === cat) ? '' : 'none';
+        }
+    });
+}
+
+// ─── TAB 16: POC TERMINAL ────────────────────────────────────────
+
+function buildTab16_Terminal() {
+    return `
+<h2 class="cs-section-title">POC COMMAND TERMINAL</h2>
+<p>Quick-reference terminal. Type <code>help</code> for available commands.</p>
+
+<div id="cs-terminal-wrap" style="background:#000;border:1px solid #333;border-radius:4px;overflow:hidden;margin-top:15px">
+    <div style="background:#111;padding:8px 12px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #333">
+        <span style="width:10px;height:10px;border-radius:50%;background:#f00"></span>
+        <span style="width:10px;height:10px;border-radius:50%;background:#ff0"></span>
+        <span style="width:10px;height:10px;border-radius:50%;background:#0f0"></span>
+        <span style="color:#666;font-size:0.75em;margin-left:8px">CrowdStrike POC Terminal v2.0</span>
+    </div>
+    <div id="cs-term-body" style="padding:12px;height:450px;overflow-y:auto;font-size:0.82em;line-height:1.8" onclick="document.getElementById('cs-term-input').focus()">
+        <div style="color:#888">CrowdStrike Falcon POC Terminal v2.0</div>
+        <div style="color:#888">Type 'help' for available commands.</div>
+        <div style="color:#888">───────────────────────────────</div>
+        <div style="display:flex;align-items:center;margin-top:4px">
+            <span style="color:#ff6600;margin-right:8px">falcon &gt;</span>
+            <input type="text" id="cs-term-input" style="background:transparent;border:none;color:#0f0;font-family:'Courier New',monospace;font-size:1em;outline:none;flex:1;caret-color:#0f0" spellcheck="false" autocomplete="off">
+        </div>
+    </div>
+</div>
+`;
+}
+
+// Terminal command handler
+const csTermHistory = [];
+let csTermHistIdx = -1;
+
+const csTermCommands = {
+    help: `Available commands:
+  help            Show this help message
+  poc-steps       POC deployment checklist
+  rules           List all IOA rules
+  policies        Policy recommendations
+  mitre           MITRE ATT&CK coverage summary
+  ioc-format      IOC CSV import format
+  integrations    SIEM integration summary
+  cs-commands     Falcon RTR command reference
+  hunt [keyword]  Hunt for a MITRE technique
+  status          Show POC module status
+  clear           Clear terminal`,
+
+    'poc-steps': `CrowdStrike Falcon POC Deployment:
+═══════════════════════════════════
+  1. Install Falcon Sensor on test endpoints
+  2. Configure Prevention Policy (Aggressive)
+  3. Create Custom IOA Rules (12+ rules)
+  4. Import IOC threat intelligence
+  5. Run detection tests (EICAR, behavioral)
+  6. Run prevention tests (blocked execution)
+  7. Demo RTR & threat hunting
+  8. Generate POC report for client`,
+
+    rules: `IOA Custom Rules (12):
+═════════════════════
+  1. [CRITICAL] Mimikatz Detection (T1003)
+  2. [CRITICAL] Ransomware File Encryption (T1486)
+  3. [HIGH]     PowerShell Obfuscation (T1059.001)
+  4. [CRITICAL] Pass The Hash (T1550.002)
+  5. [HIGH]     Kerberoasting (T1558.003)
+  6. [CRITICAL] C2 Beacon Detection (T1071)
+  7. [CRITICAL] LSASS Memory Access (T1003.001)
+  8. [HIGH]     Scheduled Task Persistence (T1053.005)
+  9. [HIGH]     WMI Persistence (T1047)
+  10.[HIGH]     DNS Tunneling (T1071.004)
+  11.[HIGH]     PsExec Lateral Movement (T1570)
+  12.[HIGH]     UAC Bypass (T1548.002)`,
+
+    policies: `Policy Recommendations:
+═══════════════════════
+  PREVENTION: All ON — Malware, Exploit, Ransomware, Script Monitor, Anti-Tamper
+  DETECTION:  Cloud ML, Behavioral IOA, IOC Scanning, Custom IOA
+  RESPONSE:   RTR, Host Containment, File Collection, Remote Kill
+  USB:        Enable where data exfil is a concern`,
+
+    mitre: `MITRE ATT&CK Coverage:
+══════════════════════
+  TA0001 Initial Access         85%  ████████░░
+  TA0002 Execution              92%  █████████░
+  TA0003 Persistence            88%  ████████░░
+  TA0004 Privilege Escalation   82%  ████████░░
+  TA0005 Defense Evasion        78%  ███████░░░
+  TA0006 Credential Access      95%  █████████░
+  TA0007 Discovery              75%  ███████░░░
+  TA0008 Lateral Movement       90%  █████████░
+  TA0009 Collection             70%  ███████░░░
+  TA0011 Command & Control      88%  ████████░░
+  TA0010 Exfiltration           80%  ████████░░
+  TA0040 Impact                 94%  █████████░
+  TA0043 Reconnaissance         65%  ██████░░░░
+  TA0042 Resource Development   60%  ██████░░░░`,
+
+    'ioc-format': `IOC CSV Import Format:
+═════════════════════
+type,value,action,severity,description,tags,expiration
+sha256,<hash>,prevent,critical,<desc>,<tags>,YYYY-MM-DD
+domain,<domain>,prevent,high,<desc>,<tags>,YYYY-MM-DD
+ipv4,<ip>,detect,medium,<desc>,<tags>,YYYY-MM-DD`,
+
+    integrations: `SIEM Integrations:
+══════════════════
+  Splunk      — CS App + HEC + Event Streaming API
+  Sentinel    — Data Connector + CrowdStrikeFalconEventStream_CL
+  Elastic     — Fleet Module + SIEM Connector + Detection Rules
+  QRadar      — DSM + Streaming API + Log Source
+
+  SOAR: XSOAR, Splunk SOAR, Sentinel Playbooks
+  Tickets: ServiceNow, Jira, PagerDuty`,
+
+    'cs-commands': `Falcon RTR Commands:
+════════════════════
+  netstat          Display network connections
+  ps               List running processes
+  ls <path>        List directory contents
+  get <file>       Download file from host
+  put <file>       Upload file to host
+  run <script>     Execute RTR script
+  contain          Network-isolate host
+  ifconfig         Display network interfaces
+  reg query <key>  Query registry key
+  eventlog list    List event log channels
+  eventlog view    View event log entries
+  filehash <path>  Get file hash
+  kill <pid>       Terminate process
+  mkdir <path>     Create directory
+  zip <path>       Compress for collection`,
+
+    status: `POC Module Status:
+══════════════════
+  Module Version:    v2.0
+  Total Tabs:        17
+  IOA Rules:         12 custom rules
+  MITRE Coverage:    14/14 tactics
+  Integrations:      4 SIEM + 3 SOAR + 3 Ticketing
+  Claude Prompts:    8 ready-to-use
+  Report Generator:  Active
+  Status:            ● OPERATIONAL`,
+};
+
+function csTermExec(cmd) {
+    cmd = cmd.trim();
+    if (!cmd) return;
+    csTermHistory.unshift(cmd);
+    csTermHistIdx = -1;
+
+    const body = document.getElementById('cs-term-body');
+    const promptLine = body.querySelector('div:last-child');
+
+    // Echo command
+    const echo = document.createElement('div');
+    echo.style.color = '#0f0';
+    echo.textContent = 'falcon > ' + cmd;
+    body.insertBefore(echo, promptLine);
+
+    if (cmd === 'clear') {
+        const lines = body.querySelectorAll('div:not(:last-child)');
+        lines.forEach(l => l.remove());
+        return;
+    }
+
+    const out = document.createElement('div');
+    out.style.whiteSpace = 'pre-wrap';
+    out.style.wordBreak = 'break-all';
+
+    if (cmd.startsWith('hunt ')) {
+        const keyword = cmd.slice(5).trim().toLowerCase();
+        const mitreMap = [
+            { id: 'TA0001', name: 'Initial Access', cov: '85%' },
+            { id: 'TA0002', name: 'Execution', cov: '92%' },
+            { id: 'TA0003', name: 'Persistence', cov: '88%' },
+            { id: 'TA0004', name: 'Privilege Escalation', cov: '82%' },
+            { id: 'TA0005', name: 'Defense Evasion', cov: '78%' },
+            { id: 'TA0006', name: 'Credential Access', cov: '95%' },
+            { id: 'TA0007', name: 'Discovery', cov: '75%' },
+            { id: 'TA0008', name: 'Lateral Movement', cov: '90%' },
+            { id: 'TA0009', name: 'Collection', cov: '70%' },
+            { id: 'TA0011', name: 'Command & Control', cov: '88%' },
+            { id: 'TA0010', name: 'Exfiltration', cov: '80%' },
+            { id: 'TA0040', name: 'Impact', cov: '94%' },
+            { id: 'TA0043', name: 'Reconnaissance', cov: '65%' },
+            { id: 'TA0042', name: 'Resource Development', cov: '60%' },
+        ];
+        const match = mitreMap.find(m => m.id.toLowerCase().includes(keyword) || m.name.toLowerCase().includes(keyword));
+        if (match) {
+            out.style.color = '#888';
+            out.textContent = `Hunting: ${match.name} (${match.id})\nCoverage: ${match.cov}\n\nSuggested Falcon Event Search:\nevent_simpleName=ProcessRollup2\n| where Tactic="${match.id}"\n| stats count by ComputerName, FileName, CommandLine\n| sort -count`;
+        } else {
+            out.style.color = '#f00';
+            out.textContent = `No match for "${keyword}". Try: hunt T1003 or hunt lateral`;
+        }
+    } else if (csTermCommands[cmd]) {
+        out.style.color = '#888';
+        out.textContent = csTermCommands[cmd];
+    } else {
+        out.style.color = '#f00';
+        out.textContent = `Unknown command: ${cmd}. Type 'help' for commands.`;
+    }
+
+    body.insertBefore(out, promptLine);
+    body.scrollTop = body.scrollHeight;
+}
+
+function csInitTerminal() {
+    const input = document.getElementById('cs-term-input');
+    if (!input) return;
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            csTermExec(this.value);
+            this.value = '';
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (csTermHistIdx < csTermHistory.length - 1) {
+                csTermHistIdx++;
+                this.value = csTermHistory[csTermHistIdx];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (csTermHistIdx > 0) { csTermHistIdx--; this.value = csTermHistory[csTermHistIdx]; }
+            else { csTermHistIdx = -1; this.value = ''; }
+        }
+    });
+}
+
+// ─── TAB 17: REPORT GENERATOR ────────────────────────────────────
+
+function buildTab17_ReportGenerator() {
+    return `
+<h2 class="cs-section-title">POC REPORT GENERATOR</h2>
+<p>Generate a professional executive report from your POC evaluation data.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:15px">
+    <div style="background:#111;border:1px solid #333;padding:20px;border-radius:4px">
+        <h3 style="margin-top:0">Client Information</h3>
+        <div style="margin:10px 0"><label style="color:#888;font-size:0.8em;display:block;margin-bottom:4px">CLIENT NAME</label><input type="text" id="cs-rpt-client" placeholder="Acme Corporation" style="width:100%;background:#0a0a0a;border:1px solid #444;color:#0f0;padding:8px;font-family:'Courier New',monospace"></div>
+        <div style="margin:10px 0"><label style="color:#888;font-size:0.8em;display:block;margin-bottom:4px">INDUSTRY</label><input type="text" id="cs-rpt-industry" placeholder="Financial Services" style="width:100%;background:#0a0a0a;border:1px solid #444;color:#0f0;padding:8px;font-family:'Courier New',monospace"></div>
+        <div style="margin:10px 0"><label style="color:#888;font-size:0.8em;display:block;margin-bottom:4px">POC DURATION</label><input type="text" id="cs-rpt-duration" placeholder="14 days" style="width:100%;background:#0a0a0a;border:1px solid #444;color:#0f0;padding:8px;font-family:'Courier New',monospace"></div>
+        <div style="margin:10px 0"><label style="color:#888;font-size:0.8em;display:block;margin-bottom:4px">ENDPOINTS</label><input type="number" id="cs-rpt-endpoints" placeholder="250" style="width:100%;background:#0a0a0a;border:1px solid #444;color:#0f0;padding:8px;font-family:'Courier New',monospace"></div>
+    </div>
+    <div style="background:#111;border:1px solid #333;padding:20px;border-radius:4px">
+        <h3 style="margin-top:0">Threats & Results</h3>
+        <p style="color:#888;font-size:0.8em;margin-bottom:8px">Select threats demonstrated:</p>
+        <div id="cs-rpt-threats" style="display:flex;flex-wrap:wrap;gap:6px">
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="Ransomware" style="accent-color:#0f0" checked> Ransomware</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="Mimikatz / Credential Theft" style="accent-color:#0f0" checked> Mimikatz</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="C2 Beaconing" style="accent-color:#0f0"> C2 Beacon</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="Lateral Movement" style="accent-color:#0f0"> Lateral Movement</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="Phishing Payload" style="accent-color:#0f0"> Phishing</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:0.82em"><input type="checkbox" value="Privilege Escalation" style="accent-color:#0f0"> Priv Esc</label>
+        </div>
+        <div style="margin-top:15px">
+            <label style="color:#888;font-size:0.8em">PREVENTION RATE: <span id="cs-rpt-rate-val" style="color:#0f0">95</span>%</label>
+            <input type="range" min="0" max="100" value="95" id="cs-rpt-rate" oninput="document.getElementById('cs-rpt-rate-val').textContent=this.value" style="width:100%;accent-color:#0f0;margin-top:6px">
+        </div>
+    </div>
+</div>
+
+<div style="text-align:center;margin:20px 0">
+    <button class="cs-btn" onclick="csGenerateReport()">&#9654; GENERATE REPORT</button>
+</div>
+
+<div id="cs-rpt-output" style="display:none;background:#0a0a0a;border:1px solid #0f0;border-radius:4px;padding:20px;font-size:0.82em;line-height:1.8;white-space:pre-wrap;margin-top:10px;max-height:600px;overflow-y:auto"></div>
+<div id="cs-rpt-actions" style="display:none;text-align:center;margin-top:10px;gap:10px">
+    <button class="cs-btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('cs-rpt-output').textContent);this.textContent='COPIED!';setTimeout(()=>this.textContent='&#128203; Copy Report',1500)">&#128203; Copy Report</button>
+    <button class="cs-btn-sm" onclick="window.print()">&#128424; Print</button>
+</div>
+`;
+}
+
+function csGenerateReport() {
+    const client = document.getElementById('cs-rpt-client').value || 'Client Organization';
+    const industry = document.getElementById('cs-rpt-industry').value || 'Enterprise';
+    const duration = document.getElementById('cs-rpt-duration').value || '14 days';
+    const endpoints = document.getElementById('cs-rpt-endpoints').value || '100';
+    const rate = document.getElementById('cs-rpt-rate').value;
+    const threats = [];
+    document.querySelectorAll('#cs-rpt-threats input:checked').forEach(cb => threats.push(cb.value));
+    if (threats.length === 0) threats.push('Ransomware', 'Mimikatz / Credential Theft');
+
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const avgCov = 81;
+
+    const report = `════════════════════════════════════════════════════════════════
+         CROWDSTRIKE FALCON — PROOF OF CONCEPT REPORT
+════════════════════════════════════════════════════════════════
+
+Client:         ${client}
+Industry:       ${industry}
+POC Duration:   ${duration}
+Endpoints:      ${endpoints}
+Date:           ${today}
+Prepared by:    CrowdStrike Falcon SE Team
+
+────────────────────────────────────────────────────────────────
+1. EXECUTIVE SUMMARY
+────────────────────────────────────────────────────────────────
+
+During the ${duration} proof of concept evaluation, CrowdStrike Falcon
+was deployed across ${endpoints} endpoints in ${client}'s ${industry}
+environment. The platform demonstrated a ${rate}% prevention rate
+against ${threats.length} distinct threat categories including
+${threats.join(', ')}.
+
+The Falcon sensor showed zero measurable performance impact on
+end-user productivity. Real-time detection identified threats
+within seconds, with automated prevention blocking malicious
+activity before damage occurred. Cloud-native architecture
+eliminated the need for on-premises infrastructure.
+
+────────────────────────────────────────────────────────────────
+2. DETECTION SUMMARY
+────────────────────────────────────────────────────────────────
+
+  Threat Category              Status        Action
+  ─────────────────────────────────────────────────────────
+${threats.map(t => `  ${t.padEnd(30)} DETECTED      PREVENTED`).join('\n')}
+
+  Total Threats Tested:        ${threats.length}
+  Total Detected:              ${threats.length} (100%)
+  Total Prevented:             ${Math.round(threats.length * rate / 100)} (${rate}%)
+  Mean Time to Detect:         < 3 seconds
+  Mean Time to Prevent:        < 1 second
+
+────────────────────────────────────────────────────────────────
+3. PREVENTION EFFECTIVENESS: ${rate}%
+────────────────────────────────────────────────────────────────
+
+  ${'█'.repeat(Math.round(rate / 2))}${'░'.repeat(50 - Math.round(rate / 2))}
+
+  Cloud ML Detection:        Active — Aggressive mode
+  Behavioral IOA Engine:     Active — All categories
+  Exploit Prevention:        Active — Memory protection
+  Ransomware Protection:     Active — Encryption blocked
+  Script Monitoring:         Active — Obfuscation detected
+
+────────────────────────────────────────────────────────────────
+4. MITRE ATT&CK COVERAGE
+────────────────────────────────────────────────────────────────
+
+  Tactics Covered:  14 / 14 (100%)
+  Average Coverage: ${avgCov}%
+
+────────────────────────────────────────────────────────────────
+5. ROI ANALYSIS
+────────────────────────────────────────────────────────────────
+
+  Avg cost of data breach (IBM 2023):     $4.45M
+  Avg ransomware payment:                 $1.54M
+  MTTD industry average:                  207 days
+  MTTD with Falcon:                       < 1 minute
+  Breach prevention value:                $${(4.45 * rate / 100).toFixed(2)}M
+  Tool consolidation:                     Replace 5-8 products
+
+────────────────────────────────────────────────────────────────
+6. RECOMMENDATION
+────────────────────────────────────────────────────────────────
+
+  Recommended: Falcon Enterprise Bundle
+  Modules: Prevent + Insight + OverWatch + Device Control + Spotlight
+  Licensing: ${endpoints} endpoints × annual subscription
+
+────────────────────────────────────────────────────────────────
+7. NEXT STEPS
+────────────────────────────────────────────────────────────────
+
+  1. Review findings with ${client} security leadership
+  2. Finalize licensing and module selection
+  3. Plan phased production rollout
+  4. Configure SIEM integration
+  5. Establish SOC workflows and runbooks
+  6. Schedule CrowdStrike University training
+  7. Set up quarterly business reviews
+
+════════════════════════════════════════════════════════════════
+          Generated by CrowdStrike POC Command Center v2.0
+════════════════════════════════════════════════════════════════`;
+
+    document.getElementById('cs-rpt-output').textContent = report;
+    document.getElementById('cs-rpt-output').style.display = 'block';
+    document.getElementById('cs-rpt-actions').style.display = 'flex';
+    document.getElementById('cs-rpt-output').scrollIntoView({ behavior: 'smooth' });
+}
+
 // ─── MAIN FUNCTION ───────────────────────────────────────────────
 
 function loadCrowdStrikePOC() {
@@ -3906,6 +4521,11 @@ function loadCrowdStrikePOC() {
         <button class="cs-tab-btn" data-tab="cs-tab-10" onclick="csSwitchTab('cs-tab-10')" style="color:#00d4ff">10. FW/USB</button>
         <button class="cs-tab-btn" data-tab="cs-tab-11" onclick="csSwitchTab('cs-tab-11')" style="color:#ff6600">11. CLIENT</button>
         <button class="cs-tab-btn" data-tab="cs-tab-12" onclick="csSwitchTab('cs-tab-12')" style="color:#ff6600">12. FAQ</button>
+        <button class="cs-tab-btn" data-tab="cs-tab-13" onclick="csSwitchTab('cs-tab-13')" style="color:#0ff">13. IOC</button>
+        <button class="cs-tab-btn" data-tab="cs-tab-14" onclick="csSwitchTab('cs-tab-14')" style="color:#0ff">14. MITRE</button>
+        <button class="cs-tab-btn" data-tab="cs-tab-15" onclick="csSwitchTab('cs-tab-15')" style="color:#0ff">15. AI PROMPTS</button>
+        <button class="cs-tab-btn" data-tab="cs-tab-16" onclick="csSwitchTab('cs-tab-16')" style="color:#0f0">16. TERMINAL</button>
+        <button class="cs-tab-btn" data-tab="cs-tab-17" onclick="csSwitchTab('cs-tab-17')" style="color:#0f0">17. REPORT</button>
     </div>
 
     <div id="cs-tab-1" class="cs-tab-content active">${buildTab1_DeploymentGuide()}</div>
@@ -3920,6 +4540,13 @@ function loadCrowdStrikePOC() {
     <div id="cs-tab-10" class="cs-tab-content">${buildTab10_FirewallUSB()}</div>
     <div id="cs-tab-11" class="cs-tab-content">${buildTab11_ClientPresentation()}</div>
     <div id="cs-tab-12" class="cs-tab-content">${buildTab12_TroubleshootFAQ()}</div>
+    <div id="cs-tab-13" class="cs-tab-content">${buildTab13_IOCManagement()}</div>
+    <div id="cs-tab-14" class="cs-tab-content">${buildTab14_MITRECoverage()}</div>
+    <div id="cs-tab-15" class="cs-tab-content">${buildTab15_ClaudePrompts()}</div>
+    <div id="cs-tab-16" class="cs-tab-content">${buildTab16_Terminal()}</div>
+    <div id="cs-tab-17" class="cs-tab-content">${buildTab17_ReportGenerator()}</div>
 </div>
 `;
+    // Initialize terminal after DOM is updated
+    setTimeout(csInitTerminal, 100);
 }
