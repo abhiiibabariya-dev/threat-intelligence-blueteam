@@ -2,49 +2,18 @@
 // BLUESHELL - SOC Dashboard Engine v3.0
 // ═══════════════════════════════════════════════════════
 
-// ── Boot Sequence (fast) ──
-const bootMessages = [
-    "BlueShell v3.0 // Threat Intelligence Platform",
-    "──────────────────────────────────────────",
-    "[BOOT] Loading MITRE ATT&CK v15..........OK",
-    "[BOOT] Detection engine...................OK",
-    "[LOAD] SIEM: 14 | EDR: 4 | XDR: 3 | SOAR: 7",
-    "[LOAD] Detection Rules: 500+ loaded",
-    "[LOAD] CrowdStrike POC Module: 12 tabs loaded",
-    "[LOAD] Threat Intel Feeds: 8 configured",
-    "[NET ] OSINT feeds connected..............OK",
-    "[READY] All systems operational."
-];
-
-let bootIndex = 0;
-const bootLog = document.getElementById('boot-log');
-const bootScreen = document.getElementById('boot-screen');
+// ── Initialize App (no boot sequence) ──
 const app = document.getElementById('app');
 
-function runBoot() {
-    if (bootIndex < bootMessages.length) {
-        bootLog.textContent += bootMessages[bootIndex] + '\n';
-        bootLog.scrollTop = bootLog.scrollHeight;
-        bootIndex++;
-        setTimeout(runBoot, 40);
-    } else {
-        setTimeout(() => {
-            bootScreen.style.opacity = '0';
-            bootScreen.style.transition = 'opacity 0.4s';
-            setTimeout(() => {
-                bootScreen.style.display = 'none';
-                app.classList.remove('hidden');
-                startMatrixRain();
-                startClock();
-                startLiveFeed();
-                animateStats();
-            }, 400);
-        }, 300);
-    }
+function initApp() {
+    startClock();
+    startLiveFeed();
+    animateStats();
 }
 
-// Start boot
-setTimeout(runBoot, 200);
+// Start immediately
+document.addEventListener('DOMContentLoaded', initApp);
+setTimeout(initApp, 100);
 
 // ── Mobile Menu ──
 function toggleMobileMenu() {
@@ -54,49 +23,9 @@ function toggleMobileMenu() {
     overlay.classList.toggle('active');
 }
 
-// ── Matrix Rain ──
-let matrixActive = true;
-
-function startMatrixRain() {
-    const canvas = document.getElementById('matrix-bg');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const chars = '01010110100110101001011010';
-    const fontSize = 14;
-    const columns = Math.floor(canvas.width / fontSize);
-    const drops = new Array(columns).fill(1);
-
-    function draw() {
-        if (!matrixActive) return;
-        ctx.fillStyle = 'rgba(15, 17, 23, 0.05)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#3b82f6';
-        ctx.font = fontSize + 'px monospace';
-
-        for (let i = 0; i < drops.length; i++) {
-            const text = chars[Math.floor(Math.random() * chars.length)];
-            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-            drops[i]++;
-        }
-        requestAnimationFrame(draw);
-    }
-    draw();
-
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    });
-}
-
-function toggleMatrix() {
-    matrixActive = !matrixActive;
-    if (matrixActive) startMatrixRain();
-}
+// ── Matrix Rain (disabled for clean theme) ──
+function startMatrixRain() { /* disabled */ }
+function toggleMatrix() { /* disabled */ }
 
 // ── Clock ──
 function startClock() {
