@@ -1914,6 +1914,7 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">DETECTION ENGINEERING GUIDE</h1>
     <span class="card-tag" style="position:static">BLUE TEAM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Complete guide to building, testing, and maintaining high-fidelity detection rules using Detection-as-Code methodology with Sigma, CI/CD pipelines, and MITRE ATT&CK coverage tracking.</p>
 
 <div class="pg-section">
     <div class="pg-section-title">DETECTION-AS-CODE PIPELINE</div>
@@ -1926,53 +1927,174 @@ ${pgBack()}
     │  Git Repo│    │  Validate│    │  Review  │    │  SIEM    │    │  Tune    │
     └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
     </pre></div>
+    <p style="color:var(--text-secondary);font-size:0.85em;line-height:1.7;margin-top:12px"><strong>WRITE:</strong> Author rules in Sigma YAML format. Store in Git repo with version control. Each rule includes MITRE mapping, severity, FP guidance.<br>
+    <strong>TEST:</strong> Validate with Atomic Red Team or MITRE Caldera. Run against historical logs to check for hits and false positives.<br>
+    <strong>REVIEW:</strong> Peer review via pull request. Senior analyst validates logic, FP assessment, and MITRE mapping.<br>
+    <strong>DEPLOY:</strong> CI/CD pipeline (GitHub Actions / GitLab CI) auto-converts Sigma to platform-native format (SPL, KQL, AQL) and deploys to SIEM.<br>
+    <strong>MONITOR:</strong> Track TP/FP rates weekly. Tune thresholds. Retire rules with >50% FP rate. Celebrate rules with confirmed detections.</p>
 </div>
 
 <div class="pg-section">
-    <div class="pg-section-title">SIGMA RULE TEMPLATE</div>
+    <div class="pg-section-title">SIGMA RULES — 5 PRODUCTION EXAMPLES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. PowerShell Encoded Command</h4>
     ${pgCode(`title: Suspicious PowerShell Encoded Command
 id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-status: experimental
-description: Detects PowerShell with encoded command arguments
-author: BlueShell SOC
-date: 2024/01/15
-modified: 2024/06/01
-tags:
-    - attack.execution
-    - attack.t1059.001
-    - attack.defense_evasion
-    - attack.t1027
+status: stable
+tags: [attack.execution, attack.t1059.001]
 logsource:
     category: process_creation
     product: windows
 detection:
-    selection_process:
-        Image|endswith:
-            - '\\powershell.exe'
-            - '\\pwsh.exe'
-    selection_encoded:
-        CommandLine|contains:
-            - '-enc'
-            - '-EncodedCommand'
-            - '-ec '
-    condition: selection_process and selection_encoded
-falsepositives:
-    - Legitimate admin scripts using encoded commands
-    - SCCM/Intune deployments
-    - Configuration management tools
+    selection:
+        Image|endswith: ['\\powershell.exe', '\\pwsh.exe']
+        CommandLine|contains: ['-enc', '-EncodedCommand', '-ec ']
+    filter:
+        ParentImage|endswith: ['\\svchost.exe', '\\msiexec.exe']
+    condition: selection and not filter
+falsepositives: [SCCM deployments, Config management tools]
+level: high`, 'yaml')}
+
+    <h4 style="color:var(--accent);margin-top:15px">2. LSASS Memory Access (Credential Dumping)</h4>
+    ${pgCode(`title: LSASS Memory Access for Credential Dumping
+id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+status: stable
+tags: [attack.credential_access, attack.t1003.001]
+logsource:
+    category: process_access
+    product: windows
+detection:
+    selection:
+        TargetImage|endswith: '\\lsass.exe'
+        GrantedAccess|contains: ['0x1010', '0x1038', '0x1FFFFF']
+    filter:
+        SourceImage|endswith: ['\\MsMpEng.exe', '\\csrss.exe', '\\svchost.exe', '\\lsm.exe']
+    condition: selection and not filter
+level: critical`, 'yaml')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement via PsExec</h4>
+    ${pgCode(`title: PsExec Service Installation (Lateral Movement)
+id: c3d4e5f6-a7b8-9012-cdef-123456789012
+status: stable
+tags: [attack.lateral_movement, attack.t1021.002]
+logsource:
+    product: windows
+    service: system
+detection:
+    selection:
+        EventID: 7045
+        ServiceName: 'PSEXESVC'
+    condition: selection
+level: high`, 'yaml')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. Ransomware Pre-Encryption (Shadow Copy Deletion)</h4>
+    ${pgCode(`title: Shadow Copy Deletion - Ransomware Indicator
+id: d4e5f6a7-b8c9-0123-defa-234567890123
+status: stable
+tags: [attack.impact, attack.t1490]
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    sel_vssadmin:
+        Image|endswith: '\\vssadmin.exe'
+        CommandLine|contains|all: ['delete', 'shadows']
+    sel_bcdedit:
+        Image|endswith: '\\bcdedit.exe'
+        CommandLine|contains: 'recoveryenabled no'
+    sel_wmic:
+        Image|endswith: '\\wmic.exe'
+        CommandLine|contains|all: ['shadowcopy', 'delete']
+    condition: sel_vssadmin or sel_bcdedit or sel_wmic
+level: critical`, 'yaml')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. Suspicious Service Installation</h4>
+    ${pgCode(`title: Suspicious Service Installed with Temp Path
+id: e5f6a7b8-c9d0-1234-efab-345678901234
+status: experimental
+tags: [attack.persistence, attack.t1543.003]
+logsource:
+    product: windows
+    service: system
+detection:
+    selection:
+        EventID: 7045
+    filter_path:
+        ImagePath|contains: ['\\Temp\\', '\\AppData\\', '\\Downloads\\', 'cmd.exe', 'powershell']
+    condition: selection and filter_path
 level: high`, 'yaml')}
 </div>
 
 <div class="pg-section">
     <div class="pg-section-title">DETECTION MATURITY MODEL</div>
     <table class="pg-table">
-        <tr><th>Level</th><th>Name</th><th>Description</th></tr>
-        <tr><td>0</td><td>None</td><td>No detection capability. Relying on vendor defaults.</td></tr>
-        <tr><td>1</td><td>Reactive</td><td>Basic vendor rules enabled. Alert on known-bad IOCs. Manual triage.</td></tr>
-        <tr><td>2</td><td>Proactive</td><td>Custom rules for org-specific threats. Sigma format. Some automation.</td></tr>
-        <tr><td>3</td><td>Managed</td><td>Detection-as-code pipeline. Automated testing. Coverage tracking vs MITRE.</td></tr>
-        <tr><td>4</td><td>Optimized</td><td>ML-assisted detection. Continuous tuning. Red team validated. <5% FP rate.</td></tr>
+        <tr><th>Level</th><th>Name</th><th>Description</th><th>Action Items</th></tr>
+        <tr><td>0</td><td>None</td><td>No custom detection. Relying on vendor defaults only.</td><td>Enable built-in SIEM rules. Deploy Sysmon. Start logging.</td></tr>
+        <tr><td>1</td><td>Reactive</td><td>Basic rules enabled. Alert on known-bad IOCs. Manual triage.</td><td>Import Sigma community rules. Create IOC feeds. Basic alert triage process.</td></tr>
+        <tr><td>2</td><td>Proactive</td><td>Custom rules for org-specific threats. Sigma format. Some automation.</td><td>Write custom Sigma rules. Map coverage to MITRE. Start FP tracking.</td></tr>
+        <tr><td>3</td><td>Managed</td><td>Detection-as-code. CI/CD pipeline. Automated testing. Coverage tracking.</td><td>Git repo for rules. Atomic Red Team testing. PR review process. MITRE heatmap.</td></tr>
+        <tr><td>4</td><td>Optimized</td><td>ML-assisted. Continuous tuning. Red team validated. &lt;5% FP rate.</td><td>Behavioral analytics. Purple team exercises. Automated tuning. Detection SLAs.</td></tr>
     </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">DATA SOURCE ONBOARDING PRIORITY</div>
+    <table class="pg-table">
+        <tr><th>Data Source</th><th>Log Type</th><th>Key Fields</th><th>MITRE Coverage</th><th>Priority</th></tr>
+        <tr><td>Windows Security Events</td><td>4624, 4625, 4720, 4732, 4688</td><td>LogonType, TargetUser, SourceIP</td><td>Credential Access, Persistence, Lateral Movement</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Sysmon</td><td>EventID 1,3,7,8,10,11,13,22</td><td>Process, Network, File, Registry, DNS</td><td>Execution, Defense Evasion, Discovery</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Firewall</td><td>Allow/Deny, NAT</td><td>SrcIP, DstIP, DstPort, Action</td><td>C2, Exfiltration, Lateral Movement</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>DNS</td><td>Query/Response</td><td>QueryName, QueryType, SrcIP, ResponseIP</td><td>C2 (DNS tunneling), Exfiltration</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Web Proxy</td><td>HTTP/HTTPS access logs</td><td>URL, UserAgent, BytesSent, Category</td><td>C2, Exfiltration, Initial Access</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>EDR Telemetry</td><td>Process, File, Network, Registry</td><td>Process tree, command line, parent</td><td>All tactics (endpoint-focused)</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Email Gateway</td><td>Inbound/Outbound, Attachments</td><td>Sender, Recipient, Subject, Attachments</td><td>Initial Access (Phishing)</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Cloud (O365/AWS)</td><td>Sign-in, Audit, CloudTrail</td><td>UserPrincipal, Action, IP, Resource</td><td>Credential Access, Collection, Persistence</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Active Directory</td><td>LDAP, Replication, GPO</td><td>ObjectDN, Operation, SourceDC</td><td>Discovery, Credential Access, Persistence</td><td><span class="pg-badge pg-badge-blue">Medium</span></td></tr>
+        <tr><td>VPN</td><td>Connect/Disconnect</td><td>User, SourceIP, Duration, GeoLocation</td><td>Initial Access, Exfiltration</td><td><span class="pg-badge pg-badge-blue">Medium</span></td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">FALSE POSITIVE REDUCTION FRAMEWORK</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Baseline (Week 1):</strong> Deploy rule in audit/alert-only mode. Record all hits. Do NOT auto-block. Collect data on who/what triggers the rule.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Categorize (Week 2):</strong> Review all hits. Label each as TP (true positive), FP (false positive), or BTP (benign true positive — real behavior, but expected). Track percentages.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Whitelist (Week 2-3):</strong> Add exclusions for common FPs: admin scripts, SCCM deployments, approved tools. Use specific exclusions (user+host+process), not broad wildcards.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Tune Thresholds (Week 3):</strong> Adjust count thresholds, time windows, and grouping. If brute force rule fires on 3 failures, raise to 10. If DNS rule fires on length 30, raise to 50.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Peer Review (Week 4):</strong> Another analyst reviews the rule logic, exclusions, and tuning decisions. Fresh eyes catch gaps. Document the rationale for every exclusion.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Promote to Production:</strong> If FP rate &lt;10% after 4 weeks, promote to production with auto-alerting. If FP rate &gt;30%, rethink the detection approach entirely.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">RULE TESTING WITH ATOMIC RED TEAM</div>
+    ${pgCode(`# Install Atomic Red Team
+IEX (IWR 'https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/install-atomicredteam.ps1' -UseBasicParsing)
+Install-AtomicRedTeam
+
+# Test a specific MITRE technique
+Invoke-AtomicTest T1059.001    # PowerShell
+Invoke-AtomicTest T1003.001    # LSASS Credential Dumping
+Invoke-AtomicTest T1053.005    # Scheduled Task Persistence
+Invoke-AtomicTest T1490        # Shadow Copy Deletion
+Invoke-AtomicTest T1021.002    # PsExec Lateral Movement
+
+# Test and verify detection in SIEM
+# 1. Run atomic test
+# 2. Wait 2-5 minutes for log ingestion
+# 3. Check SIEM for corresponding alert
+# 4. If no alert → rule gap → write new detection
+# 5. If alert → validate severity and context are correct`, 'powershell')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Sigma as Standard</h4><p>Write all rules in Sigma YAML first. Auto-convert to SPL/KQL/AQL using sigmac or pySigma. This makes rules portable across SIEMs and version-controllable.</p></div>
+        <div class="pg-info-card"><h4>Git Everything</h4><p>Store rules in Git with CI/CD. Every rule change is a commit with context. PR reviews catch logic errors. Automated deployment prevents manual mistakes.</p></div>
+        <div class="pg-info-card"><h4>MITRE Coverage Tracking</h4><p>Maintain a MITRE ATT&CK heatmap showing which techniques have detections. Prioritize gaps. Target 80% coverage across top 10 techniques per tactic.</p></div>
+        <div class="pg-info-card"><h4>Test Before Deploy</h4><p>Every rule must be tested with Atomic Red Team or equivalent before production. If it doesn't fire during testing, it won't fire during an attack.</p></div>
+        <div class="pg-info-card"><h4>FP Budget</h4><p>Set a FP budget per analyst per day (~50-80 alerts). If a rule exceeds the budget, it gets tuned or removed. Alert fatigue kills detection programs.</p></div>
+        <div class="pg-info-card"><h4>Detection SLAs</h4><p>Set SLAs for new detection requests: Critical technique → 48h. High → 1 week. Medium → 2 weeks. Track delivery against SLAs.</p></div>
+    </div>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -1986,9 +2108,10 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">INCIDENT RESPONSE PLAYBOOKS</h1>
     <span class="card-tag" style="position:static">BLUE TEAM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">8 comprehensive IR playbooks aligned to NIST SP 800-61 and SANS PICERL. Step-by-step procedures from detection to recovery for your SOC team.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">NIST INCIDENT RESPONSE LIFECYCLE</div>
+    <div class="pg-section-title">NIST SP 800-61 INCIDENT RESPONSE LIFECYCLE</div>
     <div class="pg-ascii-art"><pre>
     ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
     │ PREPARATION  │───▶│  DETECTION   │───▶│ CONTAINMENT  │───▶│  RECOVERY    │
@@ -2002,14 +2125,151 @@ ${pgBack()}
 </div>
 
 <div class="pg-section">
-    <div class="pg-section-title">PLAYBOOK QUICK REFERENCE</div>
+    <div class="pg-section-title">PLAYBOOK 1: PHISHING RESPONSE</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> HIGH | <strong>SLA:</strong> 1 hour | <strong>MITRE:</strong> T1566.001, T1566.002</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Identify:</strong> User reports phishing email or SIEM alert fires on suspicious email. Record sender, subject, timestamp, recipient list, any URLs/attachments.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Contain:</strong> Use email admin (Exchange/M365) to delete the email from ALL recipient inboxes. Block sender domain on email gateway. Add URLs to proxy blocklist.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Extract IOCs:</strong> Detonate attachments in sandbox (Any.Run, Joe Sandbox). Extract: sender IP, reply-to address, URLs, file hashes, domain registrations.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Scope:</strong> Query SIEM: who received the email? Who clicked the link? Who opened the attachment? Check proxy logs for URL visits. Check EDR for file execution.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Remediate:</strong> Reset passwords for any user who clicked/opened. Force MFA re-enrollment. Scan affected endpoints with EDR. Check for inbox rules forwarding to external.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Recover:</strong> Confirm no persistence on affected endpoints. Push IOCs to all SIEMs. Update email gateway rules. Notify affected users with safe/unsafe guidance.</div></div>
+    <div class="pg-step"><div class="pg-step-num">7</div><div class="pg-step-text"><strong>Document:</strong> Create incident report. Update phishing simulation training. Add new detection rule if this pattern wasn't caught by existing rules.</div></div>
+    ${pgCode(`# Splunk - Find who clicked the phishing URL
+index=proxy dest_url="*malicious-domain.com*"
+| stats count by src_ip, user, dest_url, _time
+| sort -_time
+
+# M365 - Delete email from all mailboxes (PowerShell)
+Get-ComplianceSearch -Identity "PhishSearch" | Remove-ComplianceSearchAction
+New-ComplianceSearch -Name "PhishSearch" -ExchangeLocation All -ContentMatchQuery 'subject:"Urgent Invoice" AND from:attacker@evil.com'
+Start-ComplianceSearch -Identity "PhishSearch"
+New-ComplianceSearchAction -SearchName "PhishSearch" -Purge -PurgeType HardDelete`, 'powershell')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 2: RANSOMWARE RESPONSE</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> CRITICAL | <strong>SLA:</strong> 15 minutes | <strong>MITRE:</strong> T1486, T1490, T1489</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>IMMEDIATE:</strong> Isolate affected hosts via EDR (network quarantine). Do NOT power off — preserve memory. Disable compromised accounts. Block C2 IPs/domains on firewall.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Scope:</strong> Query EDR for vssadmin/bcdedit/wmic shadowcopy across all endpoints. Check for lateral movement (PsExec, RDP). Identify patient zero from process tree.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Preserve evidence:</strong> Memory dump of running ransomware process. Copy ransom note. Collect encrypted file samples + original versions (for decryptor analysis).</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Identify variant:</strong> Upload ransom note/encrypted file to ID Ransomware (id-ransomware.malwarehunterteam.com). Check for known decryptors at NoMoreRansom.org.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Eradicate:</strong> Use EDR to kill ransomware processes, quarantine binaries, remove persistence (scheduled tasks, services, registry). Scan all endpoints.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Recover:</strong> Restore from clean backups (verify backup integrity first). If SentinelOne — use Rollback feature. Rebuild compromised DCs from scratch.</div></div>
+    <div class="pg-step"><div class="pg-step-num">7</div><div class="pg-step-text"><strong>Post-incident:</strong> Reset ALL domain passwords if AD was compromised. Implement network segmentation. Deploy enhanced monitoring. Brief executives. File law enforcement report (FBI IC3).</div></div>
+    ${pgCode(`# Splunk - Hunt ransomware pre-encryption activity
+index=sysmon (EventCode=1)
+  (process_name="vssadmin.exe" CommandLine="*delete*shadows*")
+  OR (process_name="bcdedit.exe" CommandLine="*recoveryenabled*no*")
+  OR (process_name="wmic.exe" CommandLine="*shadowcopy*delete*")
+  OR (process_name="cipher.exe" CommandLine="/w:*")
+| table _time, ComputerName, user, process_name, CommandLine, ParentCommandLine`, 'spl')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 3: DATA BREACH RESPONSE</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> CRITICAL | <strong>SLA:</strong> 30 minutes | <strong>MITRE:</strong> T1041, T1567, T1048</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Contain:</strong> Block exfiltration channels (IP/domain/URL). Revoke compromised credentials. Disable external sharing on cloud platforms.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Scope:</strong> Determine what data was accessed. Query DLP logs, file access audit, cloud sharing logs. Classify data sensitivity (PII, PHI, financial, IP).</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Legal notification:</strong> GDPR: 72 hours to supervisory authority. HIPAA: 60 days. State laws vary. Engage legal counsel and privacy officer IMMEDIATELY.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Evidence:</strong> Preserve all logs. Legal hold on email/documents. Chain of custody documentation. Engage forensics firm if needed for litigation support.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Notify:</strong> Affected individuals (if PII). Credit monitoring services. Public statement if required. Regulatory bodies per jurisdiction.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 4: BUSINESS EMAIL COMPROMISE (BEC)</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> CRITICAL | <strong>SLA:</strong> 30 minutes | <strong>MITRE:</strong> T1534, T1114</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Contain:</strong> Disable compromised mailbox. Revoke all OAuth app consents. Force sign-out from all sessions. Reset password + MFA re-enrollment.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Check inbox rules:</strong> Search for auto-forwarding rules to external addresses. Check Sent Items for fraudulent emails. Review mailbox delegation permissions.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Financial:</strong> If wire transfer was requested — contact bank IMMEDIATELY (within 24h for possible recall). File FBI IC3 complaint. Engage CFO/Finance.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Scope:</strong> Check if attacker accessed SharePoint/OneDrive. Review Azure AD sign-in logs for impossible travel. Check for additional compromised accounts.</div></div>
+    ${pgCode(`# KQL - Find inbox rules created by compromised account
+CloudAppEvents
+| where ActionType == "New-InboxRule" or ActionType == "Set-InboxRule"
+| where AccountObjectId == "<compromised_user_id>"
+| extend RuleName = tostring(RawEventData.Parameters[0].Value)
+| extend ForwardTo = tostring(RawEventData.Parameters[1].Value)
+| project Timestamp, AccountUpn = AccountObjectId, RuleName, ForwardTo`, 'kql')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 5: INSIDER THREAT</div>
+    <div class="pg-callout pg-callout-warn"><strong>Severity:</strong> HIGH | <strong>SLA:</strong> 1 hour | <strong>MITRE:</strong> T1005, T1567, T1114</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>DO NOT alert the user.</strong> Coordinate with HR and Legal before any technical action. Get written authorization for monitoring. Preserve evidence chain of custody.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Monitor:</strong> Enable enhanced logging on user's account. DLP policy for data classification. UEBA baseline comparison. Email/cloud activity monitoring.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Scope:</strong> What data was accessed? Downloaded? Transferred? Check USB activity, cloud uploads, email attachments, print logs.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Contain (when authorized by HR/Legal):</strong> Disable account. Revoke VPN/remote access. Collect company devices. Preserve mailbox and files.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 6: CLOUD ACCOUNT COMPROMISE</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> HIGH | <strong>SLA:</strong> 30 minutes | <strong>MITRE:</strong> T1078, T1098</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Contain:</strong> Force sign-out all sessions. Reset password. Revoke ALL refresh tokens. Remove all OAuth app consents. Disable account if severity warrants.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Check:</strong> Azure AD sign-in logs — impossible travel? New MFA method registered? New inbox forwarding rules? New OAuth apps consented?</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Scope:</strong> Check SharePoint/OneDrive access logs. Review email access patterns. Check for data downloads. Review admin role assignments if privileged account.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Recover:</strong> Re-enable account with new MFA. Conditional access policy review (block legacy auth, require compliant device). Monitor for 30 days.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 7: SUPPLY CHAIN COMPROMISE</div>
+    <div class="pg-callout pg-callout-danger"><strong>Severity:</strong> CRITICAL | <strong>SLA:</strong> 1 hour | <strong>MITRE:</strong> T1195.001, T1195.002</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Contain:</strong> Block compromised software/update server. Isolate systems that installed the compromised version. Block known C2 infrastructure.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Inventory:</strong> Identify ALL systems running the affected software version. Check SBOM (Software Bill of Materials). Query EDR for process execution of compromised binary.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Investigate:</strong> Compare file hashes against known-good versions. Check for backdoors, unauthorized network connections, persistence mechanisms.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Recover:</strong> Roll back to last known-good version. Apply vendor patch when available. Enhanced monitoring for 90 days. Vendor notification and coordination.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK 8: DDoS RESPONSE</div>
+    <div class="pg-callout pg-callout-warn"><strong>Severity:</strong> HIGH | <strong>SLA:</strong> 15 minutes | <strong>MITRE:</strong> T1498, T1499</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Identify attack type:</strong> Volumetric (bandwidth flood), Protocol (SYN flood, ICMP), Application (HTTP GET/POST flood, Slowloris). Check firewall/CDN dashboards.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Activate defenses:</strong> Enable CDN/WAF DDoS protection (Cloudflare Under Attack Mode, AWS Shield Advanced). Enable rate limiting. Geo-block attack source regions if applicable.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Escalate:</strong> Contact ISP for upstream filtering/null-routing. Activate DDoS scrubbing service. Notify management and affected business units.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Post-attack:</strong> Analyze attack patterns. Update WAF rules. Review capacity planning. Consider always-on DDoS protection. Document timeline for insurance claims.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">EVIDENCE COLLECTION GUIDE</div>
+    <table class="pg-table">
+        <tr><th>Artifact</th><th>Location</th><th>Collection Tool</th><th>Priority</th></tr>
+        <tr><td>Memory dump</td><td>RAM</td><td>WinPmem, AVML (Linux), Volatility</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Process list</td><td>OS</td><td>EDR console, Tasklist, ps aux</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Network connections</td><td>OS</td><td>netstat -anob, ss -tulnp</td><td><span class="pg-badge pg-badge-red">Critical</span></td></tr>
+        <tr><td>Event logs</td><td>Windows: %SystemRoot%\\System32\\winevt</td><td>wevtutil, Event Log Explorer</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Sysmon logs</td><td>Microsoft-Windows-Sysmon/Operational</td><td>wevtutil, SIEM export</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Prefetch files</td><td>C:\\Windows\\Prefetch</td><td>PECmd (Eric Zimmerman), robocopy</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Registry hives</td><td>SYSTEM, SAM, SOFTWARE, NTUSER.DAT</td><td>RECmd, RegRipper</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+        <tr><td>Browser history</td><td>AppData\\Local per browser</td><td>Hindsight (Chrome), BrowsingHistoryView</td><td><span class="pg-badge pg-badge-blue">Medium</span></td></tr>
+        <tr><td>Disk image</td><td>Full disk</td><td>FTK Imager, dd, KAPE</td><td><span class="pg-badge pg-badge-blue">Medium</span></td></tr>
+        <tr><td>Cloud logs</td><td>Azure AD, AWS CloudTrail, GCP Audit</td><td>Cloud console, API export</td><td><span class="pg-badge pg-badge-orange">High</span></td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">POST-INCIDENT REVIEW (10 QUESTIONS)</div>
+    <table class="pg-table">
+        <tr><th>#</th><th>Question</th></tr>
+        <tr><td>1</td><td>What happened? (Timeline of events from initial compromise to containment)</td></tr>
+        <tr><td>2</td><td>How was it detected? (Alert, user report, threat hunt, external notification)</td></tr>
+        <tr><td>3</td><td>What was the root cause? (Phishing, vulnerability, misconfiguration, insider)</td></tr>
+        <tr><td>4</td><td>What was the impact? (Systems, data, users, financial, reputational)</td></tr>
+        <tr><td>5</td><td>What went well in our response? (What should we keep doing?)</td></tr>
+        <tr><td>6</td><td>What could we improve? (Gaps in detection, response, communication)</td></tr>
+        <tr><td>7</td><td>Were our playbooks followed? (Deviations and why)</td></tr>
+        <tr><td>8</td><td>What detection rules should we create/update? (Specific SIEM rules)</td></tr>
+        <tr><td>9</td><td>What preventive measures should we implement? (Patches, policies, training)</td></tr>
+        <tr><td>10</td><td>What is our action item list with owners and deadlines?</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>1. Phishing Response</h4><p><strong>Contain:</strong> Delete email from all inboxes, block sender domain. <strong>Investigate:</strong> Check who clicked, extract IOCs. <strong>Remediate:</strong> Reset compromised passwords, scan endpoints.</p></div>
-        <div class="pg-info-card"><h4>2. Ransomware Response</h4><p><strong>Contain:</strong> Isolate affected hosts immediately, disable network shares. <strong>Investigate:</strong> Identify patient zero, determine encryption scope. <strong>Recover:</strong> Restore from clean backups, rebuild if needed.</p></div>
-        <div class="pg-info-card"><h4>3. Data Breach Response</h4><p><strong>Contain:</strong> Revoke access, block exfil channels. <strong>Investigate:</strong> Determine what data was accessed/exfiltrated. <strong>Report:</strong> Legal notification within 72 hours (GDPR), breach notification.</p></div>
-        <div class="pg-info-card"><h4>4. Insider Threat</h4><p><strong>Contain:</strong> Disable account, preserve evidence. <strong>Investigate:</strong> DLP logs, email activity, file access audit. <strong>Coordinate:</strong> HR, Legal, Management involvement required.</p></div>
-        <div class="pg-info-card"><h4>5. DDoS Response</h4><p><strong>Contain:</strong> Engage CDN/WAF, rate limiting, geo-blocking. <strong>Investigate:</strong> Identify attack type (volumetric, protocol, application). <strong>Mitigate:</strong> ISP null-route, scrubbing service activation.</p></div>
-        <div class="pg-info-card"><h4>6. Supply Chain Compromise</h4><p><strong>Contain:</strong> Block compromised software/update, isolate affected systems. <strong>Investigate:</strong> Identify scope of compromise, check for backdoors. <strong>Recover:</strong> Roll back to clean version, enhanced monitoring.</p></div>
+        <div class="pg-info-card"><h4>Playbook-Driven Response</h4><p>Never improvise during an incident. Follow the playbook. Deviations should be documented and reviewed in post-incident. Update playbooks based on lessons learned.</p></div>
+        <div class="pg-info-card"><h4>Evidence First, Then Contain</h4><p>Capture volatile evidence (memory, connections) BEFORE containing. Once you isolate a host, volatile evidence is lost. Memory dump first, then quarantine.</p></div>
+        <div class="pg-info-card"><h4>Communication Cadence</h4><p>Critical incidents: status update every 30 minutes. High: every 2 hours. Keep a running incident timeline document. Use a dedicated Slack/Teams channel per incident.</p></div>
+        <div class="pg-info-card"><h4>Scope Before You Remediate</h4><p>Don't remediate until you understand the full scope. Cleaning one host while the attacker has 10 others just tips them off. Scope the entire compromise first.</p></div>
+        <div class="pg-info-card"><h4>Legal and PR Coordination</h4><p>For any breach involving PII: engage Legal within 1 hour. For any public-facing incident: coordinate with PR/Communications before any external statement.</p></div>
+        <div class="pg-info-card"><h4>Post-Incident is Mandatory</h4><p>Every P1/P2 incident gets a blameless post-incident review within 5 business days. Document findings, action items with owners, and update detection rules.</p></div>
     </div>
 </div>
 
@@ -2056,34 +2316,160 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">THREAT HUNTING PLAYBOOKS</h1>
     <span class="card-tag" style="position:static">BLUE TEAM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">12 hypothesis-driven hunting playbooks with queries in SPL (Splunk) and KQL (Sentinel/MDE). Each hunt maps to MITRE ATT&CK with expected results and indicators.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">HYPOTHESIS-DRIVEN HUNTING</div>
+    <div class="pg-section-title">HUNTING METHODOLOGY</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │HYPOTHESIS│───▶│  COLLECT  │───▶│ ANALYZE  │───▶│ FINDINGS │───▶│NEW DETECT│
+    │  ──────  │    │  ──────  │    │  ──────  │    │  ──────  │    │  ──────  │
+    │  MITRE   │    │  Query   │    │  Filter  │    │  IOCs    │    │  Sigma   │
+    │  Threat  │    │  SIEM    │    │  Baseline│    │  TTPs    │    │  Rule    │
+    │  Intel   │    │  EDR     │    │  Anomaly │    │  Report  │    │  Deploy  │
+    └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">12 HUNTING PLAYBOOKS</div>
+
     <div class="pg-grid">
         <div class="pg-info-card">
-            <h4>Hunt 1: Persistence via Scheduled Tasks</h4>
-            <p><strong>Hypothesis:</strong> Attackers are using scheduled tasks for persistence.</p>
-            <p><strong>Data:</strong> Sysmon Event ID 1 (process), Windows Event 4698</p>
-            <p><strong>SPL:</strong> <code>index=wineventlog EventCode=4698 | search TaskName!="\\Microsoft\\*"</code></p>
+            <h4>Hunt 1: Scheduled Task Persistence</h4>
+            <p><strong>MITRE:</strong> T1053.005 | <strong>Data:</strong> Sysmon 1, Windows 4698</p>
+            ${pgCode(`# SPL
+index=wineventlog EventCode=4698
+| search TaskName!="\\\\Microsoft\\\\*"
+| table _time, ComputerName, user, TaskName, Command`, 'spl')}
         </div>
         <div class="pg-info-card">
             <h4>Hunt 2: DNS Tunneling</h4>
-            <p><strong>Hypothesis:</strong> C2 or exfil via DNS queries with encoded data.</p>
-            <p><strong>Data:</strong> DNS logs, Sysmon Event ID 22</p>
-            <p><strong>SPL:</strong> <code>index=dns | eval len=len(query) | where len>50 | stats count by src_ip, query</code></p>
+            <p><strong>MITRE:</strong> T1071.004 | <strong>Data:</strong> DNS logs, Sysmon 22</p>
+            ${pgCode(`# SPL
+index=dns | eval len=len(query)
+| where len>50
+| stats count avg(len) as avg_len by src_ip
+| where count>100 AND avg_len>40`, 'spl')}
         </div>
         <div class="pg-info-card">
-            <h4>Hunt 3: Living Off the Land</h4>
-            <p><strong>Hypothesis:</strong> Attackers using LOLBins (certutil, mshta, etc.).</p>
-            <p><strong>Data:</strong> Process creation events</p>
-            <p><strong>KQL:</strong> <code>DeviceProcessEvents | where FileName in~("certutil.exe","mshta.exe","regsvr32.exe")</code></p>
+            <h4>Hunt 3: LOLBin Abuse</h4>
+            <p><strong>MITRE:</strong> T1218 | <strong>Data:</strong> Process creation</p>
+            ${pgCode(`# KQL
+DeviceProcessEvents
+| where FileName in~("certutil.exe","mshta.exe",
+    "regsvr32.exe","bitsadmin.exe","rundll32.exe")
+| where ProcessCommandLine has_any
+    ("http","ftp","urlcache","decode")`, 'kql')}
         </div>
         <div class="pg-info-card">
             <h4>Hunt 4: Kerberoasting</h4>
-            <p><strong>Hypothesis:</strong> Attackers requesting TGS tickets for service accounts.</p>
-            <p><strong>Data:</strong> Windows Event 4769</p>
-            <p><strong>SPL:</strong> <code>index=wineventlog EventCode=4769 TicketEncryptionType=0x17 | stats count by ServiceName, TargetUserName</code></p>
+            <p><strong>MITRE:</strong> T1558.003 | <strong>Data:</strong> Windows 4769</p>
+            ${pgCode(`# SPL
+index=wineventlog EventCode=4769
+    TicketEncryptionType=0x17
+| stats count by ServiceName, TargetUserName
+| where count > 5`, 'spl')}
         </div>
+        <div class="pg-info-card">
+            <h4>Hunt 5: Cobalt Strike Beacon</h4>
+            <p><strong>MITRE:</strong> T1071.001 | <strong>Data:</strong> Proxy, DNS, Netflow</p>
+            ${pgCode(`# SPL - Beacon interval detection
+index=proxy
+| sort 0 _time
+| streamstats current=f last(_time) as prev_time by src_ip, dest
+| eval interval=_time-prev_time
+| stats stdev(interval) as jitter, avg(interval) as avg_int, count by src_ip, dest
+| where jitter<5 AND avg_int>30 AND avg_int<120 AND count>20`, 'spl')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 6: DCSync Attack</h4>
+            <p><strong>MITRE:</strong> T1003.006 | <strong>Data:</strong> Windows 4662</p>
+            ${pgCode(`# SPL
+index=wineventlog EventCode=4662
+    AccessMask=0x100
+    Properties="*1131f6ad*"
+| search NOT SubjectUserName IN ("*$")
+| table _time, SubjectUserName, ObjectName`, 'spl')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 7: Golden Ticket</h4>
+            <p><strong>MITRE:</strong> T1558.001 | <strong>Data:</strong> Windows 4769, 4768</p>
+            ${pgCode(`# KQL - TGT with unusual lifetime
+IdentityLogonEvents
+| where LogonType == "NonInteractive"
+| where Application == "Active Directory"
+| where ActionType == "LogonSuccess"
+| where Timestamp > ago(7d)
+| summarize count() by AccountUpn, DeviceName`, 'kql')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 8: WMI Persistence</h4>
+            <p><strong>MITRE:</strong> T1546.003 | <strong>Data:</strong> Sysmon 19, 20, 21</p>
+            ${pgCode(`# SPL
+index=sysmon (EventCode=19 OR EventCode=20 OR EventCode=21)
+| table _time, ComputerName, EventType, Operation, User, Consumer, Query`, 'spl')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 9: Process Injection</h4>
+            <p><strong>MITRE:</strong> T1055 | <strong>Data:</strong> Sysmon 8, 10</p>
+            ${pgCode(`# SPL - CreateRemoteThread
+index=sysmon EventCode=8
+| where SourceImage!=TargetImage
+| where TargetImage IN ("*explorer.exe","*svchost.exe","*lsass.exe")
+| table _time, Computer, SourceImage, TargetImage`, 'spl')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 10: Rogue Admin Accounts</h4>
+            <p><strong>MITRE:</strong> T1136.001 | <strong>Data:</strong> Windows 4720, 4732</p>
+            ${pgCode(`# SPL
+index=wineventlog (EventCode=4720 OR EventCode=4732)
+| transaction SubjectUserName maxspan=1h
+| where eventcount>1
+| table _time, SubjectUserName, TargetUserName, EventCode`, 'spl')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 11: Data Staging</h4>
+            <p><strong>MITRE:</strong> T1074 | <strong>Data:</strong> EDR file events</p>
+            ${pgCode(`# KQL
+DeviceFileEvents
+| where ActionType == "FileCreated"
+| where FileName endswith ".zip" or FileName endswith ".7z" or FileName endswith ".rar"
+| where FolderPath has_any ("\\\\Temp","\\\\staging","\\\\Public")
+| summarize FileCount=count(), TotalSize=sum(FileSize) by DeviceName, InitiatingProcessFileName`, 'kql')}
+        </div>
+        <div class="pg-info-card">
+            <h4>Hunt 12: Suspicious RDP</h4>
+            <p><strong>MITRE:</strong> T1021.001 | <strong>Data:</strong> Windows 4624 Type 10</p>
+            ${pgCode(`# SPL
+index=wineventlog EventCode=4624 Logon_Type=10
+| stats dc(ComputerName) as targets, values(ComputerName) as hosts by TargetUserName, IpAddress
+| where targets > 3`, 'spl')}
+        </div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">HUNTING MATURITY MODEL</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Name</th><th>Description</th></tr>
+        <tr><td>HM0</td><td>Initial</td><td>No hunting capability. Rely entirely on automated alerts.</td></tr>
+        <tr><td>HM1</td><td>Minimal</td><td>Use IOC-based searches from threat intel. Reactive hunting only.</td></tr>
+        <tr><td>HM2</td><td>Procedural</td><td>Follow pre-built hunting playbooks (like these). Hypothesis-driven.</td></tr>
+        <tr><td>HM3</td><td>Innovative</td><td>Create new hypotheses from threat intel and org context. Custom queries.</td></tr>
+        <tr><td>HM4</td><td>Leading</td><td>Automated hunting with ML anomaly detection. Continuous. Hunt findings auto-become detections.</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Start with Hypothesis</h4><p>Never hunt without a hypothesis. "I think attackers may be using scheduled tasks for persistence in our environment because we saw it in recent threat reports."</p></div>
+        <div class="pg-info-card"><h4>Document Everything</h4><p>Record: hypothesis, data sources queried, queries run, results found, actions taken. Even null results are valuable — they prove coverage.</p></div>
+        <div class="pg-info-card"><h4>Findings → Detections</h4><p>Every successful hunt should produce a new automated detection rule. If you had to hunt for it manually, automate it for next time.</p></div>
+        <div class="pg-info-card"><h4>Threat Intel Driven</h4><p>Read threat reports (Mandiant, CrowdStrike, Recorded Future). Extract TTPs. Build hunts for those TTPs in your environment.</p></div>
+        <div class="pg-info-card"><h4>Schedule Regular Hunts</h4><p>Dedicate 20% of senior analyst time to hunting. Schedule 2-3 hunts per week. Track hunt-to-detection conversion rate.</p></div>
+        <div class="pg-info-card"><h4>Know Your Baseline</h4><p>You can't find anomalies if you don't know normal. Baseline admin tools usage, RDP patterns, service accounts before hunting for abuse.</p></div>
     </div>
 </div>
 
