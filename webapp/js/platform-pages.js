@@ -2232,8 +2232,11 @@ ${pgBack()}
 <!-- Interactive Heatmap -->
 <div class="mitre-heatmap" id="mitre-heatmap"></div>
 
-<script>
-(function(){
+<div id="mitre-heatmap-init" data-init="initMitreHeatmap"></div>
+`;
+
+// ── MITRE Heatmap Renderer (called after innerHTML set) ──
+function initMitreHeatmap() {
 const mitreData = [
   { tactic:"Initial Access", id:"TA0001", techniques:[
     {id:"T1566",name:"Phishing",status:"detected",platforms:["Splunk","Sentinel","MDE","CrowdStrike","Wazuh"],rule:"Email with malicious attachment/link detected + user interaction"},
@@ -2331,7 +2334,7 @@ mitreData.forEach(tactic => {
     html += '</div>';
 });
 heatmap.innerHTML = html;
-})();
+}
 
 function showMitreDetail(el) {
     const d = el.dataset;
@@ -2353,8 +2356,9 @@ function showMitreDetail(el) {
         '<button class="btn-hack" onclick="document.getElementById(\'mitre-detail\').style.display=\'none\'" style="margin-top:12px;font-size:11px">CLOSE</button>';
     panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
-</script>
 
+// Continue MITRE page content after the heatmap div
+richPageContent.mitre += `
 <!-- Tactic Summary Table -->
 <div class="pg-section" style="margin-top:24px">
     <div class="pg-section-title">TACTIC COVERAGE SUMMARY</div>
