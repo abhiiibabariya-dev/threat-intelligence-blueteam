@@ -981,6 +981,55 @@ function loadSOCWorkflow() {
         .sw-exec-all:hover { transform:translateY(-1px); box-shadow:0 6px 25px rgba(34,211,238,0.35); }
         .sw-exec-all:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 
+        /* ── Scenario Switch Animation ── */
+        .sw-workflow-body { transition:opacity 0.3s ease, transform 0.3s ease; }
+        .sw-workflow-body.fade-out { opacity:0; transform:translateY(12px); }
+        .sw-workflow-body.fade-in { opacity:1; transform:translateY(0); }
+
+        /* ── Section Stagger Animation ── */
+        .sw-section { opacity:0; transform:translateY(16px); animation:sw-slide-in 0.4s ease forwards; }
+        @keyframes sw-slide-in { to { opacity:1; transform:translateY(0); } }
+
+        /* ── Auto Demo Pulse ── */
+        .sw-section.sw-demo-active {
+            border-color:rgba(34,211,238,0.4) !important;
+            box-shadow:0 0 20px rgba(34,211,238,0.12), inset 0 0 20px rgba(34,211,238,0.03);
+            transition:border-color 0.4s, box-shadow 0.4s;
+        }
+        .sw-demo-highlight {
+            animation:sw-glow-pulse 1s ease-in-out;
+        }
+        @keyframes sw-glow-pulse {
+            0% { box-shadow:0 0 0 rgba(34,211,238,0); }
+            50% { box-shadow:0 0 30px rgba(34,211,238,0.2); }
+            100% { box-shadow:0 0 0 rgba(34,211,238,0); }
+        }
+
+        /* ── Log Typing Animation ── */
+        .sw-log.sw-log-typing { opacity:0; animation:sw-log-appear 0.3s ease forwards; }
+        @keyframes sw-log-appear { to { opacity:1; } }
+
+        /* ── Mode Toggle Buttons ── */
+        .sw-mode-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+        .sw-mode-btn {
+            padding:9px 20px; border:1px solid var(--border); border-radius:8px;
+            background:var(--bg-card); color:var(--text-secondary); font-size:12px;
+            font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.2s;
+            display:flex; align-items:center; gap:8px;
+        }
+        .sw-mode-btn:hover { border-color:var(--accent); color:var(--accent); }
+        .sw-mode-btn.active { background:rgba(34,211,238,0.1); border-color:#22d3ee; color:#22d3ee; box-shadow:0 0 15px rgba(34,211,238,0.1); }
+        .sw-mode-btn.demo-running { background:rgba(239,68,68,0.1); border-color:#ef4444; color:#ef4444; animation:pulse-dot 1s infinite; }
+        .sw-mode-icon { font-size:14px; }
+        .sw-mode-divider { width:1px; height:28px; background:var(--border); margin:0 4px; }
+
+        /* ── Timeline Event Stagger ── */
+        .sw-tl-event { opacity:0; animation:sw-slide-in 0.3s ease forwards; }
+
+        /* ── Chain Stage Animation ── */
+        .sw-chain-stage { opacity:0; animation:sw-slide-in 0.4s ease forwards; }
+        .sw-chain-arrow { opacity:0; animation:sw-slide-in 0.3s ease forwards; }
+
         .sw-view-toggle { display:flex; gap:8px; margin-bottom:20px; }
         .sw-view-btn {
             padding:8px 18px; border:1px solid var(--border); border-radius:6px;
@@ -1036,12 +1085,23 @@ function loadSOCWorkflow() {
             <button class="sw-scenario-btn" onclick="swLoadScenario('dns-tunneling')">DNS Tunneling (Exfil)</button>
         </div>
 
-        <div class="sw-view-toggle">
-            <button class="sw-view-btn active" id="sw-view-ui" onclick="swSwitchView('ui')">Dashboard View</button>
-            <button class="sw-view-btn" id="sw-view-json" onclick="swSwitchView('json')">JSON Export</button>
+        <div class="sw-mode-bar">
+            <button class="sw-mode-btn active" id="sw-mode-instant" onclick="swSwitchView('ui')">
+                <span class="sw-mode-icon">&#9889;</span> Instant Demo
+            </button>
+            <button class="sw-mode-btn" id="sw-mode-json" onclick="swSwitchView('json')">
+                <span class="sw-mode-icon">{ }</span> JSON Export
+            </button>
+            <div class="sw-mode-divider"></div>
+            <button class="sw-mode-btn" id="sw-auto-demo-btn" onclick="swAutoDemo()">
+                <span class="sw-mode-icon">&#9654;</span> Auto Demo
+            </button>
+            <button class="sw-mode-btn" id="sw-stop-demo-btn" onclick="swStopDemo()" style="display:none">
+                <span class="sw-mode-icon">&#9632;</span> Stop Demo
+            </button>
         </div>
 
-        <div id="sw-workflow-body"></div>
+        <div id="sw-workflow-body" class="sw-workflow-body"></div>
         <div id="sw-json-body" style="display:none"></div>
     </div>
     `;
@@ -1053,6 +1113,12 @@ function swLoadScenario(id) {
     const s = socScenarios[id];
     if (!s) return;
 
+    // Stop any running demo
+    swStopDemo();
+
+    // Switch to UI view
+    swSwitchView('ui');
+
     // Update active button
     document.querySelectorAll('.sw-scenario-btn').forEach(b => b.classList.remove('active'));
     document.querySelector(`.sw-scenario-btn[onclick*="${id}"]`)?.classList.add('active');
@@ -1060,6 +1126,12 @@ function swLoadScenario(id) {
     const sevClass = { Critical: 'sw-sev-critical', High: 'sw-sev-high', Medium: 'sw-sev-medium' };
 
     const body = document.getElementById('sw-workflow-body');
+
+    // Fade out animation
+    body.classList.add('fade-out');
+    body.classList.remove('fade-in');
+
+    setTimeout(() => {
     body.innerHTML = `
 
     <!-- 1. Alert Details -->
@@ -1269,21 +1341,45 @@ function swLoadScenario(id) {
 
     `;
 
+    // Fade in
+    requestAnimationFrame(() => {
+        body.classList.remove('fade-out');
+        body.classList.add('fade-in');
+    });
+
+    // Stagger section animations
+    body.querySelectorAll('.sw-section').forEach((sec, i) => {
+        sec.style.animationDelay = `${i * 60}ms`;
+    });
+
+    // Stagger timeline events
+    body.querySelectorAll('.sw-tl-event').forEach((ev, i) => {
+        ev.style.animationDelay = `${300 + i * 100}ms`;
+    });
+
+    // Stagger chain stages
+    body.querySelectorAll('.sw-chain-stage, .sw-chain-arrow').forEach((el, i) => {
+        el.style.animationDelay = `${200 + i * 120}ms`;
+    });
+
     // Animate risk bar
     setTimeout(() => {
         const fill = body.querySelector('.sw-risk-fill');
         if (fill) { fill.style.width = '0%'; setTimeout(() => { fill.style.width = s.risk.score + '%'; }, 50); }
-    }, 100);
+    }, 400);
 
     // Store current scenario for SOAR actions
     window._swCurrentScenario = s;
+    window._swCurrentId = id;
     window._swActionsDone = {};
+
+    }, 200); // end of fade-out setTimeout
 }
 
 function swSection(num, title, content, collapsed = false) {
     const id = `sw-sec-${num}`;
     return `
-    <div class="sw-section">
+    <div class="sw-section" id="sw-section-${num}">
         <div class="sw-section-head" onclick="swToggleSection('${id}')">
             <div class="sw-section-title">
                 <span class="sw-section-num">${num}</span>
@@ -1450,8 +1546,8 @@ function swCopyJSON() {
 function swSwitchView(view) {
     const uiBody = document.getElementById('sw-workflow-body');
     const jsonBody = document.getElementById('sw-json-body');
-    const uiBtn = document.getElementById('sw-view-ui');
-    const jsonBtn = document.getElementById('sw-view-json');
+    const uiBtn = document.getElementById('sw-mode-instant');
+    const jsonBtn = document.getElementById('sw-mode-json');
     if (!uiBody || !jsonBody) return;
 
     if (view === 'json') {
@@ -1466,4 +1562,155 @@ function swSwitchView(view) {
         uiBtn?.classList.add('active');
         jsonBtn?.classList.remove('active');
     }
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTO DEMO MODE — Animated walkthrough of entire workflow
+// ═══════════════════════════════════════════════════════
+window._swDemoTimers = [];
+window._swDemoRunning = false;
+
+function swAutoDemo() {
+    if (window._swDemoRunning) return;
+    window._swDemoRunning = true;
+
+    const demoBtn = document.getElementById('sw-auto-demo-btn');
+    const stopBtn = document.getElementById('sw-stop-demo-btn');
+    if (demoBtn) { demoBtn.style.display = 'none'; }
+    if (stopBtn) { stopBtn.style.display = 'flex'; stopBtn.classList.add('demo-running'); }
+
+    // Make sure we're in UI mode
+    swSwitchView('ui');
+
+    // Collapse all sections first
+    for (let i = 1; i <= 15; i++) {
+        const secBody = document.getElementById(`sw-sec-${i}`);
+        const chev = document.getElementById(`chev-sw-sec-${i}`);
+        if (secBody) secBody.classList.add('collapsed');
+        if (chev) chev.classList.remove('open');
+    }
+
+    // Demo sequence: reveal each section one-by-one with highlight
+    const demoSteps = [
+        { section: 1, delay: 800, label: 'Alert Details' },
+        { section: 2, delay: 2000, label: 'Case Details' },
+        { section: 3, delay: 3500, label: 'Incident Summary' },
+        { section: 4, delay: 5000, label: 'MITRE Mapping' },
+        { section: 5, delay: 7000, label: 'SIEM Detection' },
+        { section: 6, delay: 9500, label: 'EDR Detection' },
+        { section: 7, delay: 12000, label: 'XDR Correlation' },
+        { section: 8, delay: 14500, label: 'Timeline' },
+        { section: 9, delay: 17000, label: 'Log Evidence' },
+        { section: 10, delay: 19500, label: 'SOAR Response' },
+        { section: 11, delay: 21500, label: 'Response Status' },
+        { section: 12, delay: 23000, label: 'Detection Conditions' },
+        { section: 13, delay: 24500, label: 'False Positives' },
+        { section: 14, delay: 26000, label: 'Tuning' },
+        { section: 15, delay: 27500, label: 'Risk Score' },
+    ];
+
+    demoSteps.forEach((step) => {
+        const timer = setTimeout(() => {
+            if (!window._swDemoRunning) return;
+            swDemoRevealSection(step.section);
+        }, step.delay);
+        window._swDemoTimers.push(timer);
+    });
+
+    // Auto-execute SOAR actions after logs
+    const soarTimer = setTimeout(() => {
+        if (!window._swDemoRunning) return;
+        swExecuteAll();
+    }, 22000);
+    window._swDemoTimers.push(soarTimer);
+
+    // Animate risk bar at end
+    const riskTimer = setTimeout(() => {
+        if (!window._swDemoRunning) return;
+        const body = document.getElementById('sw-workflow-body');
+        const fill = body?.querySelector('.sw-risk-fill');
+        if (fill) { fill.style.width = '0%'; setTimeout(() => { fill.style.width = (window._swCurrentScenario?.risk.score || 90) + '%'; }, 100); }
+    }, 28000);
+    window._swDemoTimers.push(riskTimer);
+
+    // End demo
+    const endTimer = setTimeout(() => {
+        swStopDemo();
+    }, 30000);
+    window._swDemoTimers.push(endTimer);
+}
+
+function swDemoRevealSection(num) {
+    const section = document.getElementById(`sw-section-${num}`);
+    const secBody = document.getElementById(`sw-sec-${num}`);
+    const chev = document.getElementById(`chev-sw-sec-${num}`);
+
+    if (!section) return;
+
+    // Expand section
+    if (secBody) secBody.classList.remove('collapsed');
+    if (chev) chev.classList.add('open');
+
+    // Highlight with glow
+    section.classList.add('sw-demo-active', 'sw-demo-highlight');
+
+    // Scroll into view
+    section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Remove highlight after glow animation
+    setTimeout(() => {
+        section.classList.remove('sw-demo-highlight');
+    }, 1200);
+
+    // Remove active border from previous sections
+    setTimeout(() => {
+        section.classList.remove('sw-demo-active');
+    }, 2200);
+
+    // Animate log lines typing effect for section 9
+    if (num === 9) {
+        const logs = section.querySelectorAll('.sw-log');
+        logs.forEach((log, i) => {
+            log.classList.add('sw-log-typing');
+            log.style.animationDelay = `${i * 150}ms`;
+        });
+    }
+
+    // Animate timeline events for section 8
+    if (num === 8) {
+        const events = section.querySelectorAll('.sw-tl-event');
+        events.forEach((ev, i) => {
+            ev.style.opacity = '0';
+            ev.style.animation = 'none';
+            setTimeout(() => {
+                ev.style.animation = `sw-slide-in 0.4s ease ${i * 150}ms forwards`;
+            }, 50);
+        });
+    }
+
+    // Animate chain for section 7
+    if (num === 7) {
+        const stages = section.querySelectorAll('.sw-chain-stage, .sw-chain-arrow');
+        stages.forEach((el, i) => {
+            el.style.opacity = '0';
+            el.style.animation = 'none';
+            setTimeout(() => {
+                el.style.animation = `sw-slide-in 0.4s ease ${i * 200}ms forwards`;
+            }, 50);
+        });
+    }
+}
+
+function swStopDemo() {
+    window._swDemoRunning = false;
+    window._swDemoTimers.forEach(t => clearTimeout(t));
+    window._swDemoTimers = [];
+
+    const demoBtn = document.getElementById('sw-auto-demo-btn');
+    const stopBtn = document.getElementById('sw-stop-demo-btn');
+    if (demoBtn) { demoBtn.style.display = 'flex'; }
+    if (stopBtn) { stopBtn.style.display = 'none'; stopBtn.classList.remove('demo-running'); }
+
+    // Remove any demo highlights
+    document.querySelectorAll('.sw-demo-active').forEach(el => el.classList.remove('sw-demo-active'));
 }
