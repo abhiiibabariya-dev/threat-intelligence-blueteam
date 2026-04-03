@@ -343,26 +343,270 @@ function escapeHtml(text) {
 
 // ── Live Feed ──
 const feedMessages = [
-    { sev: 'critical', msg: 'abuse.ch: New Emotet C2 IP detected - 185.xxx.xxx.xxx' },
-    { sev: 'high', msg: 'URLhaus: 15 new malicious URLs added to blocklist' },
-    { sev: 'medium', msg: 'MITRE ATT&CK: Technique T1059.001 updated with new procedures' },
-    { sev: 'high', msg: 'ThreatFox: AsyncRAT IOC cluster identified - 12 indicators' },
-    { sev: 'critical', msg: 'CISA KEV: New actively exploited vulnerability added' },
-    { sev: 'low', msg: 'NVD: 47 new CVEs published in last 24 hours' },
-    { sev: 'high', msg: 'MalwareBazaar: LockBit 3.0 sample submitted - SHA256 tracked' },
-    { sev: 'medium', msg: 'Emerging Threats: 23 new Suricata rules published' },
-    { sev: 'critical', msg: 'FeodoTracker: Qakbot resurgence - 8 new C2 servers' },
-    { sev: 'high', msg: 'AlienVault OTX: APT29 pulse updated with new indicators' },
-    { sev: 'medium', msg: 'Detection rule updated: Kerberoasting via RC4 TGS' },
-    { sev: 'low', msg: 'Wazuh: 3 new decoders added for FortiGate logs' },
-    { sev: 'high', msg: 'Sentinel: New fusion detection for multi-stage attack' },
-    { sev: 'critical', msg: 'Splunk ES: Risk score threshold exceeded for DC01' },
-    { sev: 'medium', msg: 'Chronicle: YARA-L rule matched DNS tunneling pattern' },
+    {
+        sev: 'critical', msg: 'abuse.ch: New Emotet C2 IP detected - 185.xxx.xxx.xxx',
+        detail: {
+            source: 'abuse.ch FeodoTracker',
+            description: 'A new Emotet command-and-control server has been identified at IP 185.234.72.19. This IP is actively distributing Emotet loader payloads via HTTPS on port 443. The server was first observed 2 hours ago and has already been linked to 47 unique beacon check-ins from compromised endpoints worldwide.',
+            mitre: ['T1071.001 — Web Protocols', 'T1059.001 — PowerShell', 'T1547.001 — Registry Run Keys'],
+            iocs: ['185.234.72.19:443', 'emotet_e5_loader.dll (SHA256: a1b2c3...d4e5f6)', 'hxxps://185.234.72.19/wp-content/update.php'],
+            actions: ['Block IP on perimeter firewall', 'Hunt for beacon traffic in SIEM', 'Scan endpoints for loader DLL']
+        }
+    },
+    {
+        sev: 'high', msg: 'URLhaus: 15 new malicious URLs added to blocklist',
+        detail: {
+            source: 'abuse.ch URLhaus',
+            description: '15 new malicious URLs have been submitted and verified in the last hour. The URLs are primarily distributing IcedID banking trojan via fake invoice lures. Delivery method is ZIP archives containing ISO files with embedded LNK shortcuts that trigger PowerShell download cradles.',
+            mitre: ['T1566.001 — Spearphishing Attachment', 'T1204.002 — Malicious File', 'T1059.001 — PowerShell'],
+            iocs: ['hxxps://invoice-doc[.]net/dl/inv_2024.zip', 'hxxps://secure-update[.]top/payload.iso', '15 URLs across 8 domains'],
+            actions: ['Update URL blocklist on proxy', 'Alert SOC for phishing triage', 'Check email gateway for matching lures']
+        }
+    },
+    {
+        sev: 'medium', msg: 'MITRE ATT&CK: Technique T1059.001 updated with new procedures',
+        detail: {
+            source: 'MITRE ATT&CK v15',
+            description: 'The PowerShell execution technique (T1059.001) has been updated with 4 new procedure examples observed in recent campaigns by FIN7 and Lazarus Group. New sub-techniques include obfuscated Invoke-Expression patterns and AMSI bypass chains. Detection coverage should be reviewed.',
+            mitre: ['T1059.001 — PowerShell', 'T1027 — Obfuscated Files', 'T1562.001 — Disable or Modify Tools'],
+            iocs: ['N/A — Technique update, no direct IOCs'],
+            actions: ['Review PowerShell detection rules', 'Update AMSI bypass signatures', 'Validate logging coverage for ScriptBlock']
+        }
+    },
+    {
+        sev: 'high', msg: 'ThreatFox: AsyncRAT IOC cluster identified - 12 indicators',
+        detail: {
+            source: 'abuse.ch ThreatFox',
+            description: 'A new AsyncRAT campaign cluster has been identified with 12 indicators including 4 C2 IPs, 3 domains, and 5 file hashes. The campaign uses Discord CDN for initial payload delivery and DuckDNS dynamic DNS for C2 resolution. Primary targets appear to be SMB organizations in LATAM.',
+            mitre: ['T1219 — Remote Access Software', 'T1071.001 — Web Protocols', 'T1568.002 — Domain Generation Algorithms'],
+            iocs: ['194.59.31.87:6606', 'asyncupdate.duckdns[.]org', 'cdn.discordapp[.]com/attachments/.../stub.exe', '5 SHA256 hashes'],
+            actions: ['Block DuckDNS at DNS resolver', 'Hunt for AsyncRAT mutexes', 'Check Discord CDN traffic in proxy logs']
+        }
+    },
+    {
+        sev: 'critical', msg: 'CISA KEV: New actively exploited vulnerability added',
+        detail: {
+            source: 'CISA Known Exploited Vulnerabilities',
+            description: 'CVE-2024-21887 (Ivanti Connect Secure command injection, CVSS 9.1) has been added to the KEV catalog. Active exploitation confirmed by multiple threat actors including UNC5221. Chained with CVE-2023-46805 for unauthenticated RCE. Federal agencies must patch by 2024-02-02.',
+            mitre: ['T1190 — Exploit Public-Facing Application', 'T1059 — Command and Scripting Interpreter'],
+            iocs: ['CVE-2024-21887', 'CVE-2023-46805', 'Web shells: GLASSTOKEN, BUSHWALK'],
+            actions: ['Patch Ivanti Connect Secure immediately', 'Run Ivanti integrity checker', 'Hunt for web shell indicators on VPN appliances']
+        }
+    },
+    {
+        sev: 'low', msg: 'NVD: 47 new CVEs published in last 24 hours',
+        detail: {
+            source: 'NIST National Vulnerability Database',
+            description: '47 new CVEs published in the last 24 hours. Breakdown: 3 Critical (CVSS 9.0+), 11 High (7.0-8.9), 18 Medium (4.0-6.9), 15 Low (<4.0). Notable entries include a critical RCE in Apache Struts and a high-severity auth bypass in Fortinet FortiOS.',
+            mitre: ['T1190 — Exploit Public-Facing Application'],
+            iocs: ['CVE-2024-XXXXX (Apache Struts RCE)', 'CVE-2024-XXXXX (FortiOS auth bypass)'],
+            actions: ['Prioritize critical CVEs for patching', 'Cross-reference with asset inventory', 'Update vulnerability scanner signatures']
+        }
+    },
+    {
+        sev: 'high', msg: 'MalwareBazaar: LockBit 3.0 sample submitted - SHA256 tracked',
+        detail: {
+            source: 'abuse.ch MalwareBazaar',
+            description: 'A new LockBit 3.0 ransomware sample has been submitted and confirmed. The sample uses a unique packer not previously seen in LockBit campaigns. Analysis shows it targets both Windows and VMware ESXi environments. The binary performs anti-VM checks and disables Windows Defender before encryption.',
+            mitre: ['T1486 — Data Encrypted for Impact', 'T1490 — Inhibit System Recovery', 'T1562.001 — Disable or Modify Tools'],
+            iocs: ['SHA256: 7f3e8c...a9b2d1 (LockBit 3.0)', 'Mutex: Global\\{8761ABBD-7F85-42EE-B272}', 'Ransom note: !!!-Restore-My-Files-!!!.txt'],
+            actions: ['Update EDR signatures', 'Block hash at email gateway', 'Validate backup integrity and isolation']
+        }
+    },
+    {
+        sev: 'medium', msg: 'Emerging Threats: 23 new Suricata rules published',
+        detail: {
+            source: 'Proofpoint Emerging Threats',
+            description: '23 new Suricata IDS/IPS rules released covering: 8 rules for Cobalt Strike Malleable C2 profiles, 6 rules for SocGholish fake browser update chains, 5 rules for DNS-over-HTTPS abuse, and 4 rules for credential harvesting kits. SID range: 2048901-2048923.',
+            mitre: ['T1071.001 — Web Protocols', 'T1189 — Drive-by Compromise', 'T1572 — Protocol Tunneling'],
+            iocs: ['SID 2048901-2048923', 'Cobalt Strike Malleable C2 JA3 hashes', 'SocGholish staging domains'],
+            actions: ['Deploy rules to Suricata/Snort sensors', 'Test in IDS mode before IPS enforcement', 'Validate no false positives on staging']
+        }
+    },
+    {
+        sev: 'critical', msg: 'FeodoTracker: Qakbot resurgence - 8 new C2 servers',
+        detail: {
+            source: 'abuse.ch FeodoTracker',
+            description: 'Qakbot (QBot) has resurfaced after the August 2023 takedown. 8 new C2 servers identified in the last 6 hours across hosting providers in Russia and Moldova. The new variant uses updated encryption and a modified communication protocol. Initial access via phishing emails with PDF attachments containing embedded URLs.',
+            mitre: ['T1566.001 — Spearphishing Attachment', 'T1071.001 — Web Protocols', 'T1055 — Process Injection'],
+            iocs: ['194.135.33.41:443', '91.215.85.17:2222', '45.63.99.180:443', '5 additional C2 IPs'],
+            actions: ['Block C2 IPs at firewall', 'Hunt for Qakbot registry persistence', 'Alert email security team for PDF lure detection']
+        }
+    },
+    {
+        sev: 'high', msg: 'AlienVault OTX: APT29 pulse updated with new indicators',
+        detail: {
+            source: 'AlienVault Open Threat Exchange',
+            description: 'The APT29 (Cozy Bear / Midnight Blizzard) OTX pulse has been updated with 34 new indicators from their latest campaign targeting diplomatic entities. New TTPs include HTML smuggling for initial access and abuse of Microsoft Graph API for C2 communication. Attribution confidence: HIGH.',
+            mitre: ['T1027.006 — HTML Smuggling', 'T1102.002 — Bidirectional Communication', 'T1078 — Valid Accounts'],
+            iocs: ['34 new indicators (IPs, domains, hashes)', 'Graph API C2 endpoints', 'HTML smuggling dropper hashes'],
+            actions: ['Ingest IOCs into TIP', 'Hunt for Graph API anomalies', 'Review diplomatic sector exposure']
+        }
+    },
+    {
+        sev: 'medium', msg: 'Detection rule updated: Kerberoasting via RC4 TGS',
+        detail: {
+            source: 'Internal Detection Engineering',
+            description: 'Updated detection rule for Kerberoasting attacks requesting RC4-encrypted TGS tickets (encryption type 0x17). The rule now includes exception handling for legacy service accounts and reduces false positives by correlating with abnormal requesting account patterns. Covers tools: Rubeus, Impacket GetUserSPNs, PowerView.',
+            mitre: ['T1558.003 — Kerberoasting', 'T1078.002 — Domain Accounts'],
+            iocs: ['Event ID 4769 with 0x17 encryption', 'Rubeus.exe hash signatures', 'Impacket GetUserSPNs artifacts'],
+            actions: ['Deploy updated rule to SIEM', 'Validate exception list for legacy SPNs', 'Run detection test with Atomic Red Team']
+        }
+    },
+    {
+        sev: 'low', msg: 'Wazuh: 3 new decoders added for FortiGate logs',
+        detail: {
+            source: 'Wazuh Community',
+            description: '3 new Wazuh decoders added for FortiGate NGFW logs: (1) SSL-VPN authentication events including MFA status, (2) IPS signature matches with full context fields, (3) Web filter category blocks with URL and user identity. Decoders normalize fields to Wazuh schema for consistent alerting.',
+            mitre: ['T1133 — External Remote Services', 'T1190 — Exploit Public-Facing Application'],
+            iocs: ['N/A — Log parsing enhancement'],
+            actions: ['Deploy decoders to Wazuh manager', 'Test with sample FortiGate logs', 'Create corresponding alert rules']
+        }
+    },
+    {
+        sev: 'high', msg: 'Sentinel: New fusion detection for multi-stage attack',
+        detail: {
+            source: 'Microsoft Sentinel',
+            description: 'New Fusion detection rule correlates: initial access via compromised OAuth app → mailbox rule creation for email forwarding → suspicious Azure AD sign-in from anonymizing service → SharePoint mass file download. This multi-stage detection identifies sophisticated BEC and data exfiltration campaigns with high fidelity.',
+            mitre: ['T1550.001 — Application Access Token', 'T1114.003 — Email Forwarding Rule', 'T1530 — Data from Cloud Storage'],
+            iocs: ['Fusion incident correlation ID patterns', 'OAuth app client IDs under investigation'],
+            actions: ['Enable Fusion rule in Sentinel', 'Review OAuth app consent policies', 'Audit email forwarding rules org-wide']
+        }
+    },
+    {
+        sev: 'critical', msg: 'Splunk ES: Risk score threshold exceeded for DC01',
+        detail: {
+            source: 'Splunk Enterprise Security',
+            description: 'Domain controller DC01 risk score exceeded threshold (current: 847, threshold: 500). Contributing factors: 12 failed admin logons in 10 min, NTDS.dit access attempt via Volume Shadow Copy, suspicious scheduled task creation pointing to external IP, and LSASS memory dump detected by Sysmon.',
+            mitre: ['T1003.001 — LSASS Memory', 'T1003.003 — NTDS', 'T1053.005 — Scheduled Task', 'T1110.001 — Password Guessing'],
+            iocs: ['DC01 (10.0.1.5)', 'External callback: 203.0.113.42:8443', 'Scheduled task: \\Microsoft\\Windows\\SvcUpdate'],
+            actions: ['Isolate DC01 from network immediately', 'Initiate IR playbook for DC compromise', 'Reset krbtgt password twice', 'Forensic image of DC01']
+        }
+    },
+    {
+        sev: 'medium', msg: 'Chronicle: YARA-L rule matched DNS tunneling pattern',
+        detail: {
+            source: 'Google Chronicle SIEM',
+            description: 'YARA-L detection rule identified DNS tunneling activity from endpoint WS-PC089 (10.0.5.89). The host is making high-frequency DNS TXT queries to a suspicious domain (xf7k2.datacache[.]cloud) with base64-encoded subdomains. Pattern matches known iodine/dnscat2 tunneling signatures. Data exfiltration estimated at ~2.4 MB over 45 minutes.',
+            mitre: ['T1572 — Protocol Tunneling', 'T1048.001 — Exfiltration Over Alternative Protocol', 'T1071.004 — DNS'],
+            iocs: ['xf7k2.datacache[.]cloud', 'WS-PC089 (10.0.5.89)', 'High-frequency DNS TXT queries (>500/hr)'],
+            actions: ['Block domain at DNS resolver', 'Isolate WS-PC089 for investigation', 'Check for dnscat2/iodine artifacts on host']
+        }
+    },
 ];
+
+// ── Feed Detail Modal ──
+function createFeedDetailModal() {
+    if (document.getElementById('feed-detail-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'feed-detail-overlay';
+    overlay.className = 'feed-detail-overlay';
+    overlay.addEventListener('click', closeFeedDetail);
+
+    const modal = document.createElement('div');
+    modal.id = 'feed-detail-modal';
+    modal.className = 'feed-detail-modal';
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+}
+
+function showFeedDetail(item, timestamp) {
+    createFeedDetailModal();
+    const modal = document.getElementById('feed-detail-modal');
+    const overlay = document.getElementById('feed-detail-overlay');
+    const d = item.detail;
+    const sevLabel = item.sev.toUpperCase();
+
+    modal.innerHTML = `
+        <div class="feed-detail-header">
+            <div>
+                <div style="margin-bottom:8px">
+                    <span class="feed-severity ${item.sev}" style="font-size:11px">${sevLabel}</span>
+                    <span style="color:var(--text-muted);font-size:11px;margin-left:8px">${timestamp}</span>
+                </div>
+                <h3>${escapeHTML(item.msg)}</h3>
+            </div>
+            <button class="feed-detail-close" onclick="closeFeedDetail()" title="Close">&times;</button>
+        </div>
+        <div class="feed-detail-body">
+            <div class="feed-detail-row">
+                <span class="feed-detail-label">Source</span>
+                <span class="feed-detail-value"><span class="feed-detail-tag source">${escapeHTML(d.source)}</span></span>
+            </div>
+            <div class="feed-detail-row">
+                <span class="feed-detail-label">Description</span>
+                <span class="feed-detail-value">${escapeHTML(d.description)}</span>
+            </div>
+            <div class="feed-detail-row">
+                <span class="feed-detail-label">MITRE ATT&CK</span>
+                <span class="feed-detail-value">
+                    <div class="feed-detail-tags">${d.mitre.map(t => `<span class="feed-detail-tag mitre">${escapeHTML(t)}</span>`).join('')}</div>
+                </span>
+            </div>
+            <div class="feed-detail-row">
+                <span class="feed-detail-label">IOCs</span>
+                <span class="feed-detail-value">${d.iocs.map(i => `<code>${escapeHTML(i)}</code>`).join('<br>')}</span>
+            </div>
+            <div class="feed-detail-row">
+                <span class="feed-detail-label">Actions</span>
+                <span class="feed-detail-value">
+                    ${d.actions.map((a, i) => `<div style="margin-bottom:4px;color:var(--text-secondary)"><span style="color:var(--cyan);font-weight:700;margin-right:6px">${i + 1}.</span>${escapeHTML(a)}</div>`).join('')}
+                </span>
+            </div>
+        </div>
+        <div class="feed-detail-actions">
+            <button class="primary" onclick="closeFeedDetail()">Acknowledge</button>
+            <button onclick="navigator.clipboard.writeText(JSON.stringify(${escapeHTML(JSON.stringify(d))}, null, 2)); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy IOCs',1500)">Copy IOCs</button>
+            <button onclick="closeFeedDetail()">Dismiss</button>
+        </div>
+    `;
+
+    requestAnimationFrame(() => {
+        overlay.classList.add('active');
+        modal.classList.add('active');
+    });
+}
+
+function closeFeedDetail() {
+    const modal = document.getElementById('feed-detail-modal');
+    const overlay = document.getElementById('feed-detail-overlay');
+    if (modal) modal.classList.remove('active');
+    if (overlay) overlay.classList.remove('active');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeFeedDetail();
+});
 
 function startLiveFeed() {
     const feed = document.getElementById('live-feed');
     let idx = 0;
+
+    // Make existing static feed items clickable with sample details
+    feed.querySelectorAll('.feed-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const msgEl = el.querySelector('.feed-msg');
+            const sevEl = el.querySelector('.feed-severity');
+            const timeEl = el.querySelector('.feed-time');
+            const msg = msgEl ? msgEl.textContent : '';
+            const sevText = sevEl ? sevEl.textContent.trim().toLowerCase() : 'medium';
+            const sevMap = { 'crit': 'critical', 'high': 'high', 'med': 'medium', 'low': 'low', 'info': 'low' };
+            const sev = sevMap[sevText] || 'medium';
+            showFeedDetail({
+                sev: sev,
+                msg: msg,
+                detail: {
+                    source: 'SOC Live Monitoring',
+                    description: msg + ' — This event was detected by the SOC monitoring pipeline and correlated across multiple data sources. Immediate triage recommended based on severity classification.',
+                    mitre: ['See event details for mapped techniques'],
+                    iocs: ['See SIEM for full IOC extraction'],
+                    actions: ['Triage in SIEM console', 'Correlate with related alerts', 'Escalate if confirmed true positive']
+                }
+            }, timeEl ? timeEl.textContent : '');
+        });
+    });
 
     setInterval(() => {
         const item = feedMessages[idx % feedMessages.length];
@@ -374,6 +618,7 @@ function startLiveFeed() {
             <span class="feed-severity ${item.sev}">${item.sev.toUpperCase().substring(0, 4)}</span>
             <span class="feed-msg">${item.msg}</span>
         `;
+        el.addEventListener('click', () => showFeedDetail(item, time));
         feed.insertBefore(el, feed.firstChild);
         if (feed.children.length > 20) feed.removeChild(feed.lastChild);
         idx++;
