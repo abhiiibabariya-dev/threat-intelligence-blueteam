@@ -992,6 +992,11 @@ function loadDetectionGenerator() {
                     style="flex:1;padding:14px 18px;font-size:15px;font-family:var(--font-sans);border:2px solid var(--border);border-radius:var(--radius);background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s"
                     onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                     onkeydown="if(event.key==='Enter')runDetectionGenerator()">
+                <select id="det-gen-mode" onchange="_onModeChange()"
+                    style="padding:14px 14px;font-size:13px;font-family:var(--font-sans);border:2px solid var(--border);border-radius:var(--radius);background:var(--bg-primary);color:var(--text-primary);cursor:pointer;outline:none;min-width:150px">
+                    <option value="full">Full Detection</option>
+                    <option value="siem">SIEM Only</option>
+                </select>
                 <select id="det-gen-platform" onchange="_onPlatformChange()"
                     style="padding:14px 14px;font-size:13px;font-family:var(--font-sans);border:2px solid var(--border);border-radius:var(--radius);background:var(--bg-primary);color:var(--text-primary);cursor:pointer;outline:none;min-width:180px">
                     <option value="ALL">All Platforms</option>
@@ -1029,10 +1034,24 @@ function loadDetectionGenerator() {
     _onPlatformChange();
 }
 
+function _onModeChange() {
+    const m = document.getElementById('det-gen-mode');
+    const badge = document.getElementById('det-platform-badge');
+    if (!m || !badge) return;
+    if (m.value === 'siem') {
+        badge.innerHTML = '<span style="color:var(--cyan);font-weight:700">SIEM ONLY MODE</span> — Focused output: Detection Logic + Splunk SPL + KQL + Investigation + Response (12 sections)';
+    } else {
+        _onPlatformChange();
+    }
+}
+
 function _onPlatformChange() {
     const p = document.getElementById('det-gen-platform');
+    const m = document.getElementById('det-gen-mode');
     const badge = document.getElementById('det-platform-badge');
     if (!p || !badge) return;
+    // If in SIEM mode, don't override the badge
+    if (m && m.value === 'siem') { _onModeChange(); return; }
     if (p.value === 'CrowdStrike') {
         badge.innerHTML = '<span style="color:var(--orange);font-weight:600">CROWDSTRIKE MODE</span> — Output will include IOA, IOC, Prevention Policy, RTR Response';
     } else if (p.value === 'ALL') {
@@ -1053,10 +1072,12 @@ function _runDemo() {
 function runDetectionGenerator() {
     const input = document.getElementById('det-gen-input');
     const platformSelect = document.getElementById('det-gen-platform');
+    const modeSelect = document.getElementById('det-gen-mode');
     const btn = document.getElementById('det-gen-btn');
     const output = document.getElementById('det-gen-output');
     const ruleName = input.value.trim();
     const platformFocus = platformSelect.value;
+    const mode = modeSelect ? modeSelect.value : 'full';
 
     if (!ruleName) {
         input.style.borderColor = 'var(--red)';
@@ -1067,11 +1088,12 @@ function runDetectionGenerator() {
     btn.textContent = 'GENERATING...';
     btn.style.opacity = '0.6';
     btn.disabled = true;
+    const modeLabel = mode === 'siem' ? 'SIEM Only' : 'Full Detection';
     output.innerHTML = `
     <div style="text-align:center;padding:60px 20px">
         <div style="display:inline-block;width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:detspin 0.8s linear infinite"></div>
         <p style="margin-top:16px;font-size:14px;color:var(--text-secondary)">Generating detection for: <strong style="color:var(--text-primary)">${_esc(ruleName)}</strong></p>
-        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Platform: ${_esc(platformFocus)} | Analyzing attack patterns...</p>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Mode: ${modeLabel} | Platform: ${_esc(platformFocus)} | Analyzing attack patterns...</p>
     </div>
     <style>@keyframes detspin{to{transform:rotate(360deg)}}</style>`;
 
@@ -1084,21 +1106,214 @@ function runDetectionGenerator() {
             result = generateDetectionRule(ruleName);
         }
         result.platformFocus = platformFocus;
-        renderDetectionOutput(result);
+        result.mode = mode;
+        if (mode === 'siem') {
+            renderSiemOutput(result);
+        } else {
+            renderDetectionOutput(result);
+        }
         btn.textContent = 'GENERATE DETECTION';
         btn.style.opacity = '1';
         btn.disabled = false;
     }).catch(() => {
         const result = generateDetectionRule(ruleName);
         result.platformFocus = platformFocus;
-        renderDetectionOutput(result);
+        result.mode = mode;
+        if (mode === 'siem') {
+            renderSiemOutput(result);
+        } else {
+            renderDetectionOutput(result);
+        }
         btn.textContent = 'GENERATE DETECTION';
         btn.style.opacity = '1';
         btn.disabled = false;
     });
 }
 
-// ── Tabbed Card Output Renderer ────────────────────────────────────────
+// ── SIEM-Only Card Renderer ───────────────────────────────────────────
+
+function renderSiemOutput(result) {
+    const output = document.getElementById('det-gen-output');
+    const t = result.template;
+    const mitre = result.mitre;
+
+    const severityColors = { 'Critical': 'var(--red)', 'High': 'var(--orange)', 'Medium': 'var(--yellow)', 'Low': 'var(--green)' };
+    const severityBg = { 'Critical': 'var(--red-dim)', 'High': 'var(--orange-dim)', 'Medium': 'var(--yellow-dim)', 'Low': 'var(--green-dim)' };
+    const cardStyle = `background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)`;
+    const headStyle = `font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px`;
+    const subStyle = `font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:16px 0 8px`;
+
+    output.innerHTML = `
+    <!-- SIEM Mode Header -->
+    <div style="${cardStyle};position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--cyan))"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+            <div style="flex:1;min-width:300px">
+                <div style="font-size:10px;font-weight:700;color:var(--cyan);letter-spacing:1.5px;margin-bottom:6px">SIEM DETECTION RULE</div>
+                <div style="font-size:20px;font-weight:800;color:var(--text-primary);line-height:1.3">${_esc(result.ruleName)}</div>
+                <p style="font-size:12px;color:var(--text-secondary);margin-top:8px;line-height:1.6">
+                    Detection of <strong>${_esc(result.ruleName)}</strong> via correlated log analysis across authentication events, process execution, and network signals. Designed for production SOC deployment.
+                </p>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+                <div style="text-align:center;padding:10px 18px;background:${severityBg[t.severity]};border:1px solid ${severityColors[t.severity]};border-radius:var(--radius)">
+                    <div style="font-size:18px;font-weight:800;color:${severityColors[t.severity]}">${t.severity.toUpperCase()}</div>
+                    <div style="font-size:9px;color:var(--text-dim);margin-top:2px;letter-spacing:1px">SEVERITY</div>
+                </div>
+                <div style="text-align:center;padding:10px 18px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius)">
+                    <div style="font-size:18px;font-weight:800;color:var(--accent)">${t.thresholds.events}</div>
+                    <div style="font-size:9px;color:var(--text-dim);margin-top:2px;letter-spacing:1px">EVENTS</div>
+                </div>
+                <div style="text-align:center;padding:10px 18px;background:var(--cyan-dim);border:1px solid var(--cyan);border-radius:var(--radius)">
+                    <div style="font-size:14px;font-weight:800;color:var(--cyan)">${t.thresholds.window}</div>
+                    <div style="font-size:9px;color:var(--text-dim);margin-top:2px;letter-spacing:1px">WINDOW</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIEM Cards Grid: 2 columns -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Card: MITRE ATT&CK -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--purple)"><span>&#127919;</span> MITRE ATT&CK</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                ${mitre.map(m => `
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:var(--radius)">
+                    <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent);min-width:85px">${m.id}</span>
+                    <span style="font-size:13px;color:var(--text-primary);flex:1">${m.name}</span>
+                    <span style="padding:2px 10px;font-size:10px;font-weight:600;border-radius:20px;background:var(--purple-dim);color:var(--purple)">${m.tactic}</span>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Card: Log Sources -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--accent)"><span>&#128203;</span> Log Sources Required</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <tr style="background:var(--bg-tertiary)">
+                    <th style="text-align:left;padding:8px 10px;border:1px solid var(--border);font-weight:600">Source</th>
+                    <th style="text-align:left;padding:8px 10px;border:1px solid var(--border);font-weight:600">Event ID</th>
+                    <th style="text-align:left;padding:8px 10px;border:1px solid var(--border);font-weight:600">Purpose</th>
+                </tr>
+                ${t.logSources.map(l => `
+                <tr>
+                    <td style="padding:8px 10px;border:1px solid var(--border);font-weight:500">${l.source}</td>
+                    <td style="padding:8px 10px;border:1px solid var(--border);font-family:var(--font-mono);color:var(--accent)">${l.eventId}</td>
+                    <td style="padding:8px 10px;border:1px solid var(--border);color:var(--text-secondary);font-size:11px">${l.purpose}</td>
+                </tr>`).join('')}
+            </table>
+        </div>
+    </div>
+
+    <!-- Card: Detection Logic -->
+    <div style="${cardStyle}">
+        <div style="${headStyle};color:var(--cyan)"><span>&#128269;</span> Detection Logic</div>
+        <div style="${subStyle}">Correlation Steps</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+            <div style="padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);line-height:1.6">
+                <strong style="color:var(--text-primary)">Stage 1:</strong> Identify initial event matching rule criteria from primary log source
+            </div>
+            <div style="padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);line-height:1.6">
+                <strong style="color:var(--text-primary)">Stage 2:</strong> Correlate with secondary events on same host/user within detection window
+            </div>
+            <div style="padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);line-height:1.6">
+                <strong style="color:var(--text-primary)">Stage 3:</strong> Apply threshold conditions and generate alert with enrichment data
+            </div>
+        </div>
+        <div style="padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-dim)">
+            <strong style="color:var(--text-secondary)">Threshold:</strong> ${t.thresholds.events} event(s) within ${t.thresholds.window} &nbsp;|&nbsp; <strong style="color:var(--text-secondary)">Note:</strong> ${_esc(t.thresholds.note)}
+        </div>
+    </div>
+
+    <!-- Card: Splunk SPL -->
+    <div style="${cardStyle}">
+        <div style="${headStyle};color:var(--green)"><span>&#128202;</span> Splunk SPL Query</div>
+        ${_codeBlock(t.splunk, 'spl')}
+    </div>
+
+    <!-- Card: Sentinel KQL -->
+    <div style="${cardStyle}">
+        <div style="${headStyle};color:var(--accent)"><span>&#9729;&#65039;</span> Microsoft Sentinel KQL</div>
+        ${_codeBlock(t.kql, 'kql')}
+    </div>
+
+    <!-- 2-column grid: Investigation + Response -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Card: Investigation Steps -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--orange)"><span>&#128270;</span> Investigation Steps</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+                ${t.investigationSteps.map((step, i) => `
+                <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;${i % 2 === 0 ? 'background:var(--bg-primary);' : ''}border-radius:var(--radius)">
+                    <span style="width:22px;height:22px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0">${i + 1}</span>
+                    <span style="font-size:12px;color:var(--text-secondary);line-height:1.5">${_esc(step)}</span>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Card: Response Actions -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--red)"><span>&#128680;</span> Response Actions</div>
+            <div style="${subStyle}">SOAR Trigger</div>
+            <div style="padding:8px 14px;background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:var(--radius);font-size:12px;color:var(--text-primary);margin-bottom:12px">${_esc(t.soarTrigger)}</div>
+            <div style="${subStyle}">Automated Actions</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+                ${t.soarActions.map((a, i) => {
+                    const [action, ...rest] = a.split(': ');
+                    const detail = rest.join(': ');
+                    const colors = ['var(--cyan)', 'var(--accent)', 'var(--red)', 'var(--orange)', 'var(--purple)', 'var(--green)'];
+                    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)">
+                        <span style="font-size:10px;font-weight:700;color:${colors[i % colors.length]};min-width:60px;text-transform:uppercase">${_esc(action)}</span>
+                        <span style="font-size:12px;color:var(--text-secondary)">${_esc(detail)}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-column grid: False Positives + Tuning -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Card: False Positives -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--yellow)"><span>&#9888;&#65039;</span> False Positives</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+                ${t.falsePositives.map(fp => `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)">
+                    <span style="color:var(--yellow);font-weight:bold;flex-shrink:0">!</span>
+                    <span style="font-size:12px;color:var(--text-secondary)">${_esc(fp)}</span>
+                </div>`).join('')}
+            </div>
+        </div>
+
+        <!-- Card: Tuning -->
+        <div style="${cardStyle}">
+            <div style="${headStyle};color:var(--green)"><span>&#128295;</span> Tuning Recommendations</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+                ${t.tuning.map(tune => `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)">
+                    <span style="color:var(--green);font-weight:bold;flex-shrink:0">&#10003;</span>
+                    <span style="font-size:12px;color:var(--text-secondary)">${_esc(tune)}</span>
+                </div>`).join('')}
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Bar -->
+    <div style="display:flex;gap:10px;margin-bottom:40px">
+        <button onclick="_exportDetectionJSON('${_esc(result.ruleName).replace(/'/g, "\\'")}')" class="btn-hack" style="padding:10px 20px">Export JSON</button>
+        <button onclick="_copyFullDetection()" class="btn-hack" style="padding:10px 20px">Copy All</button>
+        <button onclick="window.print()" class="btn-hack" style="padding:10px 20px">Print / PDF</button>
+    </div>
+    `;
+
+    output.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Tabbed Card Output Renderer (Full Mode) ──────────────────────────
 
 function renderDetectionOutput(result) {
     const output = document.getElementById('det-gen-output');
@@ -1487,17 +1702,17 @@ function _copyFullDetection() {
 async function generateDetectionViaAPI(ruleName) {
     const context = getDetectionContext(ruleName);
     const platformFocus = document.getElementById('det-gen-platform')?.value || 'ALL';
+    const mode = document.getElementById('det-gen-mode')?.value || 'full';
 
     // Build the prompt using master template ({{RULE_NAME}} + {{CONTEXT_DATA}} replacement)
     const prompt = buildDetectionPrompt(ruleName, platformFocus);
-    console.log('[BlueShell] Prompt built for:', ruleName, '| Platform:', platformFocus);
-    console.log('[BlueShell] Context injected:', context.substring(0, 100) + '...');
+    console.log('[BlueShell] Prompt built for:', ruleName, '| Mode:', mode, '| Platform:', platformFocus);
 
     try {
         const response = await fetch('/api/generate-detection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ruleName, context, platformFocus })
+            body: JSON.stringify({ ruleName, context, platformFocus, mode })
         });
         if (!response.ok) return null;
         return await response.json();
