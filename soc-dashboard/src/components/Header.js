@@ -4,13 +4,19 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="header-title">AI SOC Detection &amp; Response Platform</h1>
-        <span className="header-sub">Real-time threat monitoring &amp; automated response</span>
+        <div className="header-logo">
+          <span className="logo-glyph">◈</span>
+          <h1 className="header-title">AI SOC Detection &amp; Response Platform</h1>
+        </div>
       </div>
       <div className="header-right">
-        <div className="risk-badge">
-          <span className="risk-label">RISK SCORE</span>
-          <span className="risk-value critical">87</span>
+        <div className="header-badge risk-badge">
+          <span className="badge-label">RISK SCORE</span>
+          <span className="badge-value risk-critical">91%</span>
+        </div>
+        <div className="header-badge threat-badge">
+          <span className="badge-label">THREAT LEVEL</span>
+          <span className="badge-value threat-critical">CRITICAL</span>
         </div>
         <button className="btn-demo">TRY DEMO</button>
       </div>
