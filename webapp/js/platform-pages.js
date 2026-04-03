@@ -2284,25 +2284,122 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">ALERT TRIAGE FRAMEWORK</h1>
     <span class="card-tag" style="position:static">BLUE TEAM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Standardized alert triage methodology for SOC analysts. Severity matrix, decision trees, FP catalog, enrichment sources, and escalation procedures.</p>
 
 <div class="pg-section">
     <div class="pg-section-title">5-MINUTE TRIAGE METHODOLOGY</div>
-    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>CONTEXT (30s):</strong> What rule fired? What MITRE technique? What's the severity? Has this alert fired before?</div></div>
-    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>SOURCE (60s):</strong> What host/user triggered it? Is this a critical asset or VIP? What's the asset's risk profile?</div></div>
-    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>EVIDENCE (90s):</strong> Look at the raw log. Does the evidence match the rule logic? Check for obvious false positives (admin activity, known tool, scheduled task).</div></div>
-    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>ENRICHMENT (60s):</strong> Check IOC reputation (VirusTotal, AbuseIPDB). Check user's recent activity. Check if there are related alerts.</div></div>
-    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>DECISION (60s):</strong> True Positive → Escalate to Incident. False Positive → Tune rule. Benign True Positive → Document exception.</div></div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>CONTEXT (30s):</strong> What rule fired? What MITRE technique? Severity? Has this alert fired before? Check the rule description and FP notes.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>SOURCE (60s):</strong> What host/user triggered it? Is this a critical asset (DC, finance server) or VIP? Check asset inventory and user role.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>EVIDENCE (90s):</strong> Look at raw logs. Does evidence match rule logic? Check for obvious FPs: admin activity, known tools, scheduled maintenance windows.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>ENRICHMENT (60s):</strong> Check IOC reputation (VirusTotal, AbuseIPDB, GreyNoise). Check user's recent activity timeline. Look for related alerts on same host/user.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>DECISION (60s):</strong> <strong>True Positive</strong> → Escalate to Incident, contain. <strong>False Positive</strong> → Document, tune rule. <strong>Benign True Positive</strong> → Add exception, document.</div></div>
 </div>
 
 <div class="pg-section">
-    <div class="pg-section-title">SEVERITY MATRIX</div>
+    <div class="pg-section-title">TRIAGE DECISION TREE</div>
+    <div class="pg-ascii-art"><pre>
+                            ┌─────────────┐
+                            │  NEW ALERT  │
+                            └──────┬──────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │  Known FP pattern?   │
+                        └──┬───────────────┬───┘
+                       YES │               │ NO
+                           ▼               ▼
+                    ┌────────────┐  ┌──────────────────┐
+                    │ Auto-close │  │ Check IOC repos   │
+                    │ + Log      │  │ (VT, AbuseIPDB)   │
+                    └────────────┘  └──────┬───────────┘
+                                           ▼
+                                ┌─────────────────────┐
+                                │  Malicious IOC?      │
+                                └──┬───────────────┬───┘
+                               YES │               │ NO
+                                   ▼               ▼
+                          ┌──────────────┐  ┌──────────────────┐
+                          │ ESCALATE     │  │ Check user/host   │
+                          │ → Incident   │  │ context & history │
+                          │ → Contain    │  └──────┬───────────┘
+                          └──────────────┘         ▼
+                                         ┌─────────────────────┐
+                                         │ Suspicious behavior? │
+                                         └──┬───────────────┬───┘
+                                        YES │               │ NO
+                                            ▼               ▼
+                                   ┌──────────────┐  ┌────────────┐
+                                   │ Investigate   │  │ Close as   │
+                                   │ deeper (L2)   │  │ Benign TP  │
+                                   └──────────────┘  └────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SEVERITY MATRIX & SLA</div>
     <table class="pg-table">
-        <tr><th>Severity</th><th>Response SLA</th><th>Examples</th><th>Action</th></tr>
-        <tr><td><span class="pg-badge pg-badge-red">Critical</span></td><td>15 minutes</td><td>Active ransomware, confirmed breach, C2 callback</td><td>Immediate containment, page on-call, war room</td></tr>
-        <tr><td><span class="pg-badge pg-badge-orange">High</span></td><td>1 hour</td><td>Credential theft, lateral movement, data exfil attempt</td><td>Investigate + contain within SLA, notify management</td></tr>
-        <tr><td><span class="pg-badge pg-badge-blue">Medium</span></td><td>4 hours</td><td>Suspicious process, policy violation, recon activity</td><td>Investigate during shift, triage and assign</td></tr>
-        <tr><td><span class="pg-badge pg-badge-green">Low</span></td><td>24 hours</td><td>Info-level alerts, compliance checks, scan activity</td><td>Batch review, auto-close if benign pattern</td></tr>
+        <tr><th>Severity</th><th>Response SLA</th><th>Resolution SLA</th><th>Examples</th><th>Action</th></tr>
+        <tr><td><span class="pg-badge pg-badge-red">P1 Critical</span></td><td>15 min</td><td>4 hours</td><td>Active ransomware, confirmed breach, C2 callback, data exfil in progress</td><td>Page on-call, war room, immediate containment, exec notification</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">P2 High</span></td><td>1 hour</td><td>24 hours</td><td>Credential theft, lateral movement, privilege escalation, suspicious admin activity</td><td>Investigate + contain within SLA, notify SOC lead</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">P3 Medium</span></td><td>4 hours</td><td>72 hours</td><td>Suspicious process, policy violation, recon activity, failed exploit attempt</td><td>Investigate during shift, assign to analyst, triage and track</td></tr>
+        <tr><td><span class="pg-badge pg-badge-green">P4 Low</span></td><td>24 hours</td><td>1 week</td><td>Info-level alerts, compliance scans, port scans from known scanners</td><td>Batch review end of shift, auto-close if matches known benign pattern</td></tr>
     </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">COMMON FALSE POSITIVE CATALOG</div>
+    <table class="pg-table">
+        <tr><th>Alert Type</th><th>FP Cause</th><th>Resolution</th></tr>
+        <tr><td>PowerShell encoded command</td><td>SCCM/Intune deploying software packages</td><td>Exclude parent process sccm-agent.exe or msiexec.exe</td></tr>
+        <tr><td>LSASS access</td><td>Antivirus scanning LSASS for protection</td><td>Exclude AV process (MsMpEng.exe, SentinelAgent.exe)</td></tr>
+        <tr><td>Multiple failed logins</td><td>Service account with expired password</td><td>Alert service account owner, exclude after remediation</td></tr>
+        <tr><td>Lateral movement (RDP)</td><td>IT helpdesk using remote support tools</td><td>Exclude helpdesk user group + approved RDP sources</td></tr>
+        <tr><td>Suspicious service install</td><td>Patch management installing updates</td><td>Exclude WSUS/SCCM during maintenance windows</td></tr>
+        <tr><td>Mass file modification</td><td>Backup agent scanning/indexing files</td><td>Exclude backup agent process by path + signer</td></tr>
+        <tr><td>Port scan detection</td><td>Vulnerability scanner (Nessus, Qualys)</td><td>Exclude scanner IP addresses in firewall rules</td></tr>
+        <tr><td>LOLBin execution</td><td>Developer build tools using certutil, msbuild</td><td>Exclude dev machine group + specific tool combinations</td></tr>
+        <tr><td>VPN from unusual location</td><td>Employee traveling for business</td><td>Cross-reference with HR travel calendar, add temp exception</td></tr>
+        <tr><td>Service account high activity</td><td>Batch jobs during business processing</td><td>Baseline normal activity, alert only on deviation from baseline</td></tr>
+        <tr><td>New scheduled task</td><td>Software auto-update mechanisms</td><td>Exclude known updater paths (Chrome, Adobe, Java)</td></tr>
+        <tr><td>DNS long queries</td><td>CDN domains with long subdomains (Akamai, Cloudflare)</td><td>Whitelist known CDN base domains</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">IOC ENRICHMENT SOURCES</div>
+    <table class="pg-table">
+        <tr><th>Source</th><th>IOC Types</th><th>Free Tier</th><th>Best For</th></tr>
+        <tr><td>VirusTotal</td><td>Hash, IP, Domain, URL</td><td>500 req/day</td><td>Multi-engine AV scan, community reputation</td></tr>
+        <tr><td>AbuseIPDB</td><td>IP</td><td>1000 req/day</td><td>IP abuse reports, confidence score</td></tr>
+        <tr><td>GreyNoise</td><td>IP</td><td>50 req/day</td><td>Is this IP scanning everyone or just me?</td></tr>
+        <tr><td>Shodan</td><td>IP</td><td>Limited</td><td>Open ports, services, vulnerabilities on IPs</td></tr>
+        <tr><td>URLScan.io</td><td>URL, Domain</td><td>Unlimited public</td><td>Safe URL detonation, screenshot, DOM analysis</td></tr>
+        <tr><td>WHOIS</td><td>Domain, IP</td><td>Free</td><td>Domain registration age, registrant info</td></tr>
+        <tr><td>OTX (AlienVault)</td><td>All</td><td>Free</td><td>Community threat intel pulses</td></tr>
+        <tr><td>MISP</td><td>All</td><td>Self-hosted</td><td>Threat sharing community, IOC correlation</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ESCALATION CRITERIA</div>
+    <table class="pg-table">
+        <tr><th>From</th><th>To</th><th>When</th></tr>
+        <tr><td>L1 Analyst</td><td>L2 Analyst</td><td>After 15 min investigation if: confirmed malicious IOC, unable to determine scope, multiple related alerts, requires EDR deep-dive</td></tr>
+        <tr><td>L2 Analyst</td><td>L3 / Threat Hunter</td><td>Confirmed incident requiring: forensic analysis, advanced threat hunting, malware reverse engineering, or active attacker in environment</td></tr>
+        <tr><td>L3 Analyst</td><td>CIRT / Management</td><td>Active breach, data exfiltration confirmed, ransomware deployment, regulatory notification required, media/PR involvement</td></tr>
+        <tr><td>Any Level</td><td>Legal / Privacy</td><td>PII/PHI exposed, breach notification may be required, law enforcement involvement needed</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>5-Minute Rule</h4><p>If you can't determine TP/FP within 5 minutes, escalate to L2. Don't spend 30 minutes on one alert while 50 others wait. Fast triage, then deep-dive.</p></div>
+        <div class="pg-info-card"><h4>Document Every Decision</h4><p>Whether TP, FP, or BTP — document why. This builds the FP catalog, trains new analysts, and provides audit trail for compliance.</p></div>
+        <div class="pg-info-card"><h4>Automate Enrichment</h4><p>Use SOAR to auto-enrich every alert with VirusTotal, AbuseIPDB, and asset inventory before it reaches an analyst. Save 2-3 minutes per alert.</p></div>
+        <div class="pg-info-card"><h4>FP Feedback Loop</h4><p>Track FP rates per rule weekly. Rules with >30% FP rate get tuned. Rules with >50% FP rate get disabled and rewritten. This is non-negotiable.</p></div>
+        <div class="pg-info-card"><h4>Analyst Capacity Planning</h4><p>One L1 analyst can triage 50-80 alerts per 8-hour shift. If volume exceeds capacity, you need more analysts OR better automation — not longer hours.</p></div>
+        <div class="pg-info-card"><h4>Warm Handoffs</h4><p>When escalating, provide: alert ID, what you checked, what you found, what you suspect, what you need the next tier to do. Never escalate a raw alert.</p></div>
+    </div>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -2484,22 +2581,97 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">SOC RUNBOOKS</h1>
     <span class="card-tag" style="position:static">BLUE TEAM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Step-by-step operational procedures for L1/L2/L3 SOC analysts. Shift operations, tool runbooks, handoff templates, and KPI tracking.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">DAILY SOC OPERATIONS</div>
+    <div class="pg-section-title">L1 ANALYST — DAILY SHIFT RUNBOOK</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Shift start (15 min):</strong> Read handoff notes from previous shift. Check pending incident queue. Note any ongoing P1/P2 incidents.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Health check (10 min):</strong> Verify SIEM data ingestion (all sources green). Check EDR sensor health (>99% online). Review overnight critical alerts.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Alert queue (ongoing):</strong> Process alerts using 5-minute triage methodology. Target: 8-10 alerts per hour. Document every decision (TP/FP/BTP).</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Escalate when needed:</strong> 15-min rule — if you can't determine verdict in 15 min, escalate to L2 with context notes. Never sit on a suspicious alert.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Hourly check-in:</strong> Update SOC Slack/Teams channel with status: alerts processed, incidents opened, any blocked issues.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Shift end (15 min):</strong> Complete shift handoff document. List: open incidents, pending investigations, any anomalies noted, FP patterns found.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">L2 ANALYST — INVESTIGATION RUNBOOK</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Receive escalation:</strong> Read L1 notes. Understand what was checked, what was found, what needs deeper analysis.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Deep investigation:</strong> Pivot in SIEM — check 24h of activity for the affected user/host. Build timeline. Check EDR process tree. Look for related IOCs.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Scope assessment:</strong> Is this isolated or widespread? Query all endpoints for same IOCs. Check if other users/hosts are affected.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Containment decision:</strong> If confirmed malicious — contain immediately (isolate host, disable account, block IOCs). Don't wait for full investigation.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Document & report:</strong> Create incident report with timeline, affected assets, IOCs, MITRE techniques, actions taken, recommendations.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">L3 / THREAT HUNTER RUNBOOK</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Receive complex incidents:</strong> Review L2 investigation. Identify gaps. Plan advanced analysis (forensics, malware analysis, threat intel correlation).</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Advanced analysis:</strong> Memory forensics (Volatility), disk forensics (Autopsy/FTK), malware RE (Any.Run/Ghidra), network forensics (Wireshark/Zeek).</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Proactive hunting (20% time):</strong> Run 2-3 threat hunts per week using hypothesis-driven playbooks. Focus on current threat landscape for your industry.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Detection improvement:</strong> Convert hunt findings into new detection rules. Review and tune existing rules. Mentor L1/L2 analysts on investigation techniques.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TOOL-SPECIFIC QUICK REFERENCE</div>
+    <table class="pg-table">
+        <tr><th>Tool</th><th>Common L1 Tasks</th><th>Quick Commands</th></tr>
+        <tr><td>Splunk</td><td>Search alerts, check notable events, view dashboards</td><td><code>index=notable | stats count by rule_name, urgency</code></td></tr>
+        <tr><td>Sentinel</td><td>View incidents, run KQL, check analytics rules</td><td><code>SecurityIncident | where Status == "New" | sort by TimeGenerated</code></td></tr>
+        <tr><td>CrowdStrike</td><td>Check detections, run RTR, contain host</td><td>Detections > Filter by severity > Investigate > RTR</td></tr>
+        <tr><td>SentinelOne</td><td>View threats, check Storyline, initiate rollback</td><td>Threats > Filter Active > View Storyline > Mitigate</td></tr>
+        <tr><td>VirusTotal</td><td>Hash/IP/domain lookup</td><td>Paste IOC in search bar, check Detection tab</td></tr>
+        <tr><td>AbuseIPDB</td><td>IP reputation check</td><td>Check confidence score >50% = likely malicious</td></tr>
+        <tr><td>ServiceNow</td><td>Create/update incidents, assign tickets</td><td>New Incident > Set severity > Assign > Add notes</td></tr>
+        <tr><td>Slack/Teams</td><td>Alert notifications, status updates</td><td>#soc-alerts for alerts, #soc-incidents for active IR</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SHIFT HANDOFF TEMPLATE</div>
+    ${pgCode(`SHIFT HANDOFF — [DATE] [SHIFT: Day/Night]
+Analyst: [Name]
+
+OPEN INCIDENTS:
+- INC-001: [Brief description] — Status: [Investigating/Contained] — Owner: [Name]
+- INC-002: [Brief description] — Status: [Pending response] — Owner: [Name]
+
+ALERTS PROCESSED: [X] total | [Y] TP | [Z] FP | [W] escalated
+
+NOTABLE ITEMS:
+- [Any unusual patterns, new FP patterns, tool issues]
+- [Any pending actions for next shift]
+
+DATA SOURCE ISSUES:
+- [Any ingestion gaps or SIEM performance issues]
+
+HANDOFF TO: [Next analyst name]`, 'text')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SOC KPIs & METRICS</div>
+    <table class="pg-table">
+        <tr><th>KPI</th><th>Target</th><th>Measurement</th><th>Frequency</th></tr>
+        <tr><td>MTTD (Mean Time to Detect)</td><td>&lt;5 minutes</td><td>Alert timestamp vs event timestamp</td><td>Weekly</td></tr>
+        <tr><td>MTTR (Mean Time to Respond)</td><td>&lt;30 minutes</td><td>Alert timestamp vs first containment action</td><td>Weekly</td></tr>
+        <tr><td>MTTC (Mean Time to Contain)</td><td>&lt;4 hours (P1)</td><td>Detection to full containment</td><td>Per incident</td></tr>
+        <tr><td>False Positive Rate</td><td>&lt;30%</td><td>FP alerts / total alerts</td><td>Weekly</td></tr>
+        <tr><td>Alert-to-Incident Ratio</td><td>100:1</td><td>Total alerts / confirmed incidents</td><td>Monthly</td></tr>
+        <tr><td>Analyst Alerts/Day</td><td>50-80</td><td>Alerts processed per analyst per shift</td><td>Daily</td></tr>
+        <tr><td>SLA Compliance</td><td>>95%</td><td>Incidents responded within SLA / total incidents</td><td>Monthly</td></tr>
+        <tr><td>Detection Coverage</td><td>>60% MITRE</td><td>Techniques with active detections / total techniques</td><td>Quarterly</td></tr>
+        <tr><td>Sensor Health</td><td>>99%</td><td>Online sensors / total sensors</td><td>Daily</td></tr>
+        <tr><td>Threat Hunts Conducted</td><td>8-12/month</td><td>Completed hunt reports per month</td><td>Monthly</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Shift Start Checklist</h4>
-            <ul><li>Review shift handoff notes</li><li>Check pending incidents queue</li><li>Verify all data sources are ingesting</li><li>Check SIEM health dashboards</li><li>Review overnight critical alerts</li><li>Update SOC channel status</li></ul>
-        </div>
-        <div class="pg-info-card"><h4>Escalation Procedures</h4>
-            <ul><li>L1 → L2: After 15 min investigation, if complex</li><li>L2 → L3: Confirmed incident requiring forensics</li><li>L3 → CIRT: Active breach, executive involvement</li><li>Any level → Management: Data breach, ransomware, media</li></ul>
-        </div>
-        <div class="pg-info-card"><h4>Communication Templates</h4>
-            <ul><li>Initial alert notification (Slack/Teams)</li><li>Incident status update (every 30 min for critical)</li><li>Executive summary (non-technical)</li><li>All-clear notification</li><li>Post-incident report template</li></ul>
-        </div>
-        <div class="pg-info-card"><h4>KPI Tracking</h4>
-            <ul><li>MTTD (Mean Time to Detect) target: &lt;5 min</li><li>MTTR (Mean Time to Respond) target: &lt;30 min</li><li>False Positive Rate target: &lt;30%</li><li>Alert-to-Incident ratio</li><li>Analyst alerts/day capacity: 50-80</li></ul>
-        </div>
+        <div class="pg-info-card"><h4>Runbook-Driven Operations</h4><p>Every repeatable task gets a runbook. New analyst should be able to perform 80% of L1 tasks by following runbooks on day 1.</p></div>
+        <div class="pg-info-card"><h4>Shift Handoffs are Sacred</h4><p>15 minutes minimum for handoff. Written + verbal. Missing a handoff means missing an active incident. Never skip handoffs.</p></div>
+        <div class="pg-info-card"><h4>Continuous Training</h4><p>Weekly team training sessions. Monthly tabletop exercises. Quarterly purple team exercises. Annual certification renewals.</p></div>
+        <div class="pg-info-card"><h4>Metrics-Driven Improvement</h4><p>Track KPIs weekly. Review in monthly SOC meeting. If MTTR increases — investigate why. If FP rate spikes — prioritize tuning sprint.</p></div>
+        <div class="pg-info-card"><h4>Tool Proficiency Matrix</h4><p>Track which analysts are proficient in which tools. Cross-train to avoid single points of failure. Every shift should have Splunk + EDR proficiency.</p></div>
+        <div class="pg-info-card"><h4>Blameless Culture</h4><p>Missed detections and FP floods are process problems, not people problems. Post-incident reviews improve processes. Blame improves nothing.</p></div>
     </div>
 </div>
 
