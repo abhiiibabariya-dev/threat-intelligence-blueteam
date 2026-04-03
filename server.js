@@ -413,6 +413,167 @@ server.on('request', (req, res) => {
         return;
     }
 
+    // ── AI Detection Generator API ──────────────────────────
+    if (req.url === '/api/generate-detection' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+            try {
+                const { ruleName, context, platformFocus } = JSON.parse(body);
+                if (!ruleName) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'ruleName is required' }));
+                    return;
+                }
+
+                // Platform-specific context injection
+                function getPlatformContext(platform) {
+                    switch (platform) {
+                        case 'CrowdStrike':
+                            return `Focus more on: CrowdStrike Falcon
+- Generate CrowdStrike-specific IOA (Indicator of Attack) behavioral rules
+- Include CrowdStrike IOC (hash, IP, domain) blocklist entries
+- Include CrowdStrike Falcon prevention policy recommendations
+- Use CrowdStrike RTR (Real Time Response) commands for containment
+- Reference CrowdStrike Event Search queries (Falcon LQL)
+- Map to CrowdStrike Falcon detection categories
+- Include Falcon SOAR (Fusion workflows) automation steps`;
+                        case 'Splunk':
+                            return `Focus more on: Splunk Enterprise Security
+- Prioritize SPL (Search Processing Language) queries
+- Include Splunk ES Notable Event creation
+- Include Splunk Adaptive Response actions
+- Reference Splunk CIM (Common Information Model) field names
+- Include Risk-Based Alerting (RBA) risk score assignments
+- Map to Splunk ES MITRE ATT&CK framework app`;
+                        case 'Microsoft Sentinel':
+                            return `Focus more on: Microsoft Sentinel
+- Prioritize KQL (Kusto Query Language) analytics rules
+- Include Sentinel Analytic Rule YAML format
+- Include Logic App / Automation Rules for SOAR
+- Reference Microsoft Defender XDR tables (DeviceProcessEvents, etc.)
+- Include Sentinel Workbook visualizations
+- Map to Sentinel MITRE ATT&CK blade`;
+                        case 'Elastic SIEM':
+                            return `Focus more on: Elastic Security
+- Prioritize EQL (Event Query Language) and KQL queries
+- Include Elastic Detection Rule TOML format
+- Include Elastic Agent Fleet integration
+- Reference ECS (Elastic Common Schema) field names
+- Include Machine Learning anomaly detection jobs`;
+                        case 'Palo Alto Cortex XDR':
+                            return `Focus more on: Palo Alto Cortex XDR
+- Prioritize XQL (XDR Query Language) queries
+- Include BIOC (Behavioral IOC) rule definitions
+- Include Cortex XSOAR playbook automation
+- Reference Cortex XDR Analytics alert categories
+- Map to Cortex XDR MITRE ATT&CK module`;
+                        case 'QRadar':
+                            return `Focus more on: IBM QRadar
+- Prioritize AQL (Ariel Query Language) queries
+- Include QRadar Custom Rule Engine (CRE) definitions
+- Include QRadar SOAR playbook steps
+- Reference QRadar DSM event properties
+- Map to QRadar offense categorization`;
+                        case 'Wazuh':
+                            return `Focus more on: Wazuh
+- Prioritize Wazuh XML rule format
+- Include Wazuh Active Response scripts
+- Include Wazuh FIM (File Integrity Monitoring) rules
+- Reference Wazuh Syscheck and SCA modules
+- Map to Wazuh MITRE ATT&CK module`;
+                        default:
+                            return '';
+                    }
+                }
+
+                const platformCtx = getPlatformContext(platformFocus);
+
+                // Build prompt with context injection
+                const DETECTION_PROMPT = `You are a senior SOC analyst, detection engineer, and security automation expert.
+Your task is to generate a complete detection and response solution across SIEM, EDR, SOAR, and XDR platforms.
+
+Rule Name: ${ruleName}
+
+Context:
+${context || ''}
+- Windows Event ID 4624 = Successful login
+- Logon Type 10 = Remote Interactive (RDP)
+- Event ID 4625 = Failed login
+- Event ID 4672 = Privileged login
+- Event ID 5140 = SMB share access
+- PowerShell Event ID 4104 = Script execution
+- MITRE ATT&CK T1021 = Remote Services
+- MITRE ATT&CK T1059 = Command Execution
+
+${platformCtx}
+
+Output a complete JSON with these keys: ruleName, description, mitre (array of {id, name, tactic}), severity, severityReason, logSources (array of {source, eventId, purpose}), splunkSPL, sentinelKQL, edrProcess, edrParentChild, edrCmdIndicators (array), ioa (array), falsePositives (array), soarTrigger, soarActions (array), thresholds ({events, window, note}), investigationSteps (array), tuning (array).
+Return ONLY valid JSON. No markdown, no explanation.`;
+
+                // Check for ANTHROPIC_API_KEY
+                const apiKey = process.env.ANTHROPIC_API_KEY;
+
+                if (apiKey) {
+                    // Call Claude API
+                    const https = require('https');
+                    const postData = JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 4000,
+                        temperature: 0.2,
+                        messages: [{ role: 'user', content: DETECTION_PROMPT }]
+                    });
+
+                    const apiReq = https.request({
+                        hostname: 'api.anthropic.com',
+                        path: '/v1/messages',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': apiKey,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Length': Buffer.byteLength(postData)
+                        }
+                    }, (apiRes) => {
+                        let data = '';
+                        apiRes.on('data', chunk => { data += chunk; });
+                        apiRes.on('end', () => {
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.content?.[0]?.text || '{}';
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ source: 'claude-api', data: JSON.parse(content) }));
+                            } catch (e) {
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ source: 'claude-api-raw', data: data }));
+                            }
+                        });
+                    });
+
+                    apiReq.on('error', (e) => {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ source: 'local', message: 'API unavailable, use local generation', prompt: DETECTION_PROMPT }));
+                    });
+
+                    apiReq.write(postData);
+                    apiReq.end();
+                } else {
+                    // No API key — return prompt for local generation
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        source: 'local',
+                        message: 'No ANTHROPIC_API_KEY set. Using local generation engine. Set env var to enable Claude API.',
+                        prompt: DETECTION_PROMPT
+                    }));
+                }
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+            }
+        });
+        return;
+    }
+
     if (req.url === '/api/info') {
         const { execSync } = require('child_process');
         let nodeVer = process.version;
