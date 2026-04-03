@@ -110,6 +110,7 @@
                 <div class="nav-items hidden" id="section-tools">
                     <a href="#" onclick="loadPage('fetcher')" class="nav-link">Threat Intel Fetcher</a>
                     <a href="#" onclick="loadPage('rulegen')" class="nav-link">SIEM Rule Generator</a>
+                    <a href="#" onclick="loadDetectionGenerator()" class="nav-link" style="color:var(--accent);font-weight:bold">AI Detection Generator [NEW]</a>
                     <a href="#" onclick="loadRuleBuilder()" class="nav-link">Rule Builder</a>
                     <a href="#" onclick="loadPage('ioc')" class="nav-link">IOC Management</a>
                     <a href="#" onclick="loadPage('mitre')" class="nav-link">MITRE ATT&CK Map</a>
@@ -214,6 +215,12 @@
                         <div class="card-title">SOC Knowledge Base</div>
                         <div class="card-desc">Search any rule - full query, playbook, TP/FP analysis, SOAR automation</div>
                         <div class="card-tag" style="background:var(--accent);color:#fff">NEW</div>
+                    </div>
+                    <div class="hack-card" onclick="loadDetectionGenerator()" style="border-color:var(--green)">
+                        <div class="card-icon">&#129302;</div>
+                        <div class="card-title">AI Detection Generator</div>
+                        <div class="card-desc">Enter any attack name — auto-generate complete SIEM + EDR + SOAR + XDR detection & response rules</div>
+                        <div class="card-tag" style="background:var(--green);color:#fff">AI</div>
                     </div>
                     <div class="hack-card" onclick="loadPage('fetcher')">
                         <div class="card-icon">&#128225;</div>
@@ -398,6 +405,7 @@
     </div>
 
     <script src="js/rule-database.js"></script>
+    <script src="js/detection-generator.js"></script>
     <script src="js/app.js"></script>
     <script src="js/crowdstrike-poc.js"></script>
     <script src="js/platform-pages.js"></script>
