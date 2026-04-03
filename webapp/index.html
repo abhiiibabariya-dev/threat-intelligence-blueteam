@@ -137,8 +137,9 @@
             <!-- Dashboard Home -->
             <div id="dashboard" class="dashboard">
                 <div class="dash-header">
-                    <h1>BlueShell Dashboard</h1>
-                    <p class="subtitle">Threat Intelligence & Blue Team Operations Platform</p>
+                    <h1>Security Operations Dashboard</h1>
+                    <p class="subtitle">Centralized threat intelligence, detection rules, and blue team operations across 28 security platforms</p>
+                    <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Last Updated: April 2026 &nbsp;|&nbsp; Active Rules: 500+ &nbsp;|&nbsp; MITRE ATT&CK Coverage: 57% &nbsp;|&nbsp; Platforms: 28</p>
                 </div>
 
                 <!-- Stats Grid -->
@@ -146,32 +147,38 @@
                     <div class="stat-card">
                         <div class="stat-number" id="stat-siem">14</div>
                         <div class="stat-label">SIEM Platforms</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Splunk, Sentinel, QRadar, Elastic, Wazuh, Chronicle +8 more</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:100%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-rules">500+</div>
                         <div class="stat-label">Detection Rules</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">SPL, KQL, AQL, YARA-L, XML, EQL, XQL formats</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:85%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-edr">4</div>
                         <div class="stat-label">EDR Platforms</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">CrowdStrike, MDE, SentinelOne, Carbon Black</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:70%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-xdr">3</div>
                         <div class="stat-label">XDR Platforms</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Cortex XDR, M365 Defender, Vision One</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:60%"></div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="stat-soar">7</div>
                         <div class="stat-label">SOAR Platforms</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Splunk SOAR, XSOAR, Shuffle, TheHive +3 more</div>
                         <div class="stat-bar"><div class="stat-fill" style="width:90%"></div></div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="stat-mitre">70+</div>
+                        <div class="stat-number" id="stat-mitre">60</div>
                         <div class="stat-label">MITRE Techniques</div>
-                        <div class="stat-bar"><div class="stat-fill" style="width:75%"></div></div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">12 Tactics | 57% Coverage | Interactive Heatmap</div>
+                        <div class="stat-bar"><div class="stat-fill" style="width:57%"></div></div>
                     </div>
                 </div>
 
@@ -228,8 +235,34 @@
                     </div>
                 </div>
 
+                <!-- What's Inside -->
+                <div class="section-title">What's Inside This Platform</div>
+                <div class="card-grid">
+                    <div class="hack-card" onclick="loadPage('splunk')">
+                        <div class="card-icon">&#128270;</div>
+                        <div class="card-title">Detection Rules</div>
+                        <div class="card-desc">Production-ready detection rules in native query formats for every platform. Copy-paste into your SIEM and start detecting threats immediately.</div>
+                    </div>
+                    <div class="hack-card" onclick="loadPage('ir')">
+                        <div class="card-icon">&#128680;</div>
+                        <div class="card-title">Incident Response</div>
+                        <div class="card-desc">8 comprehensive IR playbooks covering phishing, ransomware, data breach, insider threat, BEC, and more. Step-by-step procedures for your SOC team.</div>
+                    </div>
+                    <div class="hack-card" onclick="loadPage('usecases')">
+                        <div class="card-icon">&#127891;</div>
+                        <div class="card-title">Training & Onboarding</div>
+                        <div class="card-desc">Zero-to-hero training roadmaps for every platform. Beginner to Expert level guides with estimated timelines for SOC analyst development.</div>
+                    </div>
+                    <div class="hack-card" onclick="loadPage('detection')">
+                        <div class="card-icon">&#127959;</div>
+                        <div class="card-title">Architecture & Best Practices</div>
+                        <div class="card-desc">Platform architecture diagrams, deployment guides, integration patterns, and field-tested best practices from real SOC operations.</div>
+                    </div>
+                </div>
+
                 <!-- MITRE ATT&CK Heatmap -->
-                <div class="section-title">MITRE ATT&CK Coverage</div>
+                <div class="section-title">MITRE ATT&CK Detection Coverage</div>
+                <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">Detection rule coverage across 12 Enterprise tactics — click any bar for details</p>
                 <div class="mitre-grid">
                     <div class="mitre-tactic">
                         <div class="tactic-name">Initial Access</div>
@@ -285,10 +318,50 @@
                 <div class="section-title">Live Threat Feed</div>
                 <div class="live-feed" id="live-feed">
                     <div class="feed-item">
-                        <span class="feed-time">00:00:00</span>
+                        <span class="feed-time">14:32:01</span>
                         <span class="feed-severity critical">CRIT</span>
-                        <span class="feed-msg">Initializing threat intelligence feeds...</span>
+                        <span class="feed-msg">Cobalt Strike beacon detected on WS-PC042 — LSASS memory access (T1003.001) — CrowdStrike Falcon auto-isolated endpoint</span>
                     </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:28:45</span>
+                        <span class="feed-severity high">HIGH</span>
+                        <span class="feed-msg">Ransomware pre-encryption: vssadmin shadow copy deletion detected on SRV-FILE03 (T1490) — SentinelOne rollback initiated</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:25:12</span>
+                        <span class="feed-severity high">HIGH</span>
+                        <span class="feed-msg">Brute force from 185.220.101.x — 847 failed logins across 12 accounts in 5 min — Splunk correlation triggered, IP blocked on FortiGate</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:21:38</span>
+                        <span class="feed-severity medium">MED</span>
+                        <span class="feed-msg">Encoded PowerShell execution by svc_deploy on DC01 — Sentinel KQL rule matched T1059.001 — investigation started</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:18:05</span>
+                        <span class="feed-severity medium">MED</span>
+                        <span class="feed-msg">Lateral movement detected: RDP from WS-PC015 to 4 unique hosts in 20 min — Cortex XDR BIOC alert (T1021.001)</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:15:22</span>
+                        <span class="feed-severity low">LOW</span>
+                        <span class="feed-msg">New YARA-L rules deployed to Chronicle — 6 rules covering DNS tunneling, DGA detection, and credential stuffing</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:12:09</span>
+                        <span class="feed-severity low">LOW</span>
+                        <span class="feed-msg">MITRE ATT&CK coverage updated: 3 new Persistence detections added — overall coverage now 57% (+2% from last week)</span>
+                    </div>
+                    <div class="feed-item">
+                        <span class="feed-time">14:08:51</span>
+                        <span class="feed-severity low">INFO</span>
+                        <span class="feed-msg">Threat intel sync complete — 342 new IOCs ingested from abuse.ch, OTX, and CISA KEV — auto-distributed to 14 SIEM platforms</span>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="text-align:center;padding:24px 0 16px;margin-top:24px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)">
+                    BlueShell v4.0 &nbsp;|&nbsp; Threat Intelligence & Blue Team Operations Platform &nbsp;|&nbsp; 28 Platforms &nbsp;|&nbsp; 500+ Rules &nbsp;|&nbsp; MITRE ATT&CK v15
                 </div>
             </div>
 

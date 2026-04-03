@@ -520,59 +520,235 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">MICROSOFT DEFENDER FOR ENDPOINT</h1>
     <span class="card-tag" style="position:static">EDR</span>
 </div>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Microsoft's EDR solution with Advanced Hunting (KQL), ASR rules, automated investigation.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Microsoft's cloud-native EDR with Advanced Hunting (KQL), Attack Surface Reduction, Automated Investigation & Response, and deep M365 integration.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">ADVANCED HUNTING QUERIES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">
+        Microsoft Defender for Endpoint (MDE) is the EDR component of Microsoft's security stack, providing behavioral-based endpoint detection, automated investigation, and threat & vulnerability management. It integrates natively with Azure AD, Intune, Microsoft Sentinel, and the full M365 Defender XDR suite, giving SOC teams unified visibility from endpoint to cloud identity.
+    </p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">
+        MDE's Advanced Hunting uses KQL (Kusto Query Language) across multiple tables — DeviceProcessEvents, DeviceNetworkEvents, DeviceFileEvents, DeviceLogonEvents, and more. Attack Surface Reduction (ASR) rules provide preventive controls, while Automated Investigation and Response (AIR) reduces analyst workload by auto-remediating common threats.
+    </p>
+</div>
 
-    <h4 style="color:#0f0;margin-top:15px">1. Credential Dumping Detection</h4>
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐
+    │  Endpoints   │     │  MDE Sensor  │     │  Microsoft Cloud     │
+    │  ──────────  │────▶│  ──────────  │────▶│  ──────────────────  │
+    │  Windows     │     │  Kernel-mode │     │  Security Center     │
+    │  macOS       │     │  driver +    │     │  Advanced Hunting    │
+    │  Linux       │     │  User-mode   │     │  Incidents & Alerts  │
+    │  Android/iOS │     │  service     │     │  Threat Analytics    │
+    └──────────────┘     └──────────────┘     └──────────┬───────────┘
+                                                         │
+    ┌──────────────┐     ┌──────────────┐     ┌──────────▼───────────┐
+    │  Response     │     │  M365 XDR   │     │  Automated           │
+    │  ──────────  │◀────│  ──────────  │◀────│  Investigation (AIR) │
+    │  Isolate     │     │  Sentinel   │     │  ──────────────────  │
+    │  Quarantine  │     │  Intune     │     │  Auto-remediate      │
+    │  Live Resp.  │     │  Azure AD   │     │  Pending Actions     │
+    └──────────────┘     └──────────────┘     └──────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>Advanced Hunting</td><td>KQL-based query engine across 20+ tables (Device*, Email*, Identity*, Cloud*) for threat hunting and custom detections</td></tr>
+        <tr><td>Live Response</td><td>Remote shell to endpoints for live investigation — run scripts, collect files, remediate without physical access</td></tr>
+        <tr><td>Automated Investigation (AIR)</td><td>AI-driven investigation of alerts — auto-collects evidence, determines verdict, takes remediation actions</td></tr>
+        <tr><td>Threat & Vulnerability Mgmt</td><td>Continuous vulnerability assessment of endpoints, software inventory, security recommendations with risk scoring</td></tr>
+        <tr><td>Attack Surface Reduction</td><td>Preventive rules blocking common attack vectors — Office macros, credential theft, script abuse, email attachments</td></tr>
+        <tr><td>Device Groups</td><td>Logical grouping of devices for policy assignment, RBAC, and automated investigation scoping</td></tr>
+        <tr><td>Custom Detection Rules</td><td>Scheduled KQL queries that generate alerts and take automated actions when conditions are met</td></tr>
+        <tr><td>Indicators (IOC)</td><td>File hashes, IPs, URLs, domains, certificates added as Allow/Alert/Block indicators across all endpoints</td></tr>
+        <tr><td>Web Content Filtering</td><td>Category-based web access control — block malicious, adult, high-bandwidth, or custom URL categories</td></tr>
+        <tr><td>Device Isolation</td><td>Network-isolate compromised endpoints while maintaining MDE cloud connectivity for investigation</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ADVANCED HUNTING QUERIES (KQL)</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Credential Dumping — LSASS Access</h4>
     ${pgCode(`DeviceProcessEvents
 | where FileName in~ ("procdump.exe", "procdump64.exe", "mimikatz.exe")
     or (FileName =~ "rundll32.exe" and ProcessCommandLine has "comsvcs.dll")
-    or ProcessCommandLine has_any ("sekurlsa", "lsadump", "MiniDump")
+    or ProcessCommandLine has_any ("sekurlsa", "lsadump", "MiniDump", "nanodump")
 | project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
 | sort by Timestamp desc`, 'kql')}
 
-    <h4 style="color:#0f0;margin-top:15px">2. Ransomware Indicators</h4>
+    <h4 style="color:var(--accent);margin-top:15px">2. Ransomware — Mass File Encryption</h4>
     ${pgCode(`DeviceFileEvents
 | where Timestamp > ago(1h)
 | where ActionType == "FileRenamed"
 | extend FileExtension = tostring(split(FileName, ".")[-1])
-| where FileExtension in ("encrypted", "locked", "crypt", "enc", "cry", "crypto")
-| summarize RenamedFiles = count(),
-    UniqueExtensions = dcount(FileExtension),
-    Devices = make_set(DeviceName)
-    by InitiatingProcessFileName, bin(Timestamp, 5m)
+| where FileExtension in ("encrypted", "locked", "crypt", "enc", "cry", "crypto", "WNCRY", "wnry")
+| summarize RenamedFiles = count(), UniqueExtensions = dcount(FileExtension),
+    Devices = make_set(DeviceName) by InitiatingProcessFileName, bin(Timestamp, 5m)
 | where RenamedFiles > 50`, 'kql')}
 
-    <h4 style="color:#0f0;margin-top:15px">3. Persistence via Scheduled Tasks</h4>
+    <h4 style="color:var(--accent);margin-top:15px">3. Persistence — Scheduled Tasks</h4>
     ${pgCode(`DeviceProcessEvents
-| where FileName =~ "schtasks.exe"
-| where ProcessCommandLine has "/create"
+| where FileName =~ "schtasks.exe" and ProcessCommandLine has "/create"
 | where ProcessCommandLine has_any ("/sc minute", "/sc hourly", "/sc onlogon", "/sc onstart")
 | where InitiatingProcessFileName !in~ ("svchost.exe", "msiexec.exe", "setup.exe")
 | project Timestamp, DeviceName, AccountName, ProcessCommandLine
 | sort by Timestamp desc`, 'kql')}
 
-    <h4 style="color:#0f0;margin-top:15px">4. Custom Detection Rule Template</h4>
-    ${pgCode(`// Custom detection: LOLBin execution from user directories
-DeviceProcessEvents
+    <h4 style="color:var(--accent);margin-top:15px">4. LOLBin Execution from User Dirs</h4>
+    ${pgCode(`DeviceProcessEvents
 | where Timestamp > ago(1h)
 | where FileName in~ ("certutil.exe", "mshta.exe", "regsvr32.exe", "rundll32.exe", "bitsadmin.exe")
 | where FolderPath has_any ("\\\\Users\\\\", "\\\\Temp\\\\", "\\\\Downloads\\\\", "\\\\AppData\\\\")
-| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine, FolderPath
-// Save as Custom Detection > Set frequency to every hour > Action: Alert + Isolate device`, 'kql')}
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine, FolderPath`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. PowerShell Download Cradle</h4>
+    ${pgCode(`DeviceProcessEvents
+| where FileName =~ "powershell.exe" or FileName =~ "pwsh.exe"
+| where ProcessCommandLine has_any ("DownloadString", "DownloadFile", "Invoke-WebRequest",
+    "wget", "curl", "Start-BitsTransfer", "Net.WebClient", "iwr", "irm")
+| where ProcessCommandLine !has "WindowsUpdate" and ProcessCommandLine !has "NuGet"
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName
+| sort by Timestamp desc`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. Suspicious Service Installation</h4>
+    ${pgCode(`DeviceProcessEvents
+| where FileName =~ "sc.exe" and ProcessCommandLine has "create"
+| where ProcessCommandLine has_any ("binpath", "binPath")
+| where ProcessCommandLine has_any ("cmd", "powershell", "mshta", "rundll32", "\\\\temp\\\\", "\\\\appdata\\\\")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. DNS Exfiltration — High Entropy Queries</h4>
+    ${pgCode(`DeviceNetworkEvents
+| where ActionType == "DnsQueryResponse"
+| extend SubdomainLength = strlen(tostring(split(RemoteUrl, ".")[0]))
+| where SubdomainLength > 30
+| summarize LongQueries = count(), UniqueSubdomains = dcount(RemoteUrl) by DeviceName, bin(Timestamp, 15m)
+| where LongQueries > 50 and UniqueSubdomains > 20
+| sort by LongQueries desc`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">8. WMI Persistence</h4>
+    ${pgCode(`DeviceProcessEvents
+| where FileName =~ "wmic.exe"
+| where ProcessCommandLine has_any ("__EventFilter", "__EventConsumer", "__FilterToConsumerBinding",
+    "ActiveScriptEventConsumer", "CommandLineEventConsumer")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine
+| sort by Timestamp desc`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">9. Token Manipulation — RunAs / Impersonation</h4>
+    ${pgCode(`DeviceLogonEvents
+| where LogonType in ("Interactive", "NewCredentials", "RemoteInteractive")
+| where IsLocalAdmin == true
+| where AccountDomain != DeviceName  // cross-account logon
+| summarize LogonCount = count(), UniqueDevices = dcount(DeviceName) by AccountName, bin(Timestamp, 1h)
+| where LogonCount > 10 or UniqueDevices > 3
+| sort by LogonCount desc`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">10. Anomalous RDP Lateral Movement</h4>
+    ${pgCode(`DeviceNetworkEvents
+| where RemotePort == 3389 and ActionType == "ConnectionSuccess"
+| where InitiatingProcessFileName in~ ("mstsc.exe", "svchost.exe")
+| summarize RDPTargets = dcount(RemoteIP), TargetList = make_set(RemoteIP)
+    by DeviceName, AccountName, bin(Timestamp, 1h)
+| where RDPTargets > 3
+| sort by RDPTargets desc`, 'kql')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">CUSTOM DETECTION RULE — API TEMPLATE</div>
+    ${pgCode(`{
+  "queryText": "DeviceProcessEvents | where FileName =~ \\"powershell.exe\\" | where ProcessCommandLine has \\"-EncodedCommand\\" | where InitiatingProcessFileName !in~ (\\"svchost.exe\\", \\"msiexec.exe\\")",
+  "queryPeriod": "1h",
+  "queryFrequency": "15m",
+  "title": "Encoded PowerShell Execution",
+  "description": "Detects PowerShell with encoded commands from suspicious parent processes",
+  "severity": "Medium",
+  "category": "Execution",
+  "mitreTechniques": ["T1059.001"],
+  "impactedAssets": ["devices"],
+  "actions": {
+    "alertAction": "generateAlert",
+    "responseAction": "initiateInvestigation"
+  }
+}`, 'json')}
 </div>
 
 <div class="pg-section">
     <div class="pg-section-title">ASR RULES (Attack Surface Reduction)</div>
     <table class="pg-table">
-        <tr><th>Rule</th><th>GUID</th><th>Impact</th></tr>
-        <tr><td>Block Office from creating child processes</td><td>D4F940AB-401B-4EFC-AADC-AD5F3C50688A</td><td>Blocks macro-based attacks</td></tr>
-        <tr><td>Block credential stealing from LSASS</td><td>9E6C4E1F-7D60-472F-BA1A-A39EF669E4B2</td><td>Prevents Mimikatz-like tools</td></tr>
-        <tr><td>Block process creations from WMI/PSExec</td><td>D1E49AAC-8F56-4280-B9BA-993A6D77406C</td><td>Stops lateral movement</td></tr>
-        <tr><td>Block executable content from email</td><td>BE9BA2D9-53EA-4CDC-84E5-9B1EEEE46550</td><td>Email-borne malware prevention</td></tr>
-        <tr><td>Block untrusted/unsigned processes from USB</td><td>B2B3F03D-6A65-4F7B-A9C7-1C7EF74A9BA4</td><td>USB-based attack prevention</td></tr>
+        <tr><th>Rule</th><th>GUID</th><th>MITRE</th><th>Mode</th></tr>
+        <tr><td>Block Office from creating child processes</td><td>D4F940AB-401B-4EFC-AADC-AD5F3C50688A</td><td>T1204.002</td><td>Block</td></tr>
+        <tr><td>Block Office macro Win32 API calls</td><td>92E97FA1-2EDF-4476-BDD6-9DD0B4DDDC7B</td><td>T1059.005</td><td>Block</td></tr>
+        <tr><td>Block credential stealing from LSASS</td><td>9E6C4E1F-7D60-472F-BA1A-A39EF669E4B2</td><td>T1003.001</td><td>Block</td></tr>
+        <tr><td>Block executable content from email</td><td>BE9BA2D9-53EA-4CDC-84E5-9B1EEEE46550</td><td>T1566.001</td><td>Block</td></tr>
+        <tr><td>Block untrusted/unsigned from USB</td><td>B2B3F03D-6A65-4F7B-A9C7-1C7EF74A9BA4</td><td>T1091</td><td>Block</td></tr>
+        <tr><td>Block JS/VBS launching executables</td><td>D3E037E1-3EB8-44C8-A917-57927947596D</td><td>T1059.007</td><td>Block</td></tr>
+        <tr><td>Block process creation from WMI/PSExec</td><td>D1E49AAC-8F56-4280-B9BA-993A6D77406C</td><td>T1047</td><td>Audit</td></tr>
+        <tr><td>Block Office from creating executable content</td><td>3B576869-A4EC-4529-8536-B80A7769E899</td><td>T1204.002</td><td>Block</td></tr>
+        <tr><td>Block Adobe Reader from creating child processes</td><td>7674BA52-37EB-4A4F-A9A1-F0F9A1619A2C</td><td>T1204.002</td><td>Block</td></tr>
+        <tr><td>Block persistence through WMI event subscription</td><td>E6DB77E5-3DF2-4CF1-B95A-636979351E5B</td><td>T1546.003</td><td>Block</td></tr>
+        <tr><td>Block abuse of exploited vulnerable signed drivers</td><td>56A863A9-875E-4185-98A7-B882C64B5CE5</td><td>T1068</td><td>Block</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">LIVE RESPONSE COMMANDS</div>
+    <table class="pg-table">
+        <tr><th>Command</th><th>Description</th><th>Admin Required</th></tr>
+        <tr><td>connections</td><td>Show all active TCP connections</td><td>No</td></tr>
+        <tr><td>processes</td><td>List all running processes with PID, name, path, user</td><td>No</td></tr>
+        <tr><td>scheduledtasks</td><td>List all scheduled tasks on the device</td><td>No</td></tr>
+        <tr><td>services</td><td>List all Windows services and their states</td><td>No</td></tr>
+        <tr><td>registry</td><td>Query registry keys and values</td><td>No</td></tr>
+        <tr><td>fileinfo</td><td>Get file information (hash, size, signer, timestamps)</td><td>No</td></tr>
+        <tr><td>trace</td><td>Start diagnostic ETW trace for advanced debugging</td><td>No</td></tr>
+        <tr><td>getfile</td><td>Download a file from the endpoint for analysis</td><td>Yes</td></tr>
+        <tr><td>putfile</td><td>Upload a file to the endpoint (scripts, tools)</td><td>Yes</td></tr>
+        <tr><td>run</td><td>Execute a PowerShell script from the library on the endpoint</td><td>Yes</td></tr>
+        <tr><td>remediate</td><td>Remediate an entity (quarantine file, stop process, remove persistence)</td><td>Yes</td></tr>
+        <tr><td>undo</td><td>Reverse a remediation action previously taken</td><td>Yes</td></tr>
+        <tr><td>collect</td><td>Collect investigation package (memory dump, logs, prefetch)</td><td>Yes</td></tr>
+        <tr><td>analyze</td><td>Submit file to cloud for deep analysis (sandbox detonation)</td><td>Yes</td></tr>
+        <tr><td>library</td><td>Manage Live Response script library (list, upload, delete)</td><td>Yes</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">INDICATOR MANAGEMENT (IOC)</div>
+    <table class="pg-table">
+        <tr><th>Indicator Type</th><th>Actions Available</th><th>Scope</th></tr>
+        <tr><td>File Hash (SHA256, SHA1, MD5)</td><td>Allow, Alert Only, Alert and Block</td><td>All devices or device group</td></tr>
+        <tr><td>IP Address</td><td>Allow, Alert Only, Alert and Block</td><td>All devices</td></tr>
+        <tr><td>URL / Domain</td><td>Allow, Alert Only, Alert and Block</td><td>All devices (requires Network Protection)</td></tr>
+        <tr><td>Certificate</td><td>Allow, Alert and Block</td><td>All devices</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Enable ASR in Audit First</h4><p>Deploy ASR rules in Audit mode for 2 weeks before switching to Block. Review ASR events in Advanced Hunting to identify false positives before enforcement.</p></div>
+        <div class="pg-info-card"><h4>Use Risk-Based Device Groups</h4><p>Create device groups by risk level (servers, executives, developers). Apply stricter policies to high-value targets, more permissive for dev machines.</p></div>
+        <div class="pg-info-card"><h4>Custom Detection Rules for Gaps</h4><p>Supplement built-in detections with custom KQL rules. Schedule every 15 minutes for critical detections, hourly for informational.</p></div>
+        <div class="pg-info-card"><h4>Automate with AIR</h4><p>Enable Automated Investigation and Response. Set auto-remediation for low-severity alerts. Require analyst approval for device isolation and file quarantine.</p></div>
+        <div class="pg-info-card"><h4>Integrate with Sentinel</h4><p>Stream MDE alerts to Microsoft Sentinel for cross-source correlation. Use Sentinel's SOAR playbooks for advanced response automation.</p></div>
+        <div class="pg-info-card"><h4>Threat & Vulnerability Mgmt</h4><p>Review TVM recommendations weekly. Prioritize exposed vulnerabilities with known exploits. Use secure score to track improvement over time.</p></div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Security Center navigation, alert triage, device inventory, basic incident management</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Advanced Hunting KQL, Live Response, ASR rules, custom detections, indicator management</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>AIR customization, API automation, Sentinel integration, threat analytics, purple teaming</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Custom connectors, advanced KQL (joins, external data), MDTI integration, full XDR orchestration</td><td>3-6 months</td></tr>
     </table>
 </div>
 
@@ -585,44 +761,258 @@ DeviceProcessEvents
 richPageContent.sentinelone = `
 ${pgBack()}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-    <h1 style="margin:0;border:none;padding:0">SENTINELONE</h1>
+    <h1 style="margin:0;border:none;padding:0">SENTINELONE SINGULARITY</h1>
     <span class="card-tag" style="position:static">EDR</span>
 </div>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Autonomous AI-driven endpoint protection with Storyline technology and Deep Visibility queries.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Autonomous AI-driven endpoint protection with Storyline technology, Deep Visibility hunting, and one-click ransomware rollback.</p>
+
+<div class="pg-section">
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">
+        SentinelOne Singularity is an autonomous endpoint protection platform that uses multiple AI engines (Static AI, Behavioral AI) to detect and respond to threats without human intervention. Its Storyline technology automatically correlates all related process, file, network, and registry events into a single attack narrative, giving analysts a complete kill chain view in seconds.
+    </p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">
+        Key differentiators include: ransomware rollback via Windows VSS snapshots, ActiveEDR for autonomous threat response, Deep Visibility for threat hunting with a SQL-like query language, STAR (Storyline Active Response) custom detection rules, and Ranger for rogue device discovery. The Singularity Data Lake provides long-term retention and cross-tenant correlation.
+    </p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌─────────────────────────────┐     ┌──────────────┐
+    │  Endpoints   │     │  SentinelOne Agent           │     │  Singularity │
+    │  ──────────  │────▶│  ───────────────────────     │────▶│  Cloud       │
+    │  Windows     │     │  Static AI (pre-execution)   │     │  ──────────  │
+    │  macOS       │     │  Behavioral AI (runtime)     │     │  Management  │
+    │  Linux       │     │  Storyline (correlation)     │     │  Console     │
+    │  Kubernetes  │     │  Anti-Tamper Protection      │     │  Data Lake   │
+    └──────────────┘     └─────────────────────────────┘     └──────┬───────┘
+                                                                    │
+    ┌──────────────┐     ┌──────────────┐     ┌─────────────────────▼──────┐
+    │  Response     │     │  Integrations│     │  Detection & Hunting      │
+    │  ──────────  │◀────│  ──────────  │◀────│  ─────────────────────    │
+    │  Kill/Quar.  │     │  SIEM / SOAR │     │  Deep Visibility Queries  │
+    │  Rollback    │     │  Marketplace │     │  STAR Custom Rules        │
+    │  Net Isolate │     │  API (REST)  │     │  Threat Intelligence      │
+    │  Remote Shell│     │  Webhooks    │     │  Ranger (Network Scan)    │
+    └──────────────┘     └──────────────┘     └───────────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>Storyline</td><td>Auto-correlates all process, file, registry, network events into unified attack narratives. Each threat gets a TrueContext Storyline ID.</td></tr>
+        <tr><td>Static AI Engine</td><td>Pre-execution file analysis using machine learning. Scans PE files, scripts, documents before they execute. No signatures needed.</td></tr>
+        <tr><td>Behavioral AI Engine</td><td>Runtime behavioral analysis detecting fileless attacks, living-off-the-land, and novel malware by monitoring execution patterns.</td></tr>
+        <tr><td>ActiveEDR</td><td>Every agent acts as an autonomous SOC analyst — auto-correlates events, maps to MITRE ATT&CK, and provides one-click remediation.</td></tr>
+        <tr><td>Deep Visibility</td><td>EDR hunting tool with SQL-like query language across all endpoint telemetry — processes, files, network, registry, logins.</td></tr>
+        <tr><td>STAR Rules</td><td>Storyline Active Response — custom detection rules using Deep Visibility queries that trigger automated response actions.</td></tr>
+        <tr><td>Ranger</td><td>Network-aware device discovery. Fingerprints all devices (managed, unmanaged, IoT) on the network without agents.</td></tr>
+        <tr><td>Singularity Data Lake</td><td>Cloud-native data lake for long-term telemetry retention (14-365 days), cross-tenant correlation, and third-party data ingestion.</td></tr>
+        <tr><td>Remote Shell</td><td>Full interactive shell (PowerShell, Bash, Python) on any managed endpoint for live investigation and remediation.</td></tr>
+        <tr><td>Rollback</td><td>Windows VSS-based ransomware rollback — reverts all file changes made by a threat to pre-attack state with one click.</td></tr>
+    </table>
+</div>
 
 <div class="pg-section">
     <div class="pg-section-title">DEEP VISIBILITY QUERIES</div>
 
-    <h4 style="color:#0f0;margin-top:15px">1. Ransomware File Encryption</h4>
+    <h4 style="color:var(--accent);margin-top:15px">1. Ransomware File Encryption</h4>
     ${pgCode(`ObjectType = "File" AND EventType = "Modified Rename"
-AND TgtFileExtension In Contains AnyCase ("encrypted","locked","crypt","ransom")
-AND SrcProcName NOT In AnyCase ("explorer.exe","rename.exe")`, 'sql')}
+AND TgtFileExtension In Contains AnyCase ("encrypted","locked","crypt","ransom","WNCRY")
+AND SrcProcName NOT In AnyCase ("explorer.exe","rename.exe","7z.exe")`, 'deep-visibility')}
 
-    <h4 style="color:#0f0;margin-top:15px">2. LOLBin Abuse</h4>
+    <h4 style="color:var(--accent);margin-top:15px">2. LOLBin Abuse with Network Activity</h4>
     ${pgCode(`ObjectType = "Process" AND EventType = "Process Creation"
-AND (TgtProcName In AnyCase ("certutil.exe","mshta.exe","regsvr32.exe","bitsadmin.exe"))
-AND TgtProcCmdLine ContainsCIS ("http" OR "ftp" OR "download" OR "transfer")`, 'sql')}
+AND TgtProcName In AnyCase ("certutil.exe","mshta.exe","regsvr32.exe","bitsadmin.exe","rundll32.exe")
+AND TgtProcCmdLine ContainsCIS ("http" OR "ftp" OR "download" OR "transfer" OR "urlcache")`, 'deep-visibility')}
 
-    <h4 style="color:#0f0;margin-top:15px">3. STAR Rule (Custom Detection)</h4>
+    <h4 style="color:var(--accent);margin-top:15px">3. Credential Dumping — LSASS Access</h4>
+    ${pgCode(`ObjectType = "Process" AND EventType = "Open Remote Process Handle"
+AND TgtProcName = "lsass.exe"
+AND SrcProcName NOT In AnyCase ("svchost.exe","csrss.exe","lsm.exe","wininit.exe","services.exe")
+AND SrcProcName NOT In AnyCase ("MsMpEng.exe","SentinelAgent.exe")`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. PowerShell Encoded Command Execution</h4>
+    ${pgCode(`ObjectType = "Process" AND EventType = "Process Creation"
+AND TgtProcName In AnyCase ("powershell.exe","pwsh.exe")
+AND TgtProcCmdLine RegExp "(?i)(-enc|-encodedcommand|-ec)\\s+"
+AND SrcProcName NOT In AnyCase ("svchost.exe","services.exe")`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. DNS Tunneling / DGA Detection</h4>
+    ${pgCode(`ObjectType = "DNS" AND EventType = "DNS Resolved"
+AND DnsRequest Length > 40
+AND DnsRequest NOT ContainsCIS ("microsoft.com" OR "windows.com" OR "office.com" OR "azure.com")`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. Lateral Movement — PsExec / Remote Service</h4>
+    ${pgCode(`ObjectType = "Process" AND EventType = "Process Creation"
+AND (TgtProcName = "PSEXESVC.exe"
+    OR (TgtProcName = "services.exe" AND TgtProcCmdLine ContainsCIS "psexec")
+    OR (TgtProcName = "wmiprvse.exe" AND SrcProcName = "svchost.exe"))`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. Persistence — Registry Run Keys</h4>
+    ${pgCode(`ObjectType = "Registry" AND EventType In ("Registry Value Create","Registry Value Modified")
+AND RegistryPath ContainsCIS "CurrentVersion\\\\Run"
+AND SrcProcName NOT In AnyCase ("explorer.exe","msiexec.exe","setup.exe","svchost.exe")`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">8. Suspicious Network Connections — Rare Ports</h4>
+    ${pgCode(`ObjectType = "IP" AND EventType = "IP Connect"
+AND DstPort NOT In (80,443,53,22,3389,445,135,8080,8443)
+AND DstPort > 1024
+AND NetworkDirection = "OUTGOING"
+AND SrcProcName NOT In AnyCase ("chrome.exe","firefox.exe","msedge.exe","svchost.exe","teams.exe")`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">9. Process Injection Detection</h4>
+    ${pgCode(`ObjectType = "Process" AND EventType = "Duplicate Process Handle"
+AND SrcProcName != TgtProcName
+AND TgtProcName In AnyCase ("explorer.exe","svchost.exe","lsass.exe","csrss.exe","winlogon.exe")
+AND SrcProcSignedStatus != "signed"`, 'deep-visibility')}
+
+    <h4 style="color:var(--accent);margin-top:15px">10. Scheduled Task Persistence</h4>
+    ${pgCode(`ObjectType = "Process" AND EventType = "Process Creation"
+AND TgtProcName = "schtasks.exe"
+AND TgtProcCmdLine ContainsCIS "/create"
+AND TgtProcCmdLine RegExp "(?i)(cmd|powershell|mshta|wscript|cscript|rundll32|regsvr32)"`, 'deep-visibility')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">STAR RULES (Custom Detection)</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. PowerShell Download Cradle</h4>
     ${pgCode(`{
   "name": "Suspicious PowerShell Download Cradle",
   "queryType": "events",
-  "query": "ObjectType = \\"Process\\" AND TgtProcName = \\"powershell.exe\\" AND TgtProcCmdLine RegExp \\"(New-Object|WebClient|DownloadString|DownloadFile|Invoke-WebRequest|wget|curl)\\"",
+  "query": "ObjectType = \\"Process\\" AND TgtProcName = \\"powershell.exe\\" AND TgtProcCmdLine RegExp \\"(New-Object|WebClient|DownloadString|DownloadFile|Invoke-WebRequest|IEX|Invoke-Expression)\\"",
   "severity": "High",
   "status": true,
   "networkQuarantine": false,
-  "treatAsThreat": "Suspicious"
+  "treatAsThreat": "Suspicious",
+  "expirationMode": "PERMANENT"
+}`, 'json')}
+
+    <h4 style="color:var(--accent);margin-top:15px">2. Credential Harvesting Tool</h4>
+    ${pgCode(`{
+  "name": "Credential Harvesting Tool Detected",
+  "queryType": "events",
+  "query": "ObjectType = \\"Process\\" AND (TgtProcName In AnyCase (\\"mimikatz.exe\\",\\"procdump.exe\\",\\"nanodump.exe\\",\\"lazagne.exe\\") OR TgtProcCmdLine ContainsCIS \\"sekurlsa\\" OR TgtProcCmdLine ContainsCIS \\"lsadump\\")",
+  "severity": "Critical",
+  "status": true,
+  "networkQuarantine": true,
+  "treatAsThreat": "Malicious",
+  "expirationMode": "PERMANENT"
+}`, 'json')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Data Exfiltration Over DNS</h4>
+    ${pgCode(`{
+  "name": "Potential DNS Exfiltration",
+  "queryType": "events",
+  "query": "ObjectType = \\"DNS\\" AND EventType = \\"DNS Resolved\\" AND DnsRequest Length > 50",
+  "severity": "High",
+  "status": true,
+  "networkQuarantine": false,
+  "treatAsThreat": "Suspicious",
+  "expirationMode": "PERMANENT",
+  "description": "Detects DNS queries with unusually long subdomains indicating potential DNS tunneling"
 }`, 'json')}
 </div>
 
 <div class="pg-section">
-    <div class="pg-section-title">KEY FEATURES</div>
+    <div class="pg-section-title">RESPONSE POLICY SETTINGS</div>
+    <table class="pg-table">
+        <tr><th>Setting</th><th>Options</th><th>Recommended</th></tr>
+        <tr><td>Detection/Response Mode</td><td>Detect / Protect</td><td>Protect (auto-kill + quarantine)</td></tr>
+        <tr><td>Engine: On-Write Detection</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Engine: Behavioral AI</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Network Quarantine on Threat</td><td>Enable / Disable</td><td>Enable for Critical/High</td></tr>
+        <tr><td>Remediation: Auto-Kill</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Remediation: Auto-Quarantine</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Remediation: Auto-Rollback</td><td>Enable / Disable</td><td>Enable (requires VSS)</td></tr>
+        <tr><td>Anti-Tamper Protection</td><td>Enable / Disable</td><td>Enable (always)</td></tr>
+        <tr><td>Snapshot (VSS) Enablement</td><td>Enable / Disable</td><td>Enable for ransomware rollback</td></tr>
+        <tr><td>Cloud Detection Intelligence</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Scripts Policy</td><td>Detect / Prevent / Disable</td><td>Detect (tune, then Prevent)</td></tr>
+        <tr><td>Unauthorized Device Policy</td><td>Alert / Block</td><td>Alert initially</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">EXCLUSION POLICIES</div>
+    ${pgCode(`{
+  "type": "path",
+  "value": "C:\\\\Program Files\\\\BackupAgent\\\\*",
+  "mode": "suppress",
+  "osType": "windows",
+  "description": "Exclude backup agent from behavioral monitoring"
+}`, 'json')}
+    <table class="pg-table" style="margin-top:12px">
+        <tr><th>Exclusion Type</th><th>Common Use Cases</th></tr>
+        <tr><td>Path Exclusion</td><td>Backup agents, SCCM, dev tools (Visual Studio, Docker), database engines</td></tr>
+        <tr><td>Hash Exclusion</td><td>Known-good internal tools, custom scripts with false positives</td></tr>
+        <tr><td>Certificate Exclusion</td><td>Internal CA-signed applications, vendor tools with valid certs</td></tr>
+        <tr><td>Browser Exclusion</td><td>Specific browser extensions causing false alerts</td></tr>
+        <tr><td>Signer Identity</td><td>Exclude all binaries signed by a specific publisher</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">REMOTE SHELL COMMANDS</div>
+    <table class="pg-table">
+        <tr><th>Command</th><th>Description</th><th>OS</th></tr>
+        <tr><td>Get-Process</td><td>List running processes with details</td><td>Windows</td></tr>
+        <tr><td>Stop-Process -Id &lt;PID&gt;</td><td>Kill a process by PID</td><td>Windows</td></tr>
+        <tr><td>Get-NetTCPConnection</td><td>List active network connections</td><td>Windows</td></tr>
+        <tr><td>Get-ScheduledTask</td><td>List all scheduled tasks</td><td>Windows</td></tr>
+        <tr><td>Get-ItemProperty HKLM:\\...\\Run</td><td>Check registry autorun entries</td><td>Windows</td></tr>
+        <tr><td>Get-ChildItem -Recurse -Force</td><td>List files including hidden ones</td><td>Windows</td></tr>
+        <tr><td>Get-FileHash &lt;file&gt;</td><td>Calculate SHA256 hash of a file</td><td>Windows</td></tr>
+        <tr><td>ps aux --sort=-%cpu</td><td>List processes by CPU usage</td><td>Linux</td></tr>
+        <tr><td>ss -tulnp</td><td>List listening sockets with process info</td><td>Linux</td></tr>
+        <tr><td>crontab -l</td><td>List cron jobs for persistence check</td><td>Linux</td></tr>
+        <tr><td>find / -name "*.sh" -mtime -1</td><td>Find recently modified scripts</td><td>Linux</td></tr>
+        <tr><td>cat /etc/passwd</td><td>Check for unauthorized user accounts</td><td>Linux</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SINGULARITY MARKETPLACE INTEGRATIONS</div>
+    <table class="pg-table">
+        <tr><th>Integration</th><th>Category</th><th>Description</th></tr>
+        <tr><td>Splunk</td><td>SIEM</td><td>Bi-directional alerts + Deep Visibility query from Splunk</td></tr>
+        <tr><td>Microsoft Sentinel</td><td>SIEM</td><td>Incident sync, automated response via Logic Apps</td></tr>
+        <tr><td>Palo Alto XSOAR</td><td>SOAR</td><td>Playbook-driven response, IOC sync, device actions</td></tr>
+        <tr><td>ServiceNow</td><td>ITSM</td><td>Auto-create incidents, CMDB enrichment</td></tr>
+        <tr><td>Okta</td><td>Identity</td><td>Suspend compromised user accounts automatically</td></tr>
+        <tr><td>AWS / Azure / GCP</td><td>Cloud</td><td>Protect cloud workloads, containers, Kubernetes</td></tr>
+        <tr><td>Zscaler</td><td>Network</td><td>Block C2 domains at network edge based on endpoint detections</td></tr>
+        <tr><td>MISP</td><td>Threat Intel</td><td>Auto-import/export IOCs for enrichment</td></tr>
+        <tr><td>VirusTotal</td><td>Threat Intel</td><td>Hash reputation lookup for Deep Visibility results</td></tr>
+        <tr><td>Slack / Teams</td><td>Communication</td><td>Real-time alert notifications to SOC channels</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Storyline</h4><p>Auto-correlates all related events into attack storylines — see the full kill chain from initial access to impact in one view.</p></div>
-        <div class="pg-info-card"><h4>Rollback</h4><p>Windows VSS-based ransomware rollback. Revert encrypted files to pre-attack state with one click.</p></div>
-        <div class="pg-info-card"><h4>Remote Shell</h4><p>Full remote shell access to endpoints for investigation and remediation — PowerShell, Bash, or Python.</p></div>
-        <div class="pg-info-card"><h4>Ranger (Network Discovery)</h4><p>Discover and fingerprint all network devices including IoT/OT. Identify unmanaged endpoints.</p></div>
+        <div class="pg-info-card"><h4>Enable Protect Mode</h4><p>Run in Detect mode for the first week to baseline behavior. Then switch to Protect for auto-kill + quarantine. Keep Rollback enabled for ransomware recovery.</p></div>
+        <div class="pg-info-card"><h4>Tune Before Enforce</h4><p>Review all detections for 7-14 days. Add path/hash/signer exclusions for legitimate software (backup agents, dev tools). Then enable auto-quarantine.</p></div>
+        <div class="pg-info-card"><h4>STAR Rules for Custom Threats</h4><p>Create STAR rules for threats specific to your industry. Use Deep Visibility to prototype queries, then promote to STAR rules with automated response.</p></div>
+        <div class="pg-info-card"><h4>Enable Ranger for Visibility</h4><p>Deploy Ranger to discover unmanaged devices (printers, IoT, BYOD). Use Ranger to identify gaps in agent deployment coverage.</p></div>
+        <div class="pg-info-card"><h4>Leverage Storyline for IR</h4><p>When investigating alerts, always start with the Storyline view. It auto-correlates all related events — no manual pivot tables needed.</p></div>
+        <div class="pg-info-card"><h4>API-First Automation</h4><p>Use the REST API for bulk operations: deploy agents, update policies, fetch threats, isolate devices. Integrate with SOAR for automated playbooks.</p></div>
     </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console navigation, alert triage, threat status (Active/Mitigated/Resolved), basic remediation actions</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Deep Visibility queries, STAR rules, exclusion management, Remote Shell, Storyline investigation</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Policy tuning, Ranger deployment, API automation, Data Lake queries, Marketplace integrations</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Purple teaming, custom threat hunting, multi-tenant management, Singularity XDR correlation</td><td>3-6 months</td></tr>
+    </table>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -634,24 +1024,262 @@ AND TgtProcCmdLine ContainsCIS ("http" OR "ftp" OR "download" OR "transfer")`, '
 richPageContent.carbonblack = `
 ${pgBack()}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-    <h1 style="margin:0;border:none;padding:0">VMWARE CARBON BLACK</h1>
+    <h1 style="margin:0;border:none;padding:0">VMWARE CARBON BLACK CLOUD</h1>
     <span class="card-tag" style="position:static">EDR</span>
 </div>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Endpoint detection with Cb Response (EDR) and Cb Defense (NGAV). Watchlist-based detection.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Endpoint detection with unified NGAV + EDR, watchlist-based hunting, Live Response, and unfiltered endpoint telemetry.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">WATCHLIST QUERIES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">
+        VMware Carbon Black Cloud is a cloud-native endpoint security platform that combines next-generation antivirus (NGAV), endpoint detection and response (EDR), and managed threat hunting. The platform captures unfiltered endpoint data — every process execution, file modification, registry change, and network connection — enabling comprehensive threat hunting and forensic investigation.
+    </p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">
+        Carbon Black uses a Solr-based query language for watchlists and process searches. Watchlists continuously monitor for IOCs using query-based or report-based indicators. The platform's reputation system classifies every binary on a spectrum from Known Malware to Company Whitelist, enabling policy-based prevention without signature updates.
+    </p>
+</div>
 
-    <h4 style="color:#0f0;margin-top:15px">1. Ransomware Behavior</h4>
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐
+    │  Endpoints   │     │  CB Sensor   │     │  Carbon Black Cloud  │
+    │  ──────────  │────▶│  ──────────  │────▶│  (PSC)               │
+    │  Windows     │     │  Kernel      │     │  ──────────────────  │
+    │  macOS       │     │  driver +    │     │  Process Search      │
+    │  Linux       │     │  User-mode   │     │  Watchlists & Feeds  │
+    │  VDI         │     │  service     │     │  Alert Management    │
+    └──────────────┘     └──────────────┘     └──────────┬───────────┘
+                                                         │
+    ┌──────────────┐     ┌──────────────┐     ┌──────────▼───────────┐
+    │  Response     │     │  Threat      │     │  Investigate         │
+    │  ──────────  │◀────│  Intel       │◀────│  ──────────────────  │
+    │  Quarantine  │     │  ──────────  │     │  Process Tree        │
+    │  Ban Hash    │     │  Watchlists  │     │  Binary Analysis     │
+    │  Live Resp.  │     │  Feeds (JSON)│     │  Network Connections │
+    │  Net Isolate │     │  Reputation  │     │  File Modifications  │
+    └──────────────┘     └──────────────┘     └──────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>Watchlist</td><td>Continuously running query that generates alerts when matching processes/events are detected across endpoints</td></tr>
+        <tr><td>Feed</td><td>Threat intelligence feed containing IOC reports (hashes, IPs, domains) with associated threat scores</td></tr>
+        <tr><td>Query-Based IOC</td><td>Solr query that matches process behavior patterns (command lines, parent-child relationships, network activity)</td></tr>
+        <tr><td>Report-Based IOC</td><td>IOCs based on file hashes, IP addresses, or domains from threat intelligence feeds</td></tr>
+        <tr><td>Process Search</td><td>Full-text search across all recorded process executions with parent-child tree visualization</td></tr>
+        <tr><td>Binary Search</td><td>Search for specific binaries by hash, name, publisher, or file properties across all endpoints</td></tr>
+        <tr><td>Live Response</td><td>Interactive remote shell session on endpoints for investigation and remediation</td></tr>
+        <tr><td>Reputation</td><td>7-tier classification from KNOWN_MALWARE to LOCAL_WHITE — drives prevention policy decisions</td></tr>
+        <tr><td>Network Isolation</td><td>Quarantine endpoint from network while maintaining sensor-to-cloud communication</td></tr>
+        <tr><td>Cb LiveOps</td><td>Real-time endpoint querying (osquery-based) for live asset inventory and vulnerability assessment</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">WATCHLIST & PROCESS SEARCH QUERIES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Ransomware Behavior</h4>
     ${pgCode(`(process_name:vssadmin.exe AND cmdline:"delete shadows") OR
 (process_name:wmic.exe AND cmdline:"shadowcopy delete") OR
 (process_name:bcdedit.exe AND cmdline:"recoveryenabled no") OR
-(filemod_count:[100 TO *] AND process_name:* AND -process_publisher_state:FILE_SIGNATURE_STATE_SIGNED)`, 'text')}
+(filemod_count:[100 TO *] AND -process_publisher_state:FILE_SIGNATURE_STATE_SIGNED)`, 'cb-query')}
 
-    <h4 style="color:#0f0;margin-top:15px">2. Living Off the Land</h4>
+    <h4 style="color:var(--accent);margin-top:15px">2. Living Off the Land Binaries</h4>
     ${pgCode(`(process_name:certutil.exe AND (cmdline:"-urlcache" OR cmdline:"-decode" OR cmdline:"-encode")) OR
 (process_name:bitsadmin.exe AND cmdline:"/transfer") OR
-(process_name:mshta.exe AND cmdline:"http")`, 'text')}
+(process_name:mshta.exe AND cmdline:"http") OR
+(process_name:regsvr32.exe AND cmdline:"/s /n /u /i:http") OR
+(process_name:cmstp.exe AND cmdline:"/s")`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Credential Dumping — LSASS Access</h4>
+    ${pgCode(`(process_name:procdump.exe AND cmdline:"lsass") OR
+(process_name:rundll32.exe AND cmdline:"comsvcs.dll" AND cmdline:"MiniDump") OR
+(process_name:mimikatz.exe) OR
+(process_name:taskmgr.exe AND cmdline:"lsass") OR
+(crossproc_type:remote_thread AND crossproc_name:lsass.exe)`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. PowerShell Encoded Commands</h4>
+    ${pgCode(`process_name:powershell.exe AND
+(cmdline:"-EncodedCommand" OR cmdline:"-enc " OR cmdline:"-ec ") AND
+-parent_name:svchost.exe AND -parent_name:msiexec.exe`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. Suspicious Script Execution</h4>
+    ${pgCode(`(process_name:wscript.exe OR process_name:cscript.exe) AND
+(cmdline:".js" OR cmdline:".vbs" OR cmdline:".wsf" OR cmdline:".hta") AND
+(cmdline:"\\\\temp\\\\" OR cmdline:"\\\\appdata\\\\" OR cmdline:"\\\\users\\\\" OR cmdline:"\\\\downloads\\\\")`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. C2 Beaconing Detection</h4>
+    ${pgCode(`process_name:* AND netconn_count:[50 TO *] AND
+-process_name:chrome.exe AND -process_name:firefox.exe AND -process_name:msedge.exe AND
+-process_name:svchost.exe AND -process_name:teams.exe AND
+-process_publisher_state:FILE_SIGNATURE_STATE_SIGNED`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. Lateral Movement — Remote Execution</h4>
+    ${pgCode(`(process_name:psexec.exe OR process_name:psexesvc.exe) OR
+(process_name:wmic.exe AND cmdline:"/node:" AND cmdline:"process call create") OR
+(process_name:winrm.exe OR process_name:winrs.exe) OR
+(process_name:sc.exe AND cmdline:"\\\\\\\\*" AND cmdline:"create")`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">8. Persistence — Registry & Scheduled Tasks</h4>
+    ${pgCode(`(regmod:*\\\\currentversion\\\\run* AND -process_name:explorer.exe AND -process_name:msiexec.exe) OR
+(process_name:schtasks.exe AND cmdline:"/create" AND cmdline:"/sc" AND
+    (cmdline:"cmd" OR cmdline:"powershell" OR cmdline:"wscript" OR cmdline:"mshta"))`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">9. Process Injection</h4>
+    ${pgCode(`crossproc_type:remote_thread AND
+-process_name:csrss.exe AND -process_name:svchost.exe AND
+-process_publisher_state:FILE_SIGNATURE_STATE_SIGNED`, 'cb-query')}
+
+    <h4 style="color:var(--accent);margin-top:15px">10. Defense Evasion — Log Clearing</h4>
+    ${pgCode(`(process_name:wevtutil.exe AND cmdline:"cl") OR
+(process_name:powershell.exe AND cmdline:"Clear-EventLog") OR
+(process_name:cmd.exe AND cmdline:"wevtutil" AND cmdline:"clear-log")`, 'cb-query')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">CUSTOM THREAT FEED (JSON)</div>
+    ${pgCode(`{
+  "feedinfo": {
+    "name": "BlueShell Custom Threat Feed",
+    "display_name": "BlueShell SOC IOCs",
+    "provider_url": "https://internal.soc/feeds",
+    "summary": "Internal threat intelligence feed with IOCs from incident response",
+    "category": "Partner",
+    "alertable": true
+  },
+  "reports": [
+    {
+      "id": "report-001",
+      "timestamp": 1711929600,
+      "title": "Cobalt Strike C2 Infrastructure",
+      "description": "Known Cobalt Strike team server IPs from recent IR engagement",
+      "severity": 9,
+      "iocs_v2": [
+        {"id": "ioc-1", "match_type": "query", "values": ["netconn_ipv4:185.220.101.0/24"]},
+        {"id": "ioc-2", "match_type": "equality", "field": "process_sha256",
+         "values": ["a1b2c3d4e5f6..."]}
+      ],
+      "tags": ["cobalt-strike", "c2", "apt"]
+    }
+  ]
+}`, 'json')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">WATCHLIST CREATION STEPS</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Define the hypothesis:</strong> What attacker behavior are you hunting for? Map to MITRE ATT&CK technique. Example: T1059.001 — suspicious PowerShell execution.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Build the query:</strong> Use Process Search to prototype your Solr query. Test against historical data. Iterate to reduce false positives.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Validate results:</strong> Run for 7 days as a saved search. Review all hits — confirm true positives, identify FP patterns, add exclusions.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Create the watchlist:</strong> Watchlists > Create Watchlist > Add your IOC query. Set alert severity and enable notifications.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Configure response:</strong> Set alert type, notification targets (email, webhook, SIEM), and optionally enable auto-ban or isolation.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Monitor and tune:</strong> Review alert volume weekly. Tune query thresholds, add exclusions for legitimate tools, and track detection efficacy.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SENSOR POLICY SETTINGS</div>
+    <table class="pg-table">
+        <tr><th>Setting</th><th>Options</th><th>Recommended</th></tr>
+        <tr><td>Known Malware Prevention</td><td>Terminate / Deny / Allow</td><td>Terminate</td></tr>
+        <tr><td>Suspect Malware Prevention</td><td>Terminate / Deny / Allow</td><td>Deny (then Terminate after tuning)</td></tr>
+        <tr><td>PUP Prevention</td><td>Terminate / Deny / Allow</td><td>Deny</td></tr>
+        <tr><td>Malware Removal</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Sensor Tamper Protection</td><td>Enable / Disable</td><td>Enable (always)</td></tr>
+        <tr><td>Background Scan</td><td>Enable / Disable</td><td>Enable (on install + periodic)</td></tr>
+        <tr><td>Hash Blocking</td><td>Enable / Disable</td><td>Enable for banned hashes</td></tr>
+        <tr><td>USB Device Control</td><td>Allow / Block / Approve Only</td><td>Approve Only for sensitive groups</td></tr>
+        <tr><td>Script Monitoring</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Memory Protection</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Ransomware Protection</td><td>Enable / Disable</td><td>Enable</td></tr>
+        <tr><td>Network Isolation</td><td>Available / Disabled</td><td>Available (use on demand)</td></tr>
+        <tr><td>Live Response</td><td>Enable / Disable</td><td>Enable for IR team</td></tr>
+        <tr><td>Bypass Rules</td><td>Path / Process / Certificate</td><td>Minimize — document all bypasses</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">LIVE RESPONSE COMMANDS</div>
+    <table class="pg-table">
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td>ps</td><td>List running processes with PID, name, path, user</td></tr>
+        <tr><td>kill &lt;PID&gt;</td><td>Terminate a process by PID</td></tr>
+        <tr><td>memdump &lt;PID&gt;</td><td>Capture process memory dump for forensic analysis</td></tr>
+        <tr><td>execfg &lt;command&gt;</td><td>Execute a command in foreground and return output</td></tr>
+        <tr><td>put &lt;local&gt; &lt;remote&gt;</td><td>Upload a file to the endpoint</td></tr>
+        <tr><td>get &lt;remote&gt;</td><td>Download a file from the endpoint</td></tr>
+        <tr><td>delete &lt;path&gt;</td><td>Delete a file from the endpoint</td></tr>
+        <tr><td>reg query &lt;key&gt;</td><td>Query Windows registry key and values</td></tr>
+        <tr><td>reg set &lt;key&gt; &lt;value&gt;</td><td>Create or modify a registry value</td></tr>
+        <tr><td>dir &lt;path&gt;</td><td>List directory contents</td></tr>
+        <tr><td>drives</td><td>List all mounted drives</td></tr>
+        <tr><td>mkdir &lt;path&gt;</td><td>Create a directory</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">API EXAMPLES (Python)</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">Search Processes by Hash</h4>
+    ${pgCode(`from cbapi.psc import CbPSCBaseAPI
+api = CbPSCBaseAPI(profile="default")
+
+# Search for processes matching a suspicious hash
+results = api.select(Process).where("process_sha256:a1b2c3d4e5f6...")
+for proc in results:
+    print(f"{proc.device_name} | {proc.process_name} | {proc.process_cmdline}")`, 'python')}
+
+    <h4 style="color:var(--accent);margin-top:15px">Isolate Compromised Device</h4>
+    ${pgCode(`import requests, json
+headers = {"X-Auth-Token": "API_SECRET_KEY/API_ID", "Content-Type": "application/json"}
+url = "https://defense.conferdeploy.net/appservices/v6/orgs/{org_key}/device_actions"
+
+payload = {
+    "action_type": "QUARANTINE",
+    "device_id": ["12345"],
+    "options": {"toggle": "ON"}
+}
+response = requests.post(url, headers=headers, json=payload)
+print(f"Status: {response.status_code} - Device isolated")`, 'python')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">REPUTATION SCORING</div>
+    <table class="pg-table">
+        <tr><th>Reputation Level</th><th>Description</th><th>Default Action</th></tr>
+        <tr><td style="color:var(--red);font-weight:bold">KNOWN_MALWARE</td><td>Confirmed malicious by CB Threat Intel</td><td>Terminate</td></tr>
+        <tr><td style="color:var(--orange);font-weight:bold">SUSPECT_MALWARE</td><td>Likely malicious based on heuristic analysis</td><td>Deny</td></tr>
+        <tr><td style="color:var(--yellow);font-weight:bold">PUP</td><td>Potentially Unwanted Program (adware, toolbar)</td><td>Deny</td></tr>
+        <tr><td>NOT_LISTED</td><td>Unknown — no reputation data available</td><td>Allow (monitor)</td></tr>
+        <tr><td style="color:var(--cyan)">ADAPTIVE_WHITE_LIST</td><td>Auto-approved based on prevalence and behavior</td><td>Allow</td></tr>
+        <tr><td style="color:var(--green)">COMPANY_WHITE_LIST</td><td>Manually approved by organization admin</td><td>Allow</td></tr>
+        <tr><td style="color:var(--green);font-weight:bold">LOCAL_WHITE</td><td>Approved by local IT admin for specific devices</td><td>Allow</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Layer Watchlists by Severity</h4><p>Create High/Medium/Low watchlists. High = immediate alert (credential dumping, ransomware). Medium = daily review. Low = weekly threat hunting.</p></div>
+        <div class="pg-info-card"><h4>Leverage Unfiltered Data</h4><p>CB captures every process, file, and network event. Use this for forensic investigations — trace any process back to its full execution chain.</p></div>
+        <div class="pg-info-card"><h4>Custom Feeds for Your Org</h4><p>Build custom threat feeds from your IR findings, threat intel, and industry ISACs. Deploy as JSON feeds for continuous automated matching.</p></div>
+        <div class="pg-info-card"><h4>Policy by Device Group</h4><p>Create separate policies for servers (strict), workstations (balanced), and dev machines (permissive). Avoid one-size-fits-all prevention.</p></div>
+        <div class="pg-info-card"><h4>Enable USB Device Control</h4><p>Use Approve Only mode for sensitive device groups. Whitelist specific USB vendor IDs for authorized devices (YubiKey, approved drives).</p></div>
+        <div class="pg-info-card"><h4>Monitor Sensor Health</h4><p>Track sensor deployment coverage, bypass status, and version drift. Alert on sensors in bypass mode or offline > 24 hours.</p></div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console navigation, alert triage, process tree investigation, basic sensor policies</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Solr query language, watchlist creation, Live Response, custom feeds, binary analysis</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Cb LiveOps (osquery), API automation, threat hunting playbooks, policy optimization</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Custom connector development, SOAR integration, multi-tenant management, advanced forensics</td><td>3-6 months</td></tr>
+    </table>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -666,29 +1294,144 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">PALO ALTO CORTEX XDR</h1>
     <span class="card-tag" style="position:static">XDR</span>
 </div>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Extended detection and response with XQL queries, BIOC rules, and cross-data-source correlation.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Industry-first XDR platform stitching endpoint, network, cloud, and identity data with XQL hunting and BIOC behavioral rules.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">XQL QUERY EXAMPLES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">
+        Palo Alto Cortex XDR was the industry's first extended detection and response platform, integrating endpoint, network (via NGFW), cloud, and third-party data into a single analytics engine. It uses the Cortex Data Lake for centralized storage and XQL (XDR Query Language) for threat hunting across all data sources. WildFire sandboxing provides zero-day malware analysis, and AutoFocus delivers threat intelligence context.
+    </p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">
+        Cortex XDR's Causality Chain stitches together process trees, network connections, and file operations into unified incidents. BIOC (Behavioral IOC) rules detect techniques like process injection, credential theft, and lateral movement at the behavioral level rather than relying on signatures. The platform supports automated response actions including endpoint isolation, file quarantine, and script execution.
+    </p>
+</div>
 
-    <h4 style="color:#0f0;margin-top:15px">1. Process Chain Analysis</h4>
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  Endpoints   │  │  NGFW Logs   │  │  Cloud Logs  │  │  3rd Party   │
+    │  (Traps/XDR) │  │  (PAN-OS)    │  │  (Prisma)    │  │  (Syslog/API)│
+    └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+           └─────────────────┼─────────────────┼─────────────────┘
+                             ▼                 ▼
+                    ┌────────────────────────────────┐
+                    │      CORTEX DATA LAKE          │
+                    │  (Centralized telemetry store)  │
+                    └────────────────┬───────────────┘
+                                     ▼
+    ┌──────────────┐     ┌───────────────────┐     ┌──────────────┐
+    │  Incidents & │     │  XDR Analytics     │     │  Response    │
+    │  Alerts      │◀────│  Engine            │────▶│  Actions     │
+    │  ──────────  │     │  ──────────────── │     │  ──────────  │
+    │  Causality   │     │  BIOC Rules       │     │  Isolate     │
+    │  Chain View  │     │  Correlation Rules│     │  Quarantine  │
+    │  MITRE Map   │     │  ML Analytics     │     │  Script Exec │
+    └──────────────┘     └───────────────────┘     └──────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>XQL</td><td>XDR Query Language — pipe-based query syntax for hunting across endpoint, network, cloud, and identity data in the Data Lake</td></tr>
+        <tr><td>BIOC Rules</td><td>Behavioral IOC rules that detect attack techniques by matching process behavior patterns (not signatures)</td></tr>
+        <tr><td>Correlation Rules</td><td>Multi-event rules that combine conditions across different data sources and timeframes to detect complex attacks</td></tr>
+        <tr><td>Causality Chain</td><td>Auto-generated attack tree showing the complete sequence from initial process to all descendant actions</td></tr>
+        <tr><td>Causality View</td><td>Visual representation of the attack chain — processes, files, network, registry in a connected graph</td></tr>
+        <tr><td>Cortex Data Lake</td><td>Cloud-native data lake storing normalized telemetry from all integrated sources for centralized analysis</td></tr>
+        <tr><td>WildFire Integration</td><td>Cloud-based sandbox that detonates unknown files and provides verdicts within minutes</td></tr>
+        <tr><td>Host Profiles</td><td>Baseline profiles of normal endpoint behavior used to detect anomalies and reduce false positives</td></tr>
+        <tr><td>Response Actions</td><td>Automated or manual actions: isolate, quarantine, kill process, block hash/IP/domain, run script</td></tr>
+        <tr><td>Analytics BIOC</td><td>ML-driven behavioral detection that identifies anomalous patterns without predefined rules</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">XQL HUNTING QUERIES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Suspicious PowerShell / Encoded Commands</h4>
     ${pgCode(`dataset = xdr_data
-| filter event_type = ENUM.PROCESS and action_process_image_name in ("cmd.exe","powershell.exe")
-| filter action_process_image_command_line contains "encodedcommand" or action_process_image_command_line contains "bypass"
+| filter event_type = ENUM.PROCESS and action_process_image_name in ("cmd.exe","powershell.exe","pwsh.exe")
+| filter action_process_image_command_line contains "encodedcommand" or action_process_image_command_line contains "bypass" or action_process_image_command_line contains "-ec "
 | fields agent_hostname, actor_process_image_name, action_process_image_name, action_process_image_command_line, _time
 | sort desc _time`, 'xql')}
 
-    <h4 style="color:#0f0;margin-top:15px">2. Lateral Movement via RDP</h4>
+    <h4 style="color:var(--accent);margin-top:15px">2. Lateral Movement via RDP</h4>
     ${pgCode(`dataset = xdr_data
-| filter event_type = ENUM.NETWORK and action_remote_port = 3389
-| comp count(agent_hostname) as connection_count by action_remote_ip
-| filter connection_count > 5
+| filter event_type = ENUM.NETWORK and action_remote_port = 3389 and action_external_hostname != null
+| comp count(agent_hostname) as connection_count, values(agent_hostname) as source_hosts by action_remote_ip
+| filter connection_count > 3
 | sort desc connection_count`, 'xql')}
 
-    <h4 style="color:#0f0;margin-top:15px">3. BIOC Rule Template</h4>
+    <h4 style="color:var(--accent);margin-top:15px">3. Credential Theft — Mimikatz / LSASS Dump</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.PROCESS
+| filter action_process_image_name = "lsass.exe" and actor_process_image_name not in ("svchost.exe","csrss.exe","lsm.exe","wininit.exe","services.exe","MsMpEng.exe")
+| fields _time, agent_hostname, actor_process_image_name, actor_process_command_line, causality_actor_process_image_name
+| sort desc _time`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. DNS Tunneling Detection</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.NETWORK and action_remote_port = 53
+| alter query_len = length(action_external_hostname)
+| filter query_len > 40
+| comp count() as query_count, avg(query_len) as avg_length by agent_hostname, action_external_hostname
+| filter query_count > 50
+| sort desc query_count`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. Persistence via Windows Services</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.PROCESS and action_process_image_name = "sc.exe"
+| filter action_process_image_command_line contains "create" and action_process_image_command_line contains "binpath"
+| filter action_process_image_command_line contains "cmd" or action_process_image_command_line contains "powershell" or action_process_image_command_line contains "temp"
+| fields _time, agent_hostname, action_process_image_command_line, actor_process_image_name`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. Process Injection — CreateRemoteThread</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.INJECTION and action_remote_process_image_name in ("explorer.exe","svchost.exe","lsass.exe","csrss.exe")
+| filter actor_process_image_name not in ("csrss.exe","svchost.exe","services.exe","MsMpEng.exe")
+| fields _time, agent_hostname, actor_process_image_name, action_remote_process_image_name, actor_process_command_line
+| sort desc _time`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. Suspicious File Downloads</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.FILE and action_file_extension in ("exe","dll","scr","bat","ps1","vbs","hta","js")
+| filter action_file_path contains "Downloads" or action_file_path contains "Temp" or action_file_path contains "AppData"
+| filter actor_process_image_name in ("chrome.exe","firefox.exe","msedge.exe","outlook.exe","winword.exe")
+| fields _time, agent_hostname, action_file_name, action_file_path, actor_process_image_name
+| sort desc _time`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">8. Brute Force Authentication</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.LOGIN and action_login_status = ENUM.LOGIN_FAIL
+| comp count() as fail_count, distinct_count(action_login_user) as unique_users by agent_hostname, action_remote_ip
+| filter fail_count > 20 or unique_users > 5
+| sort desc fail_count`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">9. Data Exfiltration via HTTP POST</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.NETWORK and action_remote_port in (80,443,8080,8443)
+| filter action_upload_bytes > 10000000
+| filter action_external_hostname not contains "microsoft.com" and action_external_hostname not contains "windows.com"
+| fields _time, agent_hostname, actor_process_image_name, action_external_hostname, action_upload_bytes
+| sort desc action_upload_bytes`, 'xql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">10. Registry Persistence</h4>
+    ${pgCode(`dataset = xdr_data
+| filter event_type = ENUM.REGISTRY and action_registry_key_name contains "CurrentVersion\\\\Run"
+| filter actor_process_image_name not in ("explorer.exe","msiexec.exe","svchost.exe","setup.exe")
+| fields _time, agent_hostname, actor_process_image_name, action_registry_key_name, action_registry_value_name, action_registry_data
+| sort desc _time`, 'xql')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BIOC RULES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. LSASS Credential Access</h4>
     ${pgCode(`{
   "name": "Suspicious LSASS Access",
-  "description": "Detects processes accessing LSASS memory for credential dumping",
   "severity": "HIGH",
   "ioc_type": "BIOC",
   "indicator": {
@@ -696,13 +1439,112 @@ ${pgBack()}
     "filter": {
       "AND": [
         {"field": "target_process_image_name", "value": "lsass.exe"},
-        {"field": "actor_process_image_name", "NOT_IN": ["svchost.exe", "lsm.exe", "csrss.exe"]}
+        {"field": "actor_process_image_name", "NOT_IN": ["svchost.exe","lsm.exe","csrss.exe","wininit.exe","MsMpEng.exe"]}
       ]
     }
   },
-  "mitre_tactics": ["TA0006"],
-  "mitre_techniques": ["T1003.001"]
+  "mitre_tactics": ["TA0006"], "mitre_techniques": ["T1003.001"]
 }`, 'json')}
+
+    <h4 style="color:var(--accent);margin-top:15px">2. Ransomware Behavior</h4>
+    ${pgCode(`{
+  "name": "Ransomware Shadow Copy Deletion + Mass Encryption",
+  "severity": "CRITICAL",
+  "ioc_type": "BIOC",
+  "indicator": {
+    "type": "process_chain",
+    "filter": {
+      "OR": [
+        {"AND": [{"field": "process_image_name", "value": "vssadmin.exe"}, {"field": "process_command_line", "contains": "delete shadows"}]},
+        {"AND": [{"field": "process_image_name", "value": "bcdedit.exe"}, {"field": "process_command_line", "contains": "recoveryenabled no"}]},
+        {"AND": [{"field": "process_image_name", "value": "wmic.exe"}, {"field": "process_command_line", "contains": "shadowcopy delete"}]}
+      ]
+    }
+  },
+  "mitre_tactics": ["TA0040"], "mitre_techniques": ["T1490","T1486"]
+}`, 'json')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">RESPONSE ACTIONS</div>
+    <table class="pg-table">
+        <tr><th>Action</th><th>Description</th><th>Scope</th></tr>
+        <tr><td>Isolate Endpoint</td><td>Network-isolate device, maintain XDR agent connectivity</td><td>Single device</td></tr>
+        <tr><td>Quarantine File</td><td>Move malicious file to quarantine vault</td><td>Single file</td></tr>
+        <tr><td>Block Hash</td><td>Block file execution by SHA256 across all endpoints</td><td>Organization-wide</td></tr>
+        <tr><td>Block IP/Domain</td><td>Block network connections to malicious destinations</td><td>NGFW + Endpoints</td></tr>
+        <tr><td>Kill Process</td><td>Terminate running malicious process</td><td>Single device</td></tr>
+        <tr><td>Delete File</td><td>Remove malicious file from endpoint</td><td>Single device</td></tr>
+        <tr><td>Live Terminal</td><td>Open remote shell for investigation</td><td>Single device</td></tr>
+        <tr><td>File Retrieval</td><td>Download file from endpoint for analysis</td><td>Single device</td></tr>
+        <tr><td>Script Execution</td><td>Run remediation script (Python/PowerShell/Shell)</td><td>Single or bulk</td></tr>
+        <tr><td>Scan Endpoint</td><td>Trigger full malware scan on demand</td><td>Single or bulk</td></tr>
+        <tr><td>Restore File</td><td>Restore quarantined file if false positive</td><td>Single file</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PREVENTION PROFILES</div>
+    <table class="pg-table">
+        <tr><th>Profile</th><th>Description</th><th>Recommended</th></tr>
+        <tr><td>Malware Prevention</td><td>WildFire verdict-based blocking, local analysis, hash blocking</td><td>Enable (Block)</td></tr>
+        <tr><td>Exploit Prevention</td><td>Memory protection against buffer overflow, ROP chains, DLL injection</td><td>Enable (Block)</td></tr>
+        <tr><td>Behavioral Threat Protection</td><td>AI-based detection of fileless attacks, LOLBin abuse, process injection</td><td>Enable (Block after tuning)</td></tr>
+        <tr><td>Restrictions Profile</td><td>Block execution from temp dirs, removable media, network shares</td><td>Enable for servers</td></tr>
+        <tr><td>Host Firewall</td><td>Endpoint-level network ACLs managed centrally</td><td>Enable for sensitive assets</td></tr>
+        <tr><td>Disk Encryption</td><td>BitLocker/FileVault management</td><td>Enable organization-wide</td></tr>
+        <tr><td>Device Control</td><td>USB and peripheral device access policies</td><td>Restrict on sensitive devices</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">API EXAMPLES (Python)</div>
+    <h4 style="color:var(--accent);margin-top:15px">Get Incidents List</h4>
+    ${pgCode(`import requests, json
+API_URL = "https://api-{fqdn}/public_api/v1/incidents/get_incidents"
+headers = {
+    "x-xdr-auth-id": "1",
+    "Authorization": "API_KEY_HERE",
+    "Content-Type": "application/json"
+}
+payload = {
+    "request_data": {
+        "filters": [{"field": "severity", "operator": "in", "value": ["high","critical"]}],
+        "search_from": 0, "search_to": 50, "sort": {"field": "creation_time", "keyword": "desc"}
+    }
+}
+resp = requests.post(API_URL, headers=headers, json=payload)
+for inc in resp.json()["reply"]["incidents"]:
+    print(f"[{inc['severity']}] {inc['description']} - {inc['host_count']} hosts")`, 'python')}
+
+    <h4 style="color:var(--accent);margin-top:15px">Isolate Endpoint</h4>
+    ${pgCode(`ISOLATE_URL = "https://api-{fqdn}/public_api/v1/endpoints/isolate"
+payload = {"request_data": {"endpoint_id_list": ["endpoint_id_here"]}}
+resp = requests.post(ISOLATE_URL, headers=headers, json=payload)
+print(f"Isolation: {resp.json()['reply']}")`, 'python')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Integrate NGFW Logs</h4><p>Connect Palo Alto NGFWs to Cortex Data Lake. XDR correlates network signatures with endpoint behavior for higher-fidelity detections.</p></div>
+        <div class="pg-info-card"><h4>Custom BIOC Rules</h4><p>Supplement built-in analytics with custom BIOCs for your environment. Focus on techniques specific to your threat model and industry.</p></div>
+        <div class="pg-info-card"><h4>Tune Behavioral Protection</h4><p>Start in Alert mode for 2 weeks. Review false positives, add exclusions, then switch to Block. Monitor the exceptions dashboard.</p></div>
+        <div class="pg-info-card"><h4>Leverage Causality View</h4><p>Always investigate using Causality View — it shows the complete attack chain from initial process to all child actions, network, and file operations.</p></div>
+        <div class="pg-info-card"><h4>WildFire for Unknown Files</h4><p>Enable WildFire submission for all unknown executables. Verdicts return in ~5 minutes and auto-update prevention policy globally.</p></div>
+        <div class="pg-info-card"><h4>Scheduled XQL Hunts</h4><p>Create saved XQL queries and schedule them weekly. Focus on: new persistence mechanisms, unusual network connections, unauthorized software.</p></div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console navigation, incident triage, Causality View, basic response actions</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>XQL queries, BIOC rules, Live Terminal, prevention profiles, WildFire analysis</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Correlation rules, API automation, third-party data integration, advanced hunting</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Custom analytics, ML model tuning, multi-tenant MSSP management, purple teaming</td><td>3-6 months</td></tr>
+    </table>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -717,14 +1559,67 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">MICROSOFT 365 DEFENDER</h1>
     <span class="card-tag" style="position:static">XDR</span>
 </div>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Unified XDR across endpoints, email, identity, and cloud apps. Cross-workload KQL hunting.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Unified XDR across Defender for Endpoint, Office 365, Identity, and Cloud Apps with cross-workload KQL hunting and AIR.</p>
 
 <div class="pg-section">
-    <div class="pg-section-title">CROSS-WORKLOAD HUNTING QUERIES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">
+        Microsoft 365 Defender is Microsoft's unified XDR platform that correlates signals across four Defender products: Endpoint (EDR), Office 365 (email), Identity (Azure AD/ADFS), and Cloud Apps (CASB). It provides a single incident queue where alerts from all workloads are auto-correlated, reducing thousands of alerts into manageable incidents with full attack chain visibility.
+    </p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">
+        Advanced Hunting supports cross-workload KQL queries spanning Device*, Email*, Identity*, and CloudApp* tables. Automated Investigation and Response (AIR) handles routine investigation and remediation, while Threat Analytics provides Microsoft-authored reports on active campaigns with detection status across your environment.
+    </p>
+</div>
 
-    <h4 style="color:#0f0;margin-top:15px">1. Phishing to Credential Theft Chain</h4>
-    ${pgCode(`// Find emails with links → user clicked → suspicious sign-in
-EmailUrlInfo
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  Defender for │  │  Defender for │  │  Defender for │  │  Defender for │
+    │  Endpoint    │  │  Office 365  │  │  Identity    │  │  Cloud Apps  │
+    │  ──────────  │  │  ──────────  │  │  ──────────  │  │  ──────────  │
+    │  Device*     │  │  Email*      │  │  Identity*   │  │  CloudApp*   │
+    │  tables      │  │  tables      │  │  tables      │  │  tables      │
+    └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+           └─────────────────┼─────────────────┼─────────────────┘
+                             ▼                 ▼
+                  ┌─────────────────────────────────┐
+                  │  UNIFIED INCIDENT QUEUE          │
+                  │  Auto-correlated cross-workload  │
+                  │  incidents with full attack chain │
+                  └────────────────┬────────────────┘
+                                   ▼
+    ┌──────────────┐     ┌────────────────┐     ┌──────────────┐
+    │  Advanced     │     │  AIR            │     │  Threat      │
+    │  Hunting      │     │  (Auto Invest.  │     │  Analytics   │
+    │  (Cross-KQL)  │     │  & Response)    │     │  (Campaign   │
+    │              │     │                │     │   Reports)   │
+    └──────────────┘     └────────────────┘     └──────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>Unified Incident Queue</td><td>Single queue auto-correlating alerts from Endpoint + Email + Identity + Cloud Apps into unified incidents</td></tr>
+        <tr><td>Advanced Hunting</td><td>Cross-workload KQL across 30+ tables: Device*, Email*, Identity*, CloudApp*, Alert*, Threat* tables</td></tr>
+        <tr><td>AIR</td><td>Automated Investigation and Response — auto-investigates alerts, collects evidence, takes remediation actions</td></tr>
+        <tr><td>Threat Analytics</td><td>Microsoft-authored reports on active threat campaigns showing your exposure, detections, and mitigations</td></tr>
+        <tr><td>Secure Score</td><td>Security posture score with prioritized improvement recommendations across all M365 workloads</td></tr>
+        <tr><td>Custom Detection Rules</td><td>KQL-based scheduled queries that generate alerts and take automated actions when conditions match</td></tr>
+        <tr><td>Attack Simulation</td><td>Built-in phishing simulation and security awareness training for users</td></tr>
+        <tr><td>Threat & Vuln Mgmt</td><td>Continuous vulnerability assessment with risk-based prioritization and remediation tracking</td></tr>
+        <tr><td>Conditional Access</td><td>Risk-based access policies integrating identity risk signals with device compliance</td></tr>
+        <tr><td>Information Protection</td><td>DLP policies, sensitivity labels, and insider risk management across M365</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">CROSS-WORKLOAD KQL QUERIES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Phishing to Credential Theft Chain</h4>
+    ${pgCode(`EmailUrlInfo
 | where Url has_any ("login", "signin", "verify", "update-account")
 | join kind=inner EmailEvents on NetworkMessageId
 | where DeliveryAction == "Delivered"
@@ -735,17 +1630,127 @@ EmailUrlInfo
 ) on $left.RecipientEmailAddress == $right.AccountUpn
 | project EmailTimestamp = Timestamp, Recipient = RecipientEmailAddress, PhishUrl = Url, LogonTime = Timestamp1, LogonIP = IPAddress`, 'kql')}
 
-    <h4 style="color:#0f0;margin-top:15px">2. BEC (Business Email Compromise)</h4>
-    ${pgCode(`// Detect inbox rule creation after suspicious sign-in
-IdentityLogonEvents
+    <h4 style="color:var(--accent);margin-top:15px">2. BEC — Inbox Rule After Suspicious Sign-in</h4>
+    ${pgCode(`IdentityLogonEvents
 | where ActionType == "LogonSuccess"
-| where ISP != "Microsoft Azure" and Country != "US" // adjust for your org
+| where ISP != "Microsoft Azure" and Country != "US"
 | join kind=inner (
     CloudAppEvents
     | where ActionType == "New-InboxRule"
     | extend RuleName = tostring(RawEventData.Parameters[0].Value)
 ) on AccountObjectId
 | project LogonTime = Timestamp, Account = AccountUpn, LogonIP = IPAddress, LogonCountry = Country, RuleCreated = RuleName`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Impossible Travel Detection</h4>
+    ${pgCode(`IdentityLogonEvents
+| where ActionType == "LogonSuccess"
+| summarize arg_min(Timestamp, Country, IPAddress) as FirstLogin, arg_max(Timestamp, Country, IPAddress) as LastLogin by AccountUpn
+| extend TimeDiff = datetime_diff('minute', LastLogin, FirstLogin)
+| where TimeDiff < 120 and Country != Country1
+| project AccountUpn, FirstCountry = Country, FirstIP = IPAddress, LastCountry = Country1, LastIP = IPAddress1, MinutesBetween = TimeDiff`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. Consent Phishing / OAuth App Abuse</h4>
+    ${pgCode(`CloudAppEvents
+| where ActionType == "Consent to application"
+| extend AppName = tostring(RawEventData.Target[3].ID)
+| extend Permissions = tostring(RawEventData.ModifiedProperties[0].NewValue)
+| where Permissions has_any ("Mail.Read", "Files.ReadWrite.All", "User.Read.All", "Directory.Read.All")
+| project Timestamp, AccountUpn = AccountObjectId, AppName, Permissions`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. Malware via Email Attachment</h4>
+    ${pgCode(`EmailAttachmentInfo
+| where FileType in ("exe", "dll", "scr", "bat", "ps1", "vbs", "js", "hta", "iso", "img")
+| join kind=inner EmailEvents on NetworkMessageId
+| where DeliveryAction == "Delivered"
+| join kind=leftouter (
+    DeviceFileEvents | where ActionType == "FileCreated"
+) on $left.SHA256 == $right.SHA256
+| project Timestamp, Recipient = RecipientEmailAddress, FileName, FileType, SHA256, Sender = SenderFromAddress, DeviceOpened = DeviceName`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. Suspicious MFA Registration</h4>
+    ${pgCode(`IdentityDirectoryEvents
+| where ActionType == "Register MFA method"
+| join kind=inner (
+    IdentityLogonEvents
+    | where ActionType == "LogonSuccess" and RiskLevelDuringSignIn in ("high", "medium")
+    | where Timestamp > ago(1h)
+) on AccountObjectId
+| project MFARegistration = Timestamp, Account = AccountUpn, RiskLevel = RiskLevelDuringSignIn, LogonIP = IPAddress, Country`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. Insider Threat — Mass SharePoint Download</h4>
+    ${pgCode(`CloudAppEvents
+| where ActionType == "FileDownloaded" and Application == "Microsoft SharePoint Online"
+| summarize DownloadCount = count(), UniqueFiles = dcount(ObjectName) by AccountObjectId, bin(Timestamp, 1h)
+| where DownloadCount > 100 or UniqueFiles > 50
+| sort by DownloadCount desc`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">8. Azure AD Role Assignment (Privilege Escalation)</h4>
+    ${pgCode(`IdentityDirectoryEvents
+| where ActionType == "Add member to role"
+| extend RoleName = tostring(AdditionalFields.Role)
+| where RoleName has_any ("Global Administrator", "Exchange Administrator", "SharePoint Administrator", "Security Administrator")
+| project Timestamp, Actor = AccountUpn, TargetAccount = TargetAccountUpn, RoleName`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">9. Full Attack Chain: Email -> Endpoint -> Identity</h4>
+    ${pgCode(`// Trace attack from phishing email to endpoint compromise to lateral movement
+let PhishedUsers = EmailEvents
+| where ThreatTypes has "Phish" and DeliveryAction == "Delivered"
+| distinct RecipientEmailAddress;
+let CompromisedDevices = DeviceLogonEvents
+| where AccountUpn in (PhishedUsers) and Timestamp > ago(4h)
+| distinct DeviceName, AccountUpn;
+DeviceProcessEvents
+| where DeviceName in (CompromisedDevices) and Timestamp > ago(4h)
+| where FileName in~ ("powershell.exe", "cmd.exe", "wmic.exe", "psexec.exe")
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine`, 'kql')}
+
+    <h4 style="color:var(--accent);margin-top:15px">10. Shadow IT — Unsanctioned Cloud App Usage</h4>
+    ${pgCode(`CloudAppEvents
+| where Application !in ("Microsoft 365", "Microsoft SharePoint Online", "Microsoft Teams",
+    "Microsoft Exchange Online", "Microsoft OneDrive for Business")
+| summarize EventCount = count(), Users = dcount(AccountObjectId) by Application
+| where EventCount > 100 or Users > 10
+| sort by Users desc`, 'kql')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">AUTOMATED INVESTIGATION & RESPONSE (AIR)</div>
+    <table class="pg-table">
+        <tr><th>Auto-Investigation Action</th><th>Workload</th><th>Outcome</th></tr>
+        <tr><td>Quarantine malicious email</td><td>Office 365</td><td>Auto or pending approval</td></tr>
+        <tr><td>Block malicious URL</td><td>Office 365</td><td>Auto</td></tr>
+        <tr><td>Disable compromised account</td><td>Identity</td><td>Pending approval</td></tr>
+        <tr><td>Force password reset</td><td>Identity</td><td>Pending approval</td></tr>
+        <tr><td>Quarantine malicious file</td><td>Endpoint</td><td>Auto</td></tr>
+        <tr><td>Kill malicious process</td><td>Endpoint</td><td>Auto</td></tr>
+        <tr><td>Remove persistence</td><td>Endpoint</td><td>Auto</td></tr>
+        <tr><td>Isolate device</td><td>Endpoint</td><td>Pending approval</td></tr>
+        <tr><td>Revoke OAuth app consent</td><td>Cloud Apps</td><td>Pending approval</td></tr>
+        <tr><td>Block sender</td><td>Office 365</td><td>Auto or pending approval</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Enable All Defender Products</h4><p>M365 Defender is most powerful when all four workloads (Endpoint, O365, Identity, Cloud Apps) feed into the unified queue. Partial deployment reduces correlation.</p></div>
+        <div class="pg-info-card"><h4>Cross-Workload Custom Detections</h4><p>Write KQL rules that span multiple tables (e.g., EmailEvents JOIN DeviceProcessEvents). These catch multi-stage attacks individual products miss.</p></div>
+        <div class="pg-info-card"><h4>Auto-Remediation Levels</h4><p>Set AIR to auto-remediate for low/medium severity. Require analyst approval for high severity and account-impacting actions (disable user, isolate device).</p></div>
+        <div class="pg-info-card"><h4>Threat Analytics Reviews</h4><p>Check Threat Analytics weekly. Microsoft publishes reports on active campaigns with detection coverage — ensure your environment is protected against current threats.</p></div>
+        <div class="pg-info-card"><h4>Secure Score Improvement</h4><p>Target Secure Score improvements monthly. Focus on high-impact, low-effort items first. Track score over time as a security posture metric for leadership.</p></div>
+        <div class="pg-info-card"><h4>Attack Simulation Training</h4><p>Run monthly phishing simulations. Target users who failed previous tests with additional training. Track click rates over time as a program metric.</p></div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Unified portal navigation, incident queue, alert triage, basic response actions</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Cross-workload KQL, custom detections, AIR management, Threat Analytics, Secure Score</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Advanced hunting joins, API automation, Sentinel integration, incident response playbooks</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Custom connectors, advanced AIR tuning, identity governance, full XDR orchestration</td><td>3-6 months</td></tr>
+    </table>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
@@ -1201,27 +2206,196 @@ ${pgBack()}
 richPageContent.mitre = `
 ${pgBack()}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-    <h1 style="margin:0;border:none;padding:0">MITRE ATT&CK NAVIGATOR</h1>
+    <h1 style="margin:0;border:none;padding:0">MITRE ATT&CK COVERAGE MAP</h1>
     <span class="card-tag" style="position:static">TOOLS</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Interactive MITRE ATT&CK Enterprise v15 technique coverage heatmap. Click any technique to view detection details and platform coverage.</p>
 
-<div class="pg-section">
-    <div class="pg-section-title">ENTERPRISE TACTICS (14)</div>
+<!-- Coverage Stats -->
+<div class="mitre-stats-bar">
+    <div class="mitre-stat"><div class="mitre-stat-num" style="color:var(--green)">34</div><div class="mitre-stat-label">DETECTED</div></div>
+    <div class="mitre-stat"><div class="mitre-stat-num" style="color:var(--yellow)">14</div><div class="mitre-stat-label">PARTIAL</div></div>
+    <div class="mitre-stat"><div class="mitre-stat-num" style="color:var(--red)">12</div><div class="mitre-stat-label">GAPS</div></div>
+    <div class="mitre-stat"><div class="mitre-stat-num" style="color:var(--accent)">57%</div><div class="mitre-stat-label">OVERALL COVERAGE</div></div>
+</div>
+
+<!-- Legend -->
+<div class="mitre-legend">
+    <div class="mitre-legend-item"><div class="mitre-legend-swatch" style="background:var(--green-dim);border-color:var(--green)"></div> Detected (rule active)</div>
+    <div class="mitre-legend-item"><div class="mitre-legend-swatch" style="background:var(--yellow-dim);border-color:var(--yellow)"></div> Partial (limited coverage)</div>
+    <div class="mitre-legend-item"><div class="mitre-legend-swatch" style="background:var(--red-dim);border-color:var(--red)"></div> Gap (no detection)</div>
+</div>
+
+<!-- Detail Panel -->
+<div id="mitre-detail" class="mitre-detail-popup" style="display:none"></div>
+
+<!-- Interactive Heatmap -->
+<div class="mitre-heatmap" id="mitre-heatmap"></div>
+
+<script>
+(function(){
+const mitreData = [
+  { tactic:"Initial Access", id:"TA0001", techniques:[
+    {id:"T1566",name:"Phishing",status:"detected",platforms:["Splunk","Sentinel","MDE","CrowdStrike","Wazuh"],rule:"Email with malicious attachment/link detected + user interaction"},
+    {id:"T1190",name:"Exploit Public-Facing App",status:"detected",platforms:["Wazuh","Cortex XDR","FortiSIEM"],rule:"WAF/IDS alerts correlated with web server process anomalies"},
+    {id:"T1133",name:"External Remote Services",status:"detected",platforms:["Splunk","Sentinel","QRadar"],rule:"VPN/RDP connections from unusual geolocations or outside business hours"},
+    {id:"T1078",name:"Valid Accounts",status:"partial",platforms:["Sentinel","M365 Defender"],rule:"Impossible travel, anomalous sign-in properties"},
+    {id:"T1195",name:"Supply Chain Compromise",status:"gap",platforms:[],rule:"Limited — requires software inventory + integrity monitoring"}
+  ]},
+  { tactic:"Execution", id:"TA0002", techniques:[
+    {id:"T1059",name:"Command & Scripting Interpreter",status:"detected",platforms:["Splunk","Sentinel","MDE","CrowdStrike","Wazuh","Elastic","SentinelOne"],rule:"Suspicious PowerShell, cmd, Python, WScript execution with encoded/obfuscated args"},
+    {id:"T1204",name:"User Execution",status:"detected",platforms:["MDE","CrowdStrike","SentinelOne"],rule:"User opens malicious file/link — correlated with process creation events"},
+    {id:"T1047",name:"WMI",status:"detected",platforms:["Splunk","MDE","Cortex XDR"],rule:"WMI process creation for remote execution (wmic /node:)"},
+    {id:"T1053",name:"Scheduled Task/Job",status:"detected",platforms:["Splunk","Sentinel","MDE","Wazuh"],rule:"schtasks.exe /create with suspicious arguments or unusual parent process"},
+    {id:"T1203",name:"Exploitation for Client Exec",status:"partial",platforms:["CrowdStrike","MDE"],rule:"EDR behavioral detection of exploit payloads post-execution"}
+  ]},
+  { tactic:"Persistence", id:"TA0003", techniques:[
+    {id:"T1547",name:"Boot/Logon Autostart",status:"detected",platforms:["Splunk","Sentinel","MDE","Wazuh","SentinelOne"],rule:"Registry Run/RunOnce key modifications, Startup folder changes"},
+    {id:"T1053.005",name:"Scheduled Task",status:"detected",platforms:["Splunk","MDE","Wazuh"],rule:"New scheduled task creation by non-admin or with suspicious binary path"},
+    {id:"T1136",name:"Create Account",status:"detected",platforms:["Splunk","Sentinel","QRadar","Wazuh"],rule:"EventCode 4720/4722 — new user creation, especially by non-admin"},
+    {id:"T1543",name:"Create/Modify System Process",status:"partial",platforms:["Splunk","MDE"],rule:"New service installed with suspicious binary path or command line"},
+    {id:"T1098",name:"Account Manipulation",status:"partial",platforms:["Sentinel","M365 Defender"],rule:"Azure AD role assignment, group membership changes"}
+  ]},
+  { tactic:"Privilege Escalation", id:"TA0004", techniques:[
+    {id:"T1548",name:"Abuse Elevation Control",status:"partial",platforms:["MDE","CrowdStrike"],rule:"UAC bypass techniques — fodhelper, eventvwr, sdclt abuse"},
+    {id:"T1134",name:"Access Token Manipulation",status:"gap",platforms:[],rule:"Difficult to detect — requires advanced ETW-based monitoring"},
+    {id:"T1068",name:"Exploitation for Priv Esc",status:"partial",platforms:["CrowdStrike","SentinelOne"],rule:"EDR behavioral detection of kernel exploit payloads"},
+    {id:"T1078",name:"Valid Accounts",status:"detected",platforms:["Sentinel","Splunk","M365 Defender"],rule:"Admin account used from unusual source or for unusual activity"}
+  ]},
+  { tactic:"Defense Evasion", id:"TA0005", techniques:[
+    {id:"T1070",name:"Indicator Removal",status:"partial",platforms:["Splunk","Wazuh"],rule:"Event log cleared (EventCode 1102), timestomping detected"},
+    {id:"T1036",name:"Masquerading",status:"gap",platforms:[],rule:"Requires binary analysis — file name vs signer mismatch"},
+    {id:"T1027",name:"Obfuscated Files/Info",status:"partial",platforms:["MDE","CrowdStrike"],rule:"Base64-encoded commands, high entropy script content"},
+    {id:"T1562",name:"Impair Defenses",status:"detected",platforms:["Splunk","Wazuh","MDE","SentinelOne"],rule:"AV/EDR tamper attempts, firewall rule changes, Sysmon deletion"},
+    {id:"T1218",name:"System Binary Proxy Exec",status:"gap",platforms:[],rule:"LOLBin abuse — rundll32, regsvr32, mshta with network activity"}
+  ]},
+  { tactic:"Credential Access", id:"TA0006", techniques:[
+    {id:"T1003",name:"OS Credential Dumping",status:"detected",platforms:["Splunk","MDE","CrowdStrike","SentinelOne","Cortex XDR"],rule:"LSASS access, procdump/mimikatz execution, comsvcs.dll MiniDump"},
+    {id:"T1558",name:"Steal/Forge Kerberos Tickets",status:"detected",platforms:["Splunk","Sentinel","MDE"],rule:"Kerberoasting (EventCode 4769 with RC4 encryption), AS-REP roasting"},
+    {id:"T1110",name:"Brute Force",status:"detected",platforms:["Splunk","Sentinel","QRadar","Wazuh","Elastic"],rule:"Multiple failed logins (4625) from same source in short timeframe"},
+    {id:"T1555",name:"Credentials from Password Stores",status:"partial",platforms:["CrowdStrike","SentinelOne"],rule:"Browser credential file access, vault enumeration"},
+    {id:"T1552",name:"Unsecured Credentials",status:"gap",platforms:[],rule:"Files containing passwords — requires DLP/content inspection"}
+  ]},
+  { tactic:"Discovery", id:"TA0007", techniques:[
+    {id:"T1087",name:"Account Discovery",status:"partial",platforms:["Splunk","Sentinel"],rule:"net user /domain, Get-ADUser, LDAP enumeration queries"},
+    {id:"T1082",name:"System Info Discovery",status:"gap",platforms:[],rule:"High false positive — systeminfo, hostname are legitimate admin tools"},
+    {id:"T1083",name:"File & Directory Discovery",status:"gap",platforms:[],rule:"Very noisy — dir/ls commands used constantly by legitimate users"},
+    {id:"T1046",name:"Network Service Scanning",status:"detected",platforms:["Wazuh","FortiSIEM","Splunk"],rule:"Port scan detection via firewall logs, IDS alerts, netflow anomalies"},
+    {id:"T1018",name:"Remote System Discovery",status:"gap",platforms:[],rule:"net view, ping sweep — high FP rate in admin environments"}
+  ]},
+  { tactic:"Lateral Movement", id:"TA0008", techniques:[
+    {id:"T1021",name:"Remote Services",status:"detected",platforms:["Splunk","Sentinel","MDE","CrowdStrike","Cortex XDR"],rule:"RDP/SMB/WinRM/SSH from unusual sources, PsExec service installation"},
+    {id:"T1570",name:"Lateral Tool Transfer",status:"detected",platforms:["MDE","CrowdStrike","Carbon Black"],rule:"File writes to admin shares (C$, ADMIN$) followed by remote execution"},
+    {id:"T1080",name:"Taint Shared Content",status:"partial",platforms:["Splunk"],rule:"Suspicious file modifications on network shares"},
+    {id:"T1550",name:"Use Alternate Auth Material",status:"detected",platforms:["Splunk","Sentinel","MDE"],rule:"Pass-the-Hash (NTLM type 3 logon), Pass-the-Ticket (Kerberos anomalies)"}
+  ]},
+  { tactic:"Collection", id:"TA0009", techniques:[
+    {id:"T1560",name:"Archive Collected Data",status:"partial",platforms:["MDE","SentinelOne"],rule:"7zip/WinRAR/tar execution with password flags on sensitive directories"},
+    {id:"T1005",name:"Data from Local System",status:"gap",platforms:[],rule:"Extremely noisy — requires DLP context to differentiate"},
+    {id:"T1114",name:"Email Collection",status:"detected",platforms:["M365 Defender","Sentinel"],rule:"Mailbox export, inbox rule forwarding to external address"},
+    {id:"T1056",name:"Input Capture",status:"partial",platforms:["CrowdStrike","SentinelOne"],rule:"Keylogger DLL injection, SetWindowsHookEx API monitoring"}
+  ]},
+  { tactic:"Exfiltration", id:"TA0010", techniques:[
+    {id:"T1041",name:"Exfil Over C2 Channel",status:"detected",platforms:["Cortex XDR","CrowdStrike","Splunk"],rule:"Large outbound data transfers to known C2 IPs/domains"},
+    {id:"T1567",name:"Exfil Over Web Service",status:"detected",platforms:["Splunk","Sentinel","M365 Defender"],rule:"Bulk uploads to cloud storage (Mega, Dropbox, Google Drive, OneDrive personal)"},
+    {id:"T1048",name:"Exfil Over Alt Protocol",status:"detected",platforms:["Splunk","Wazuh","FortiSIEM"],rule:"DNS tunneling (high query volume, long subdomain strings, high entropy)"},
+    {id:"T1537",name:"Transfer to Cloud Account",status:"partial",platforms:["M365 Defender"],rule:"Cross-tenant data movement, SharePoint external sharing spikes"}
+  ]},
+  { tactic:"Command & Control", id:"TA0011", techniques:[
+    {id:"T1071",name:"Application Layer Protocol",status:"detected",platforms:["Splunk","Sentinel","Wazuh","Cortex XDR"],rule:"Beaconing patterns (regular interval callbacks), HTTP/HTTPS to uncategorized domains"},
+    {id:"T1105",name:"Ingress Tool Transfer",status:"detected",platforms:["MDE","CrowdStrike","SentinelOne"],rule:"certutil/bitsadmin/PowerShell downloading executables from external IPs"},
+    {id:"T1572",name:"Protocol Tunneling",status:"partial",platforms:["Splunk","FortiSIEM"],rule:"DNS over HTTPS, ICMP tunneling, SSH tunneling to unusual destinations"},
+    {id:"T1573",name:"Encrypted Channel",status:"partial",platforms:["Cortex XDR"],rule:"TLS to non-standard ports, self-signed certificates, JA3 hash matching"},
+    {id:"T1090",name:"Proxy",status:"gap",platforms:[],rule:"Multi-hop proxy detection requires netflow analysis + threat intel correlation"}
+  ]},
+  { tactic:"Impact", id:"TA0040", techniques:[
+    {id:"T1486",name:"Data Encrypted for Impact",status:"detected",platforms:["MDE","CrowdStrike","SentinelOne","Carbon Black"],rule:"Mass file rename + vssadmin delete shadows + ransom note creation"},
+    {id:"T1489",name:"Service Stop",status:"detected",platforms:["Splunk","Wazuh","MDE"],rule:"Critical service stopped (AV, backup, database) — net stop, sc stop"},
+    {id:"T1490",name:"Inhibit System Recovery",status:"detected",platforms:["Splunk","MDE","Wazuh","SentinelOne"],rule:"vssadmin delete, bcdedit /set recoveryenabled no, wbadmin delete catalog"},
+    {id:"T1529",name:"System Shutdown/Reboot",status:"partial",platforms:["Wazuh"],rule:"Unexpected shutdown/reboot outside maintenance window"},
+    {id:"T1498",name:"Network DoS",status:"gap",platforms:[],rule:"Requires network-level DDoS mitigation (Cloudflare, Akamai, AWS Shield)"}
+  ]}
+];
+
+const heatmap = document.getElementById('mitre-heatmap');
+let html = '';
+mitreData.forEach(tactic => {
+    html += '<div class="mitre-column">';
+    html += '<div class="mitre-column-header">' + tactic.tactic + '<br><span style="opacity:0.7;font-size:9px">' + tactic.id + '</span></div>';
+    tactic.techniques.forEach(t => {
+        html += '<div class="mitre-cell ' + t.status + '" onclick="showMitreDetail(this)" data-id="' + t.id + '" data-name="' + t.name + '" data-status="' + t.status + '" data-platforms="' + t.platforms.join(',') + '" data-rule="' + t.rule.replace(/"/g,'&quot;') + '" data-tactic="' + tactic.tactic + '">';
+        html += '<div class="mitre-cell-id">' + t.id + '</div>';
+        html += '<div class="mitre-cell-name">' + t.name + '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+});
+heatmap.innerHTML = html;
+})();
+
+function showMitreDetail(el) {
+    const d = el.dataset;
+    const statusColors = {detected:'var(--green)',partial:'var(--yellow)',gap:'var(--red)'};
+    const statusLabels = {detected:'DETECTED',partial:'PARTIAL COVERAGE',gap:'COVERAGE GAP'};
+    const platforms = d.platforms ? d.platforms.split(',') : [];
+    const platformHtml = platforms.length > 0
+        ? platforms.map(p => '<span style="display:inline-block;padding:3px 10px;margin:3px;border-radius:4px;font-size:11px;background:var(--green-dim);color:var(--green);border:1px solid var(--green)">' + p + '</span>').join('')
+        : '<span style="color:var(--red);font-size:12px">No platform coverage — detection rule development needed</span>';
+    const panel = document.getElementById('mitre-detail');
+    panel.style.display = 'block';
+    panel.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+        '<div><span style="font-size:18px;font-weight:800;color:var(--text-primary)">' + d.id + ' — ' + d.name + '</span><br>' +
+        '<span style="font-size:12px;color:var(--text-dim)">Tactic: ' + d.tactic + '</span></div>' +
+        '<span style="padding:4px 14px;border-radius:4px;font-size:11px;font-weight:700;color:' + statusColors[d.status] + ';border:1px solid ' + statusColors[d.status] + '">' + statusLabels[d.status] + '</span></div>' +
+        '<div style="margin-bottom:12px"><strong style="font-size:12px;color:var(--text-secondary)">Detection Logic:</strong><div style="margin-top:4px;padding:10px;background:var(--bg-tertiary);border-radius:6px;font-size:12px;color:var(--text-secondary);line-height:1.6">' + d.rule + '</div></div>' +
+        '<div><strong style="font-size:12px;color:var(--text-secondary)">Platform Coverage:</strong><div style="margin-top:6px">' + platformHtml + '</div></div>' +
+        '<button class="btn-hack" onclick="document.getElementById(\'mitre-detail\').style.display=\'none\'" style="margin-top:12px;font-size:11px">CLOSE</button>';
+    panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+</script>
+
+<!-- Tactic Summary Table -->
+<div class="pg-section" style="margin-top:24px">
+    <div class="pg-section-title">TACTIC COVERAGE SUMMARY</div>
     <table class="pg-table">
-        <tr><th>ID</th><th>Tactic</th><th>Description</th><th>Coverage</th></tr>
-        <tr><td>TA0043</td><td>Reconnaissance</td><td>Gathering information for planning attacks</td><td><span class="pg-badge pg-badge-green">89%</span></td></tr>
-        <tr><td>TA0001</td><td>Initial Access</td><td>Getting into the network (phishing, exploit, supply chain)</td><td><span class="pg-badge pg-badge-green">89%</span></td></tr>
-        <tr><td>TA0002</td><td>Execution</td><td>Running malicious code (PowerShell, scripts, exploits)</td><td><span class="pg-badge pg-badge-blue">69%</span></td></tr>
-        <tr><td>TA0003</td><td>Persistence</td><td>Maintaining foothold (scheduled tasks, registry, services)</td><td><span class="pg-badge pg-badge-orange">42%</span></td></tr>
-        <tr><td>TA0004</td><td>Privilege Escalation</td><td>Gaining higher-level permissions</td><td><span class="pg-badge pg-badge-orange">38%</span></td></tr>
-        <tr><td>TA0005</td><td>Defense Evasion</td><td>Avoiding detection (obfuscation, disabling tools)</td><td><span class="pg-badge pg-badge-red">19%</span></td></tr>
-        <tr><td>TA0006</td><td>Credential Access</td><td>Stealing credentials (dumping, keylogging, phishing)</td><td><span class="pg-badge pg-badge-blue">56%</span></td></tr>
-        <tr><td>TA0007</td><td>Discovery</td><td>Learning about the environment (network, users, shares)</td><td><span class="pg-badge pg-badge-red">19%</span></td></tr>
-        <tr><td>TA0008</td><td>Lateral Movement</td><td>Moving through the network (RDP, PsExec, WMI)</td><td><span class="pg-badge pg-badge-blue">67%</span></td></tr>
-        <tr><td>TA0009</td><td>Collection</td><td>Gathering target data (screenshots, keylogging, email)</td><td><span class="pg-badge pg-badge-orange">29%</span></td></tr>
-        <tr><td>TA0010</td><td>Exfiltration</td><td>Stealing data (HTTP, DNS, cloud storage, physical)</td><td><span class="pg-badge pg-badge-blue">56%</span></td></tr>
-        <tr><td>TA0011</td><td>Command & Control</td><td>Communicating with compromised systems</td><td><span class="pg-badge pg-badge-orange">44%</span></td></tr>
-        <tr><td>TA0040</td><td>Impact</td><td>Disrupting availability (ransomware, wiper, DoS)</td><td><span class="pg-badge pg-badge-orange">33%</span></td></tr>
+        <tr><th>ID</th><th>Tactic</th><th>Techniques</th><th>Detected</th><th>Partial</th><th>Gaps</th><th>Coverage</th></tr>
+        <tr><td>TA0001</td><td>Initial Access</td><td>5</td><td>3</td><td>1</td><td>1</td><td><span class="pg-badge pg-badge-green">80%</span></td></tr>
+        <tr><td>TA0002</td><td>Execution</td><td>5</td><td>4</td><td>1</td><td>0</td><td><span class="pg-badge pg-badge-green">90%</span></td></tr>
+        <tr><td>TA0003</td><td>Persistence</td><td>5</td><td>3</td><td>2</td><td>0</td><td><span class="pg-badge pg-badge-green">80%</span></td></tr>
+        <tr><td>TA0004</td><td>Priv Escalation</td><td>4</td><td>1</td><td>2</td><td>1</td><td><span class="pg-badge pg-badge-orange">50%</span></td></tr>
+        <tr><td>TA0005</td><td>Defense Evasion</td><td>5</td><td>1</td><td>2</td><td>2</td><td><span class="pg-badge pg-badge-red">40%</span></td></tr>
+        <tr><td>TA0006</td><td>Credential Access</td><td>5</td><td>3</td><td>1</td><td>1</td><td><span class="pg-badge pg-badge-green">70%</span></td></tr>
+        <tr><td>TA0007</td><td>Discovery</td><td>5</td><td>1</td><td>1</td><td>3</td><td><span class="pg-badge pg-badge-red">30%</span></td></tr>
+        <tr><td>TA0008</td><td>Lateral Movement</td><td>4</td><td>3</td><td>1</td><td>0</td><td><span class="pg-badge pg-badge-green">88%</span></td></tr>
+        <tr><td>TA0009</td><td>Collection</td><td>4</td><td>1</td><td>2</td><td>1</td><td><span class="pg-badge pg-badge-orange">50%</span></td></tr>
+        <tr><td>TA0010</td><td>Exfiltration</td><td>4</td><td>3</td><td>1</td><td>0</td><td><span class="pg-badge pg-badge-green">88%</span></td></tr>
+        <tr><td>TA0011</td><td>Command & Control</td><td>5</td><td>2</td><td>2</td><td>1</td><td><span class="pg-badge pg-badge-blue">60%</span></td></tr>
+        <tr><td>TA0040</td><td>Impact</td><td>5</td><td>3</td><td>1</td><td>1</td><td><span class="pg-badge pg-badge-green">70%</span></td></tr>
+    </table>
+</div>
+
+<!-- Gap Analysis -->
+<div class="pg-section">
+    <div class="pg-section-title">PRIORITY GAP ANALYSIS</div>
+    <div class="pg-callout pg-callout-danger" style="margin-bottom:8px"><strong>CRITICAL GAPS:</strong> T1134 Access Token Manipulation, T1036 Masquerading, T1218 System Binary Proxy Execution — these are commonly used by APT groups and ransomware operators. Prioritize detection development.</div>
+    <div class="pg-callout pg-callout-warn" style="margin-bottom:8px"><strong>DISCOVERY BLIND SPOT:</strong> Discovery tactics (TA0007) have only 30% coverage. While these generate high false positives, consider behavioral analytics (UEBA) to detect enumeration sequences rather than individual commands.</div>
+    <div class="pg-callout pg-callout-info"><strong>RECOMMENDATION:</strong> Focus next sprint on Defense Evasion and Discovery detections. Use Sigma rules as a starting point and tune for your environment. Consider deploying Sysmon with SwiftOnSecurity config for enhanced process telemetry.</div>
+</div>
+
+<!-- Top Platform Coverage -->
+<div class="pg-section">
+    <div class="pg-section-title">PLATFORM DETECTION COVERAGE</div>
+    <table class="pg-table">
+        <tr><th>Platform</th><th>Type</th><th>Techniques Covered</th><th>Strength Areas</th></tr>
+        <tr><td>Splunk</td><td>SIEM</td><td>18</td><td>Credential Access, Lateral Movement, Exfiltration, C2</td></tr>
+        <tr><td>Microsoft Sentinel</td><td>SIEM</td><td>14</td><td>Identity-based attacks, Cloud, Initial Access</td></tr>
+        <tr><td>CrowdStrike Falcon</td><td>EDR</td><td>16</td><td>Execution, Credential Dumping, Endpoint Behavior</td></tr>
+        <tr><td>Microsoft Defender</td><td>EDR</td><td>15</td><td>LOLBin, Persistence, Ransomware, Live Response</td></tr>
+        <tr><td>SentinelOne</td><td>EDR</td><td>12</td><td>Autonomous response, Rollback, Process Injection</td></tr>
+        <tr><td>Wazuh</td><td>SIEM/XDR</td><td>11</td><td>FIM, Active Response, Linux/Cloud, Network Scanning</td></tr>
+        <tr><td>Cortex XDR</td><td>XDR</td><td>8</td><td>Cross-data correlation, BIOC, Network + Endpoint</td></tr>
+        <tr><td>M365 Defender</td><td>XDR</td><td>7</td><td>Email + Identity + Cloud Apps correlation</td></tr>
     </table>
 </div>
 
@@ -1312,15 +2486,115 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">IBM QRADAR SOAR (RESILIENT)</h1>
     <span class="card-tag" style="position:static">SOAR</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Enterprise incident response orchestration with dynamic playbooks, privacy module, and NIST/SANS-aligned workflows.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">KEY FEATURES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">IBM QRadar SOAR (formerly Resilient) is an enterprise-grade incident response platform that orchestrates people, processes, and technology for faster threat response. Its dynamic playbooks adapt in real-time based on incident type, artifacts discovered, and regulatory requirements. The built-in privacy module tracks 180+ global breach notification regulations (GDPR, CCPA, HIPAA, PCI-DSS) and auto-calculates reporting deadlines.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">QRadar SOAR integrates natively with IBM QRadar SIEM for bi-directional offense management and extends through 300+ app exchange integrations. The platform aligns to NIST SP 800-61 and SANS incident response frameworks, providing task-based workflows that guide analysts through each phase of response.</p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐
+    │  QRadar SIEM │     │  Email / ITSM│     │  QRadar SOAR         │
+    │  Offenses    │────▶│  Webhooks    │────▶│  ──────────────────  │
+    │              │     │  API Feeds   │     │  Incident Queue      │
+    └──────────────┘     └──────────────┘     │  Dynamic Playbooks   │
+                                              │  Task Management     │
+    ┌──────────────┐     ┌──────────────┐     │  Artifact Tracking   │
+    │  Response     │     │  Integrations│     │  Privacy Module      │
+    │  Actions      │◀────│  ──────────  │◀────│  Reporting & Metrics │
+    │  ──────────  │     │  300+ Apps   │     └──────────────────────┘
+    │  Block IP    │     │  EDR / SIEM  │
+    │  Disable User│     │  Firewall    │
+    │  Ticket      │     │  Threat Intel│
+    └──────────────┘     └──────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CAPABILITIES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Dynamic Playbooks</h4><p>Playbooks that adapt based on incident type and artifacts. Condition-based branching for different response paths.</p></div>
-        <div class="pg-info-card"><h4>Privacy Module</h4><p>Built-in GDPR, CCPA, and HIPAA breach reporting workflows. Auto-calculate notification deadlines.</p></div>
-        <div class="pg-info-card"><h4>MITRE ATT&CK</h4><p>Native ATT&CK technique mapping for incidents. Auto-suggest response actions based on technique.</p></div>
-        <div class="pg-info-card"><h4>Artifact Management</h4><p>Structured artifact tracking with auto-enrichment. Link artifacts across related incidents.</p></div>
+        <div class="pg-info-card"><h4>Dynamic Playbooks</h4><p>Condition-based branching that adapts in real-time. Playbooks change based on incident type, artifact enrichment results, and analyst decisions.</p></div>
+        <div class="pg-info-card"><h4>Privacy Module</h4><p>Track 180+ global breach notification regulations. Auto-calculate deadlines for GDPR (72h), HIPAA (60 days), state laws. Generate regulatory reports.</p></div>
+        <div class="pg-info-card"><h4>MITRE ATT&CK Mapping</h4><p>Native technique mapping for incidents. Auto-suggest response tasks based on detected ATT&CK techniques.</p></div>
+        <div class="pg-info-card"><h4>Artifact Management</h4><p>Track IPs, hashes, domains, emails, and custom artifacts. Auto-enrichment via threat intel. Link artifacts across incidents.</p></div>
+        <div class="pg-info-card"><h4>Case Metrics & SLA</h4><p>Track MTTD, MTTR, SLA compliance per incident type. Executive dashboards and team performance reports.</p></div>
+        <div class="pg-info-card"><h4>App Exchange</h4><p>300+ pre-built integrations: CrowdStrike, Carbon Black, Palo Alto, ServiceNow, Slack, VirusTotal, and more.</p></div>
     </div>
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK EXAMPLE — Phishing Response</div>
+    ${pgCode(`# QRadar SOAR Playbook Definition (Python Function)
+def phishing_triage(incident, artifact):
+    """Auto-triage phishing email artifacts"""
+    # Phase 1: Extract IOCs
+    urls = extract_urls(artifact.email_body)
+    hashes = extract_attachments(artifact.email_attachment)
+
+    # Phase 2: Enrich
+    for url in urls:
+        vt_result = call_virustotal(url)
+        if vt_result.malicious > 3:
+            tag_artifact(url, "malicious")
+            # Phase 3: Contain
+            block_url_on_proxy(url)
+            add_task(incident, "Notify affected users")
+
+    for file_hash in hashes:
+        sandbox_result = detonate_in_sandbox(file_hash)
+        if sandbox_result.verdict == "malicious":
+            quarantine_on_edr(file_hash)
+            add_task(incident, "Check for lateral movement")
+
+    # Phase 4: Notify
+    if incident.severity >= "High":
+        send_slack_alert(channel="#soc-alerts", incident=incident)
+        escalate_to_tier2(incident)`, 'python')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">INTEGRATIONS</div>
+    <table class="pg-table">
+        <tr><th>Integration</th><th>Category</th><th>Actions</th></tr>
+        <tr><td>IBM QRadar SIEM</td><td>SIEM</td><td>Bi-directional offense sync, reference set updates, AQL queries</td></tr>
+        <tr><td>CrowdStrike Falcon</td><td>EDR</td><td>Device isolation, IOC push, RTR commands, detection lookup</td></tr>
+        <tr><td>Microsoft Defender</td><td>EDR</td><td>Endpoint isolation, file quarantine, indicator management</td></tr>
+        <tr><td>Palo Alto NGFW</td><td>Firewall</td><td>Block IP/URL, update address groups, create security rules</td></tr>
+        <tr><td>ServiceNow</td><td>ITSM</td><td>Create/update incidents, CMDB lookup, change requests</td></tr>
+        <tr><td>VirusTotal</td><td>Threat Intel</td><td>Hash/URL/domain reputation lookup, file submission</td></tr>
+        <tr><td>Slack / Teams</td><td>Communication</td><td>Alert notifications, approval workflows, status updates</td></tr>
+        <tr><td>Have I Been Pwned</td><td>Threat Intel</td><td>Email breach lookup for privacy module compliance</td></tr>
+        <tr><td>Active Directory</td><td>Identity</td><td>Disable accounts, reset passwords, group membership changes</td></tr>
+        <tr><td>Splunk</td><td>SIEM</td><td>Run SPL queries, create notable events, update lookups</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">DEPLOYMENT STEPS</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Install SOAR server:</strong> Deploy on RHEL/CentOS VM (8 CPU, 16GB RAM minimum). Configure PostgreSQL database and Nginx reverse proxy.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Connect QRadar SIEM:</strong> Configure bi-directional integration — offenses create SOAR incidents, SOAR updates close QRadar offenses.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Install App Exchange apps:</strong> Deploy integrations for your EDR, firewall, ITSM, and threat intel platforms from the App Exchange.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Build playbooks:</strong> Start with the 5 critical playbooks: Phishing, Malware, Account Compromise, Data Breach, Ransomware.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Configure privacy module:</strong> Select applicable regulations, configure data breach types, set notification deadlines and templates.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Train analysts and go live:</strong> Run tabletop exercises with the playbooks. Start with manual approval, then enable auto-execution for low-risk actions.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Start with 5 Core Playbooks</h4><p>Phishing, Malware, Account Compromise, Data Breach, Ransomware. These cover 80% of incidents. Add more as your team matures.</p></div>
+        <div class="pg-info-card"><h4>Use Dynamic Conditions</h4><p>Don't build static playbooks. Use condition nodes to branch based on severity, artifact type, enrichment results, and analyst input.</p></div>
+        <div class="pg-info-card"><h4>Track SLA Metrics</h4><p>Configure SLAs per severity level. P1: 15 min response, 4h resolution. P2: 1h response, 24h resolution. Dashboard for leadership reporting.</p></div>
+        <div class="pg-info-card"><h4>Leverage Privacy Module</h4><p>Even if not required today, configure breach notification workflows. When a breach occurs, auto-calculated deadlines prevent regulatory violations.</p></div>
+        <div class="pg-info-card"><h4>Custom Artifact Types</h4><p>Create custom artifact types for your org (employee ID, asset tag, business unit). This enables richer context during investigation.</p></div>
+        <div class="pg-info-card"><h4>Bi-Directional SIEM Sync</h4><p>Close the loop: QRadar offense → SOAR incident → investigation → remediation → auto-close QRadar offense with notes.</p></div>
+    </div>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
 
@@ -1330,15 +2604,128 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">SHUFFLE SOAR</h1>
     <span class="card-tag" style="position:static">SOAR</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Open-source security orchestration with visual workflow builder, OpenAPI app generation, and native Wazuh integration.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">KEY FEATURES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">Shuffle is an open-source SOAR platform designed for accessibility. It runs entirely in Docker containers, requires no licensing, and can turn any API with an OpenAPI/Swagger specification into an integration app. Shuffle is the go-to SOAR for teams using Wazuh, TheHive, or other open-source security tools, with built-in connectors and community-contributed workflows.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">Workflows are built visually with a drag-and-drop editor. Each node represents an app action (e.g., "VirusTotal: scan hash", "Wazuh: get alerts", "Email: send notification"). Triggers include webhooks, schedules (cron), subflows, and manual execution. Shuffle supports conditions, loops, and parallel execution branches.</p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐
+    │  Triggers     │     │  Shuffle     │     │  App Containers      │
+    │  ──────────  │────▶│  Backend     │────▶│  ──────────────────  │
+    │  Webhooks    │     │  (Docker)    │     │  Wazuh App           │
+    │  Schedules   │     │  ──────────  │     │  TheHive App         │
+    │  Subflows    │     │  Workflow    │     │  VirusTotal App      │
+    │  Manual      │     │  Engine     │     │  Email App           │
+    └──────────────┘     │  OpenSearch │     │  Custom OpenAPI Apps │
+                         └──────────────┘     └──────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CAPABILITIES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Open Source</h4><p>Free, self-hosted SOAR. No licensing costs. Docker-based deployment. Active community.</p></div>
-        <div class="pg-info-card"><h4>Wazuh Native</h4><p>Built-in Wazuh integration — trigger workflows from Wazuh alerts automatically.</p></div>
-        <div class="pg-info-card"><h4>OpenAPI Apps</h4><p>Any API with OpenAPI/Swagger spec becomes an app. Import specs to auto-create integrations.</p></div>
-        <div class="pg-info-card"><h4>Workflow Triggers</h4><p>Webhook triggers, scheduled execution, subflow triggers, and manual execution.</p></div>
+        <div class="pg-info-card"><h4>Open Source & Free</h4><p>No licensing costs. Self-hosted on Docker. Full source code on GitHub. Active community with 1000+ contributors and shared workflows.</p></div>
+        <div class="pg-info-card"><h4>OpenAPI App Generation</h4><p>Import any OpenAPI/Swagger spec to auto-generate an integration app. Works with any REST API — no custom coding needed.</p></div>
+        <div class="pg-info-card"><h4>Wazuh Native Integration</h4><p>Built-in Wazuh app triggers workflows from Wazuh alerts. Enrich, triage, and respond to Wazuh events automatically.</p></div>
+        <div class="pg-info-card"><h4>Visual Workflow Builder</h4><p>Drag-and-drop workflow editor with conditions, loops, parallel branches, and subflow calls. No code required for basic automation.</p></div>
+        <div class="pg-info-card"><h4>Community Workflows</h4><p>Pre-built community workflows for common use cases: phishing triage, IOC enrichment, alert dedup, vulnerability management.</p></div>
+        <div class="pg-info-card"><h4>Docker-Based Apps</h4><p>Each app runs in its own container for isolation. Scale specific apps independently. Custom Python apps supported.</p></div>
     </div>
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">WORKFLOW EXAMPLE — Wazuh Alert Enrichment</div>
+    ${pgCode(`# Shuffle Workflow (JSON definition)
+{
+  "name": "Wazuh Alert Enrichment & Response",
+  "triggers": [{"type": "webhook", "source": "wazuh"}],
+  "actions": [
+    {
+      "app": "Wazuh",
+      "action": "get_alert_details",
+      "parameters": {"alert_id": "$trigger.alert_id"}
+    },
+    {
+      "app": "VirusTotal",
+      "action": "scan_hash",
+      "parameters": {"hash": "$get_alert_details.file_hash"},
+      "condition": "$get_alert_details.file_hash != null"
+    },
+    {
+      "app": "AbuseIPDB",
+      "action": "check_ip",
+      "parameters": {"ip": "$get_alert_details.src_ip"},
+      "condition": "$get_alert_details.src_ip != null"
+    },
+    {
+      "app": "TheHive",
+      "action": "create_alert",
+      "parameters": {
+        "title": "Wazuh: $get_alert_details.rule_description",
+        "severity": "$get_alert_details.rule_level",
+        "source": "Shuffle-Wazuh",
+        "observables": ["$get_alert_details.src_ip", "$get_alert_details.file_hash"]
+      },
+      "condition": "$get_alert_details.rule_level >= 10"
+    },
+    {
+      "app": "Email",
+      "action": "send",
+      "parameters": {
+        "to": "soc-team@company.com",
+        "subject": "HIGH: Wazuh Alert - $get_alert_details.rule_description",
+        "body": "Source: $get_alert_details.src_ip\\nVT Score: $scan_hash.positives"
+      },
+      "condition": "$scan_hash.positives > 5"
+    }
+  ]
+}`, 'json')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">DEPLOYMENT GUIDE</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Install Docker & Docker Compose:</strong> Shuffle requires Docker 19.03+ and Docker Compose. Recommended: 4 CPU, 8GB RAM, 50GB disk.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Clone and start:</strong> <code>git clone https://github.com/Shuffle/Shuffle && cd Shuffle && docker-compose up -d</code></div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Configure Wazuh webhook:</strong> In Wazuh ossec.conf, add integration block pointing to Shuffle webhook URL for alert forwarding.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Import apps:</strong> Go to Apps > Search for Wazuh, TheHive, VirusTotal. Or import OpenAPI specs for custom tools.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Build workflows:</strong> Start with the community phishing and IOC enrichment workflows. Customize triggers and conditions for your environment.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">INTEGRATIONS</div>
+    <table class="pg-table">
+        <tr><th>Integration</th><th>Category</th><th>Actions</th></tr>
+        <tr><td>Wazuh</td><td>SIEM/XDR</td><td>Get alerts, active response, agent management, rule lookup</td></tr>
+        <tr><td>TheHive</td><td>Case Mgmt</td><td>Create alerts/cases, add observables, run analyzers</td></tr>
+        <tr><td>MISP</td><td>Threat Intel</td><td>Search events, add attributes, create events</td></tr>
+        <tr><td>VirusTotal</td><td>Threat Intel</td><td>Hash/URL/domain/IP reputation lookup</td></tr>
+        <tr><td>AbuseIPDB</td><td>Threat Intel</td><td>IP reputation check, report abuse</td></tr>
+        <tr><td>Slack / Discord</td><td>Communication</td><td>Send messages, create channels, post alerts</td></tr>
+        <tr><td>Email (SMTP)</td><td>Communication</td><td>Send alert notifications, reports</td></tr>
+        <tr><td>Jira / ServiceNow</td><td>ITSM</td><td>Create tickets, update status, add comments</td></tr>
+        <tr><td>CrowdStrike</td><td>EDR</td><td>Device lookup, containment, IOC push</td></tr>
+        <tr><td>Any REST API</td><td>Custom</td><td>Import OpenAPI spec to auto-generate app</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Start with Wazuh Integration</h4><p>If using Wazuh, configure the webhook integration first. This gives you immediate value — auto-enrichment of every Wazuh alert.</p></div>
+        <div class="pg-info-card"><h4>Use Community Workflows</h4><p>Don't build from scratch. Import community workflows and customize. The community has 100+ tested workflows for common use cases.</p></div>
+        <div class="pg-info-card"><h4>Subflows for Reusability</h4><p>Build common actions (IOC enrichment, notification, ticket creation) as subflows. Call them from multiple parent workflows.</p></div>
+        <div class="pg-info-card"><h4>OpenAPI for Everything</h4><p>Any tool with a REST API can become a Shuffle app. Export the OpenAPI spec from your tool's API docs and import into Shuffle.</p></div>
+        <div class="pg-info-card"><h4>Monitor Resource Usage</h4><p>Each app runs in Docker. Monitor container resource usage. Scale horizontally by adding more Docker workers for busy workflows.</p></div>
+        <div class="pg-info-card"><h4>Backup Workflows</h4><p>Export workflows as JSON regularly. Store in git for version control. This enables rollback and disaster recovery.</p></div>
+    </div>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
 
@@ -1348,15 +2735,104 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">THEHIVE + CORTEX</h1>
     <span class="card-tag" style="position:static">SOAR</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Open-source incident response platform with case management, 100+ Cortex analyzers, and MISP threat intelligence sharing.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">KEY FEATURES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">TheHive is an open-source Security Incident Response Platform (SIRP) designed for SOCs and CERTs. It provides collaborative case management where multiple analysts work on incidents simultaneously with real-time updates. Each case contains tasks, observables (IOCs), and TTPs. Cortex is the companion analysis engine with 100+ analyzers for automated IOC enrichment and 30+ responders for automated actions.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">TheHive + Cortex + MISP form the "open-source SOC triad" — TheHive for case management, Cortex for analysis/response, and MISP for threat intelligence sharing. This stack provides a complete incident response workflow at zero licensing cost.</p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CAPABILITIES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Case Management</h4><p>Full incident case management with tasks, observables, and TTPs. Multi-analyst collaboration.</p></div>
-        <div class="pg-info-card"><h4>Cortex Analyzers</h4><p>100+ analyzers for IOC enrichment — VirusTotal, Shodan, AbuseIPDB, MISP, PassiveTotal, etc.</p></div>
-        <div class="pg-info-card"><h4>Cortex Responders</h4><p>Automated response actions — block IP, disable user, send email, create ticket.</p></div>
-        <div class="pg-info-card"><h4>MISP Integration</h4><p>Bi-directional integration with MISP threat sharing platform. Auto-import/export IOCs.</p></div>
+        <div class="pg-info-card"><h4>Case Management</h4><p>Create cases with tasks, observables, TTPs, and custom fields. Multi-analyst collaboration with real-time updates and audit trail.</p></div>
+        <div class="pg-info-card"><h4>Cortex Analyzers (100+)</h4><p>Auto-enrich IOCs: VirusTotal, Shodan, AbuseIPDB, PassiveTotal, MISP, MaxMind GeoIP, Abuse Finder, CyberChef, and more.</p></div>
+        <div class="pg-info-card"><h4>Cortex Responders (30+)</h4><p>Automated response: block IP on firewall, disable AD account, send email notification, create Jira ticket, update MISP event.</p></div>
+        <div class="pg-info-card"><h4>MISP Integration</h4><p>Bi-directional: import MISP events as alerts, export observables to MISP. Auto-correlate with known threat campaigns.</p></div>
+        <div class="pg-info-card"><h4>Alert Feeder</h4><p>Ingest alerts from any source (SIEM, EDR, email) via API. Merge related alerts into cases. Prevent duplicate investigations.</p></div>
+        <div class="pg-info-card"><h4>Multi-Tenant</h4><p>Support multiple organizations on a single instance. Tenant isolation with shared or private analyzers and responders.</p></div>
     </div>
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">API EXAMPLE — Create Case with Observables</div>
+    ${pgCode(`import thehive4py
+from thehive4py.api import TheHiveApi
+from thehive4py.models import Case, CaseObservable, CaseTask
+
+api = TheHiveApi('http://thehive:9000', 'API_KEY')
+
+# Create case
+case = Case(
+    title='Suspicious PowerShell Activity on WS-042',
+    description='Encoded PowerShell detected by Wazuh rule 92050',
+    severity=3, tlp=2, pap=2,
+    tags=['powershell', 'T1059.001', 'wazuh'],
+    tasks=[
+        CaseTask(title='Analyze PowerShell command', status='Waiting'),
+        CaseTask(title='Check for lateral movement', status='Waiting'),
+        CaseTask(title='Determine scope of compromise', status='Waiting')
+    ]
+)
+response = api.create_case(case)
+case_id = response.json()['id']
+
+# Add observables
+api.create_case_observable(case_id, CaseObservable(
+    dataType='ip', data='192.168.1.42', message='Source endpoint',
+    tags=['internal'], ioc=False
+))
+api.create_case_observable(case_id, CaseObservable(
+    dataType='hash', data='a1b2c3d4e5f6...', message='Downloaded payload hash',
+    tags=['malware'], ioc=True
+))`, 'python')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">CORTEX ANALYZERS (TOP 15)</div>
+    <table class="pg-table">
+        <tr><th>Analyzer</th><th>Observable Types</th><th>Description</th></tr>
+        <tr><td>VirusTotal_Scan</td><td>Hash, URL, Domain, IP</td><td>Multi-engine AV scan results, community score</td></tr>
+        <tr><td>Shodan_Host</td><td>IP</td><td>Open ports, services, vulnerabilities, geolocation</td></tr>
+        <tr><td>AbuseIPDB</td><td>IP</td><td>Abuse reports, confidence score, ISP info</td></tr>
+        <tr><td>MISP_Lookup</td><td>All</td><td>Search MISP events for matching indicators</td></tr>
+        <tr><td>PassiveTotal</td><td>Domain, IP</td><td>WHOIS, passive DNS, SSL certificates, components</td></tr>
+        <tr><td>MaxMind_GeoIP</td><td>IP</td><td>Geolocation, ASN, organization</td></tr>
+        <tr><td>URLhaus</td><td>URL, Domain</td><td>Malware distribution URL database</td></tr>
+        <tr><td>OTXQuery</td><td>All</td><td>AlienVault OTX pulse search</td></tr>
+        <tr><td>Yara_Scan</td><td>File</td><td>Scan files against YARA rule sets</td></tr>
+        <tr><td>CyberChef</td><td>Any</td><td>Decode, decrypt, decompress data</td></tr>
+        <tr><td>EmailRep</td><td>Email</td><td>Email address reputation and breach history</td></tr>
+        <tr><td>Abuse_Finder</td><td>IP, Domain</td><td>Find abuse contact for an IP or domain</td></tr>
+        <tr><td>Censys</td><td>IP, Domain</td><td>Internet-wide scan data, certificates</td></tr>
+        <tr><td>DomainMailSPFDMARC</td><td>Domain</td><td>SPF, DKIM, DMARC record validation</td></tr>
+        <tr><td>FileInfo</td><td>File</td><td>File type, entropy, strings, PE analysis</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">DEPLOYMENT STEPS</div>
+    <div class="pg-step"><div class="pg-step-num">1</div><div class="pg-step-text"><strong>Deploy TheHive:</strong> Docker Compose or DEB/RPM package. Requires Elasticsearch/OpenSearch backend and Cassandra or BerkeleyDB.</div></div>
+    <div class="pg-step"><div class="pg-step-num">2</div><div class="pg-step-text"><strong>Deploy Cortex:</strong> Separate instance recommended. Configure analyzer and responder jobs. Enable Docker-based analyzers for isolation.</div></div>
+    <div class="pg-step"><div class="pg-step-num">3</div><div class="pg-step-text"><strong>Connect MISP:</strong> Configure MISP server URL and API key in TheHive. Enable bi-directional sync for threat intel sharing.</div></div>
+    <div class="pg-step"><div class="pg-step-num">4</div><div class="pg-step-text"><strong>Configure alert feeders:</strong> Set up SIEM webhook/API integration to push alerts to TheHive. Configure alert templates and auto-merge rules.</div></div>
+    <div class="pg-step"><div class="pg-step-num">5</div><div class="pg-step-text"><strong>Enable analyzers:</strong> Activate Cortex analyzers (VirusTotal, Shodan, etc.). Add API keys. Configure auto-analysis for specific observable types.</div></div>
+    <div class="pg-step"><div class="pg-step-num">6</div><div class="pg-step-text"><strong>Build case templates:</strong> Create templates for Phishing, Malware, Ransomware, Account Compromise with pre-defined tasks and custom fields.</div></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Use Case Templates</h4><p>Pre-build case templates for your top 5 incident types. Include standard tasks, custom fields, and recommended analyzers. Saves 10+ minutes per case.</p></div>
+        <div class="pg-info-card"><h4>Auto-Analyze on Ingest</h4><p>Configure Cortex to auto-run analyzers when observables are added. VirusTotal + AbuseIPDB + MISP lookup should run automatically on all IOCs.</p></div>
+        <div class="pg-info-card"><h4>MISP Bi-Directional Sync</h4><p>Export confirmed IOCs from cases to MISP events. Import MISP events as alerts. This creates a feedback loop for threat intelligence.</p></div>
+        <div class="pg-info-card"><h4>Alert Merging</h4><p>Configure alert merge rules to combine related alerts into single cases. Prevents analysts from investigating the same incident multiple times.</p></div>
+        <div class="pg-info-card"><h4>Custom Dashboards</h4><p>Build Kibana/Grafana dashboards for TheHive metrics: open cases, MTTR by type, analyst workload, observable enrichment rates.</p></div>
+        <div class="pg-info-card"><h4>Integrate with Shuffle</h4><p>Use Shuffle SOAR for automated workflows triggered by TheHive alerts. TheHive handles case management, Shuffle handles orchestration.</p></div>
+    </div>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
 
@@ -1366,15 +2842,78 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">FORTISOAR</h1>
     <span class="card-tag" style="position:static">SOAR</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Fortinet's enterprise SOAR with visual playbook designer, 350+ connectors, ML recommendation engine, and Fortinet Security Fabric integration.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">KEY FEATURES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">FortiSOAR is Fortinet's security orchestration, automation, and response platform. It provides a visual playbook designer with drag-and-drop actions, 350+ connector integrations, and an ML-powered recommendation engine that suggests response actions based on incident type and historical patterns. FortiSOAR integrates deeply with the Fortinet Security Fabric — FortiGate, FortiAnalyzer, FortiSIEM, FortiEDR, FortiSandbox — enabling automated threat response across the entire fabric.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">The platform supports MSSP multi-tenancy with full tenant isolation, custom branding, per-tenant playbooks, and centralized management. The War Room provides real-time collaboration during incident response, and the built-in SOC Maturity Assessment helps teams measure and improve their security operations capabilities.</p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CAPABILITIES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>Visual Designer</h4><p>Drag-and-drop playbook designer with conditional branching, loops, and parallel execution.</p></div>
-        <div class="pg-info-card"><h4>Fortinet Integration</h4><p>Native FortiGate, FortiAnalyzer, FortiSIEM integration. Auto-block threats across Fortinet fabric.</p></div>
-        <div class="pg-info-card"><h4>Multi-Tenant</h4><p>MSSP-ready with tenant isolation, custom branding, and per-tenant playbooks.</p></div>
-        <div class="pg-info-card"><h4>Recommendation Engine</h4><p>AI-assisted recommendations for response actions based on incident type and historical data.</p></div>
+        <div class="pg-info-card"><h4>Visual Playbook Designer</h4><p>Drag-and-drop with conditional branching, loops, parallel execution, approvals, and human-in-the-loop decision points.</p></div>
+        <div class="pg-info-card"><h4>Fortinet Fabric Integration</h4><p>Native FortiGate, FortiAnalyzer, FortiSIEM, FortiEDR, FortiSandbox connectors. Auto-block threats across the entire Fortinet fabric.</p></div>
+        <div class="pg-info-card"><h4>ML Recommendation Engine</h4><p>AI-driven recommendations for response actions based on incident type, severity, past analyst decisions, and historical patterns.</p></div>
+        <div class="pg-info-card"><h4>Multi-Tenant (MSSP)</h4><p>Full tenant isolation with custom branding, dedicated playbooks, separate data stores, and centralized MSSP management dashboard.</p></div>
+        <div class="pg-info-card"><h4>War Room Collaboration</h4><p>Real-time incident collaboration with chat, shared timeline, artifact sharing, and task assignment during active incidents.</p></div>
+        <div class="pg-info-card"><h4>350+ Connectors</h4><p>Pre-built integrations for SIEM, EDR, firewall, cloud, ITSM, threat intel, and communication tools. Custom connector SDK available.</p></div>
     </div>
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">PLAYBOOK EXAMPLE — Malware Response</div>
+    ${pgCode(`{
+  "name": "FortiSOAR - Malware Incident Response",
+  "description": "Auto-triage malware alert from FortiSIEM",
+  "trigger": {"type": "on_create", "resource": "alerts", "conditions": {"type": "Malware"}},
+  "steps": [
+    {"name": "Enrich Hash", "connector": "VirusTotal", "action": "get_file_report",
+     "input": {"hash": "{{vars.alert.fileHash}}"}},
+    {"name": "Check Sandbox", "connector": "FortiSandbox", "action": "submit_file",
+     "input": {"file": "{{vars.alert.filePath}}"}, "condition": "{{vars.vt_score}} > 5"},
+    {"name": "Block Hash on FortiGate", "connector": "FortiGate", "action": "add_to_blocklist",
+     "input": {"hash": "{{vars.alert.fileHash}}", "policy": "malware-block"},
+     "condition": "{{vars.sandbox_verdict}} == 'malicious'"},
+    {"name": "Isolate Endpoint", "connector": "FortiEDR", "action": "isolate_device",
+     "input": {"device_id": "{{vars.alert.hostId}}"},
+     "condition": "{{vars.sandbox_verdict}} == 'malicious'", "approval_required": true},
+    {"name": "Create Ticket", "connector": "ServiceNow", "action": "create_incident",
+     "input": {"title": "Malware: {{vars.alert.name}}", "severity": "{{vars.alert.severity}}"}}
+  ]
+}`, 'json')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">INTEGRATIONS</div>
+    <table class="pg-table">
+        <tr><th>Integration</th><th>Category</th><th>Actions</th></tr>
+        <tr><td>FortiGate</td><td>Firewall</td><td>Block IP/URL, update address groups, quarantine, policy changes</td></tr>
+        <tr><td>FortiAnalyzer</td><td>Log Mgmt</td><td>Run queries, fetch logs, create reports</td></tr>
+        <tr><td>FortiSIEM</td><td>SIEM</td><td>Get events, update incidents, run searches</td></tr>
+        <tr><td>FortiEDR</td><td>EDR</td><td>Isolate endpoints, collect forensics, remediate threats</td></tr>
+        <tr><td>FortiSandbox</td><td>Sandbox</td><td>Submit files for detonation, get verdicts</td></tr>
+        <tr><td>CrowdStrike</td><td>EDR</td><td>Device actions, IOC management, RTR commands</td></tr>
+        <tr><td>Microsoft Sentinel</td><td>SIEM</td><td>Get incidents, run KQL, update status</td></tr>
+        <tr><td>Splunk</td><td>SIEM</td><td>Run SPL, get notable events, update lookups</td></tr>
+        <tr><td>ServiceNow</td><td>ITSM</td><td>Create/update incidents, CMDB lookup</td></tr>
+        <tr><td>Active Directory</td><td>Identity</td><td>Disable accounts, reset passwords, group changes</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Leverage Fabric Integration</h4><p>If using Fortinet products, connect them all. Auto-block malicious IPs on FortiGate when FortiSIEM detects C2. This is FortiSOAR's biggest differentiator.</p></div>
+        <div class="pg-info-card"><h4>Use Recommendation Engine</h4><p>Enable the ML engine and let it learn from analyst decisions. After 2-3 months of data, it suggests accurate response actions for new incidents.</p></div>
+        <div class="pg-info-card"><h4>War Room for P1 Incidents</h4><p>Use the War Room for all critical incidents. Real-time collaboration eliminates context-switching between tools during active response.</p></div>
+        <div class="pg-info-card"><h4>SOC Maturity Assessment</h4><p>Run the built-in maturity assessment quarterly. Track improvements across people, process, and technology dimensions.</p></div>
+        <div class="pg-info-card"><h4>Approval Gates</h4><p>Add human approval for high-impact actions (device isolation, account disable). Auto-approve low-risk actions (IOC enrichment, ticket creation).</p></div>
+        <div class="pg-info-card"><h4>MSSP Configuration</h4><p>For MSSPs: configure tenant-specific playbooks, dedicate connector instances per tenant, and use the centralized dashboard for cross-tenant visibility.</p></div>
+    </div>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
 
@@ -1385,49 +2924,189 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">GOOGLE CHRONICLE (SecOps)</h1>
     <span class="card-tag" style="position:static">SIEM</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Google's cloud SIEM with petabyte-scale ingestion, YARA-L 2.0 detection language, UDM data model, and 12-month hot retention by default.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">YARA-L 2.0 EXAMPLES</div>
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">Google Chronicle (now Google Security Operations) is a cloud-native SIEM built on Google's infrastructure. Its key differentiator is fixed-price ingestion — unlimited data at a flat rate. Chronicle normalizes all data into the Unified Data Model (UDM) and provides 12 months of hot, searchable retention by default. Detection rules use YARA-L 2.0, a purpose-built language that supports multi-event correlation, regex matching, and time-windowed analysis.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">Chronicle integrates natively with Google Cloud, VirusTotal, and Mandiant threat intelligence. The SOAR module (Chronicle SOAR, based on Siemplify) provides playbook automation. Entity analytics surfaces risky users and assets through behavioral baselines.</p>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  Data Sources │  │  Forwarders  │  │  API/Webhook │
+    │  ──────────  │  │  ──────────  │  │  ──────────  │
+    │  Firewall    │  │  Chronicle   │  │  Cloud Logs  │
+    │  EDR/AV      │──▶│  Forwarder   │──▶│  (GCP, AWS,  │
+    │  IAM/SSO     │  │  (Linux VM)  │  │   Azure)     │
+    │  DNS/Proxy   │  └──────────────┘  └──────┬───────┘
+    └──────────────┘                           │
+                         ┌─────────────────────▼───────────┐
+                         │  CHRONICLE CLOUD                 │
+                         │  ─────────────────────────────  │
+                         │  UDM Normalization → Detection  │
+                         │  YARA-L Rules → Entity Analytics│
+                         │  VirusTotal + Mandiant TI       │
+                         │  Chronicle SOAR (Playbooks)     │
+                         │  12-Month Hot Retention         │
+                         └─────────────────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>UDM</td><td>Unified Data Model — normalizes all log sources into a common schema (principal, target, network, security_result)</td></tr>
+        <tr><td>YARA-L 2.0</td><td>Detection language with multi-event correlation, regex, time windows, and outcome sections for enrichment</td></tr>
+        <tr><td>Entity Analytics</td><td>Behavioral analytics that baselines users and assets, surfacing anomalies (risk scores, first-seen events)</td></tr>
+        <tr><td>Reference Lists</td><td>Lookup tables (IPs, domains, users) that can be referenced in YARA-L rules for allowlisting/blocklisting</td></tr>
+        <tr><td>Chronicle Forwarder</td><td>Linux-based log forwarding agent that normalizes and sends data to Chronicle cloud via syslog, file, or Kafka</td></tr>
+        <tr><td>Curated Detections</td><td>Google-maintained detection rule packs covering common threats (Windows, Linux, cloud, network)</td></tr>
+        <tr><td>Chronicle SOAR</td><td>Integrated SOAR module (Siemplify-based) for playbook automation and case management</td></tr>
+        <tr><td>VirusTotal Integration</td><td>Native VT enrichment — every file hash and domain in your logs auto-checked against VT database</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">YARA-L 2.0 DETECTION RULES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Encoded PowerShell Execution</h4>
     ${pgCode(`rule suspicious_powershell_execution {
   meta:
     author = "BlueShell SOC"
     description = "Detects encoded PowerShell execution"
     severity = "HIGH"
     mitre_attack = "T1059.001"
-
   events:
     $process.metadata.event_type = "PROCESS_LAUNCH"
     $process.principal.process.file.full_path = /.*powershell\\.exe$/ nocase
     $process.principal.process.command_line = /.*(-enc|-EncodedCommand|-ec).*/ nocase
-
   condition:
     $process
 }`, 'yara-l')}
+
+    <h4 style="color:var(--accent);margin-top:15px">2. Brute Force — Failed Logins then Success</h4>
     ${pgCode(`rule brute_force_login {
   meta:
     author = "BlueShell SOC"
-    description = "Multiple failed logins followed by success from same IP"
     severity = "HIGH"
     mitre_attack = "T1110"
-
   events:
     $fail.metadata.event_type = "USER_LOGIN"
-    $fail.metadata.vendor_name = "Microsoft"
     $fail.security_result.action = "BLOCK"
     $fail.principal.ip = $ip
-
     $success.metadata.event_type = "USER_LOGIN"
     $success.security_result.action = "ALLOW"
     $success.principal.ip = $ip
-
     $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
-
   match:
     $ip over 15m
-
   condition:
     #fail > 10 and $success
 }`, 'yara-l')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement — PsExec Execution</h4>
+    ${pgCode(`rule psexec_lateral_movement {
+  meta:
+    author = "BlueShell SOC"
+    severity = "HIGH"
+    mitre_attack = "T1021.002"
+  events:
+    $e.metadata.event_type = "PROCESS_LAUNCH"
+    ($e.principal.process.file.full_path = /.*psexe(c|svc)\\.exe$/ nocase
+     or $e.target.process.file.full_path = /.*PSEXESVC\\.exe$/ nocase)
+    $e.principal.hostname = $src_host
+    $e.target.hostname = $dst_host
+    $src_host != $dst_host
+  match:
+    $src_host over 1h
+  condition:
+    #e > 0
+}`, 'yara-l')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. DNS Tunneling — Long Subdomain Queries</h4>
+    ${pgCode(`rule dns_tunneling_detection {
+  meta:
+    author = "BlueShell SOC"
+    severity = "MEDIUM"
+    mitre_attack = "T1071.004"
+  events:
+    $dns.metadata.event_type = "NETWORK_DNS"
+    re.regex($dns.network.dns.questions.name, ".{40,}") // subdomain > 40 chars
+    $dns.principal.ip = $src_ip
+  match:
+    $src_ip over 15m
+  condition:
+    #dns > 50
+  outcome:
+    $query_count = count_distinct($dns.network.dns.questions.name)
+}`, 'yara-l')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. Ransomware — Shadow Copy Deletion</h4>
+    ${pgCode(`rule ransomware_shadow_copy_deletion {
+  meta:
+    author = "BlueShell SOC"
+    severity = "CRITICAL"
+    mitre_attack = "T1490"
+  events:
+    $e.metadata.event_type = "PROCESS_LAUNCH"
+    (($e.principal.process.file.full_path = /.*vssadmin\\.exe$/ nocase
+      and re.regex($e.principal.process.command_line, "(?i)delete.*shadow"))
+    or ($e.principal.process.file.full_path = /.*wmic\\.exe$/ nocase
+      and re.regex($e.principal.process.command_line, "(?i)shadowcopy.*delete"))
+    or ($e.principal.process.file.full_path = /.*bcdedit\\.exe$/ nocase
+      and re.regex($e.principal.process.command_line, "(?i)recoveryenabled.*no")))
+  condition:
+    $e
+}`, 'yara-l')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. New Local Admin Account Created</h4>
+    ${pgCode(`rule new_local_admin_account {
+  meta:
+    author = "BlueShell SOC"
+    severity = "HIGH"
+    mitre_attack = "T1136.001"
+  events:
+    $create.metadata.event_type = "USER_CREATION"
+    $create.principal.user.userid = $creator
+    $create.target.user.userid = $new_user
+    $add.metadata.event_type = "GROUP_MODIFICATION"
+    $add.target.group.group_display_name = /.*admin.*/ nocase
+    $add.target.user.userid = $new_user
+    $create.metadata.event_timestamp.seconds < $add.metadata.event_timestamp.seconds
+  match:
+    $new_user over 1h
+  condition:
+    $create and $add
+}`, 'yara-l')}
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
+    <div class="pg-grid">
+        <div class="pg-info-card"><h4>Enable Curated Detections</h4><p>Activate Google-maintained rule packs for Windows, Linux, and cloud. These cover common threats and are continuously updated by Google and Mandiant.</p></div>
+        <div class="pg-info-card"><h4>Use Reference Lists</h4><p>Create reference lists for admin accounts, trusted IPs, internal domains. Reference them in YARA-L rules to reduce false positives.</p></div>
+        <div class="pg-info-card"><h4>Leverage VT Integration</h4><p>Every hash and domain in your logs is automatically checked against VirusTotal. Use VT context in YARA-L outcome sections for enrichment.</p></div>
+        <div class="pg-info-card"><h4>UDM Search for Hunting</h4><p>Use UDM Search for ad-hoc hunting across 12 months of data. Filter by UDM fields (principal.ip, target.hostname, network.dns) for fast pivoting.</p></div>
+        <div class="pg-info-card"><h4>Multi-Event Rules</h4><p>YARA-L's strength is multi-event correlation. Write rules that require multiple conditions across time windows (e.g., failed logins then success).</p></div>
+        <div class="pg-info-card"><h4>Outcome Sections</h4><p>Use outcome sections in YARA-L to enrich detections with context (count, distinct values, first_seen) — makes analyst triage faster.</p></div>
+    </div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Chronicle UI, UDM Search, alert triage, entity investigation, curated detections</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>YARA-L 2.0 rule writing, reference lists, UDM field mapping, Chronicle SOAR playbooks</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Multi-event rules, entity analytics, API automation, parser development, third-party log integration</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Custom UDM parsing, advanced YARA-L patterns, Mandiant TI integration, enterprise deployment at scale</td><td>3-6 months</td></tr>
+    </table>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
 
@@ -1437,25 +3116,628 @@ ${pgBack()}
     <h1 style="margin:0;border:none;padding:0">TREND MICRO VISION ONE</h1>
     <span class="card-tag" style="position:static">XDR</span>
 </div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Unified XDR platform correlating email, endpoint, server, cloud workload, and network data with custom detection models and Workbench investigation.</p>
+
 <div class="pg-section">
-    <div class="pg-section-title">SEARCH QUERY EXAMPLES</div>
-    ${pgCode(`-- Suspicious PowerShell execution
-eventId:1 AND processFilePath:"*powershell.exe" AND processCmd:"*encodedcommand*"
-
--- Ransomware indicators
-eventId:11 AND (objectFilePath:"*.encrypted" OR objectFilePath:"*.locked" OR objectFilePath:"*.crypto")
-
--- Lateral movement via PsExec
-eventId:1 AND processFilePath:"*psexec*" AND objectFilePath:"*PSEXESVC*"`, 'text')}
+    <div class="pg-section-title">OVERVIEW</div>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">Trend Micro Vision One is an XDR platform that collects and correlates telemetry from Trend Micro's endpoint (Apex One), email (Cloud App Security), server (Deep Security/Cloud One), and network (TippingPoint/Deep Discovery) products. The Workbench provides a centralized investigation interface with timeline-based attack visualization and automated evidence collection.</p>
+    <p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">Custom detection models use YAML-based rules with multi-condition matching across data layers. The Search app provides granular querying across all telemetry. Response actions include endpoint isolation, file quarantine, email deletion, process termination, and account disabling — all from a single console.</p>
 </div>
+
 <div class="pg-section">
-    <div class="pg-section-title">KEY CAPABILITIES</div>
+    <div class="pg-section-title">ARCHITECTURE</div>
+    <div class="pg-ascii-art"><pre>
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │  Endpoints   │  │  Email       │  │  Servers     │  │  Network     │
+    │  (Apex One)  │  │  (CAS)       │  │  (Deep Sec.) │  │  (TippingPt) │
+    └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+           └─────────────────┼─────────────────┼─────────────────┘
+                             ▼                 ▼
+                  ┌─────────────────────────────────┐
+                  │  VISION ONE PLATFORM             │
+                  │  ─────────────────────────────  │
+                  │  XDR Correlation Engine          │
+                  │  Workbench (Investigation)       │
+                  │  Search App (Granular Queries)   │
+                  │  Detection Models (YAML)         │
+                  │  Risk Insights & Attack Surface  │
+                  │  Response Manager                │
+                  └─────────────────────────────────┘
+    </pre></div>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">KEY CONCEPTS</div>
+    <table class="pg-table">
+        <tr><th>Concept</th><th>Description</th></tr>
+        <tr><td>Workbench</td><td>Centralized investigation interface with timeline view, attack chain visualization, and automated evidence collection</td></tr>
+        <tr><td>Search App</td><td>Granular query interface across all telemetry — endpoint, email, network activity data with filter-based queries</td></tr>
+        <tr><td>Detection Models</td><td>YAML-based custom rules with multi-condition matching across data layers and severity scoring</td></tr>
+        <tr><td>XDR Correlation</td><td>Cross-layer correlation combining email, endpoint, server, cloud, and network signals into unified alerts</td></tr>
+        <tr><td>Risk Insights</td><td>Risk scoring for users and devices based on detected threats, misconfigurations, and vulnerability exposure</td></tr>
+        <tr><td>Attack Surface Discovery</td><td>External attack surface mapping — internet-facing assets, exposed services, certificate issues</td></tr>
+        <tr><td>Response Manager</td><td>Centralized response actions across all layers — isolate, quarantine, block, terminate, disable</td></tr>
+        <tr><td>Companion AI</td><td>AI-assisted investigation with natural language queries and automated incident summaries</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">SEARCH QUERIES</div>
+
+    <h4 style="color:var(--accent);margin-top:15px">1. Encoded PowerShell Execution</h4>
+    ${pgCode(`eventId:1 AND processFilePath:"*powershell.exe"
+AND processCmd:"*encodedcommand*"
+AND NOT processCmd:"*WindowsUpdate*"`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">2. Ransomware File Encryption</h4>
+    ${pgCode(`eventId:11 AND (objectFilePath:"*.encrypted" OR objectFilePath:"*.locked"
+OR objectFilePath:"*.crypto" OR objectFilePath:"*.WNCRY")`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement via PsExec</h4>
+    ${pgCode(`eventId:1 AND (processFilePath:"*psexec*" OR objectFilePath:"*PSEXESVC*")
+AND processCmd:"*\\\\\\\\*"`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">4. Credential Dumping — LSASS Access</h4>
+    ${pgCode(`eventId:10 AND objectFilePath:"*lsass.exe"
+AND NOT processFilePath:"*MsMpEng.exe"
+AND NOT processFilePath:"*csrss.exe"
+AND NOT processFilePath:"*svchost.exe"`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">5. DNS Tunneling — Long Queries</h4>
+    ${pgCode(`eventId:22 AND request:"*" AND requestSize:>40
+AND NOT request:"*.microsoft.com" AND NOT request:"*.windows.com"`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">6. Suspicious Service Installation</h4>
+    ${pgCode(`eventId:1 AND processFilePath:"*sc.exe" AND processCmd:"*create*"
+AND (processCmd:"*cmd*" OR processCmd:"*powershell*" OR processCmd:"*temp*")`, 'vision-one')}
+
+    <h4 style="color:var(--accent);margin-top:15px">7. Email with Malicious Attachment</h4>
+    ${pgCode(`mailMsgDirection:"incoming" AND mailAttachmentFileType:("exe" OR "scr" OR "bat" OR "ps1" OR "js" OR "vbs" OR "iso" OR "img")
+AND mailScanResult:"malware"`, 'vision-one')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">CUSTOM DETECTION MODEL (YAML)</div>
+    ${pgCode(`name: "Suspicious LOLBin with Network Activity"
+version: 1.0
+severity: high
+description: "Detects LOLBins downloading content from external sources"
+mitre:
+  tactics: ["execution", "defense-evasion"]
+  techniques: ["T1218", "T1105"]
+data_source:
+  - endpoint_activity_data
+conditions:
+  - event_type: TELEMETRY_PROCESS
+    process_name:
+      - certutil.exe
+      - mshta.exe
+      - regsvr32.exe
+      - bitsadmin.exe
+      - rundll32.exe
+    command_line_pattern: ".*(http|ftp|download|urlcache|transfer).*"
+  - event_type: TELEMETRY_NETWORK
+    direction: outbound
+    dst_port:
+      - 80
+      - 443
+      - 8080
+response:
+  - alert
+  - collect_evidence`, 'yaml')}
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">RESPONSE ACTIONS</div>
+    <table class="pg-table">
+        <tr><th>Action</th><th>Layer</th><th>Description</th></tr>
+        <tr><td>Isolate Endpoint</td><td>Endpoint</td><td>Network-isolate device while maintaining agent connectivity</td></tr>
+        <tr><td>Terminate Process</td><td>Endpoint</td><td>Kill malicious process on endpoint</td></tr>
+        <tr><td>Quarantine File</td><td>Endpoint</td><td>Move file to quarantine vault</td></tr>
+        <tr><td>Collect File</td><td>Endpoint</td><td>Retrieve suspicious file for sandbox analysis</td></tr>
+        <tr><td>Delete Email</td><td>Email</td><td>Remove malicious email from all recipient mailboxes</td></tr>
+        <tr><td>Quarantine Email</td><td>Email</td><td>Move email to quarantine for review</td></tr>
+        <tr><td>Block Sender</td><td>Email</td><td>Block email sender across the organization</td></tr>
+        <tr><td>Add to Block List</td><td>All</td><td>Block file hash, IP, URL, or domain across all layers</td></tr>
+        <tr><td>Disable Account</td><td>Identity</td><td>Disable compromised user account</td></tr>
+        <tr><td>Force Sign-Out</td><td>Identity</td><td>Terminate all active sessions for a user</td></tr>
+    </table>
+</div>
+
+<div class="pg-section">
+    <div class="pg-section-title">BEST PRACTICES</div>
     <div class="pg-grid">
-        <div class="pg-info-card"><h4>XDR Correlation</h4><p>Cross-layer detection across email, endpoint, server, cloud workload, and network.</p></div>
-        <div class="pg-info-card"><h4>Workbench</h4><p>Centralized investigation workspace with timeline view and automated evidence collection.</p></div>
-        <div class="pg-info-card"><h4>Detection Models</h4><p>Custom YAML-based detection models with multi-condition matching and severity scoring.</p></div>
-        <div class="pg-info-card"><h4>Response Actions</h4><p>Isolate endpoints, block files, quarantine email, terminate processes — all from one console.</p></div>
+        <div class="pg-info-card"><h4>Connect All Layers</h4><p>Vision One is most effective with all Trend Micro products feeding data. Email + Endpoint + Server + Network enables true cross-layer correlation.</p></div>
+        <div class="pg-info-card"><h4>Custom Detection Models</h4><p>Build YAML detection models for threats specific to your environment. Focus on attack patterns your industry sees most frequently.</p></div>
+        <div class="pg-info-card"><h4>Workbench for Investigation</h4><p>Always investigate from Workbench — it auto-collects evidence, builds timelines, and shows the complete attack chain across all layers.</p></div>
+        <div class="pg-info-card"><h4>Risk Insights Dashboard</h4><p>Review Risk Insights weekly. Prioritize high-risk users and devices. Use attack surface discovery to find internet-facing exposures.</p></div>
+        <div class="pg-info-card"><h4>Automated Response Playbooks</h4><p>Configure automated responses for high-confidence detections. Auto-quarantine malware, auto-delete phishing emails, auto-isolate for ransomware.</p></div>
+        <div class="pg-info-card"><h4>Companion AI for Triage</h4><p>Use the AI companion for initial alert triage. It generates investigation summaries and suggests response actions based on the attack context.</p></div>
     </div>
 </div>
+
+<div class="pg-section">
+    <div class="pg-section-title">TRAINING ROADMAP</div>
+    <table class="pg-table">
+        <tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+        <tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Vision One console, Workbench alerts, basic response actions, Search app basics</td><td>1-2 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Advanced Search queries, detection models (YAML), response playbooks, Risk Insights</td><td>2-4 weeks</td></tr>
+        <tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Custom detection models, API automation, SIEM integration, attack surface management</td><td>1-2 months</td></tr>
+        <tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Multi-layer correlation tuning, advanced YAML models, enterprise deployment, MSSP operations</td><td>3-6 months</td></tr>
+    </table>
+</div>
+
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
 `;
+
+// ═══════════════════════════════════════════════════════════════════
+// REMAINING SIEM PLATFORMS — Full Rich Content
+// ═══════════════════════════════════════════════════════════════════
+
+richPageContent.exabeam = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">EXABEAM FUSION SIEM</h1><span class="card-tag" style="position:static">SIEM/UEBA</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">UEBA-powered SIEM with behavioral analytics, Smart Timelines, automated investigation, and peer group anomaly detection.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">Exabeam Fusion is a cloud-native SIEM that combines traditional log management with advanced User and Entity Behavior Analytics (UEBA). Its core strength is behavioral baselining — it learns normal behavior for every user and entity, then surfaces anomalies without manually-written rules. Smart Timelines auto-stitch all events for a user/device into a single chronological investigation view.</p>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em;margin-top:10px">Exabeam excels at insider threat detection, compromised account identification, and lateral movement tracking. Risk scoring accumulates across sessions — multiple low-risk events combine to trigger high-risk alerts. Correlation rules use YAML format with statistical, behavioral, and threshold-based detection patterns.</p></div>
+<div class="pg-section"><div class="pg-section-title">ARCHITECTURE</div><div class="pg-ascii-art"><pre>
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────────────┐
+    │  Data Sources │     │  Ingestion   │     │  Exabeam Cloud       │
+    │  ──────────  │────▶│  ──────────  │────▶│  ──────────────────  │
+    │  AD / LDAP   │     │  Syslog/API  │     │  Behavioral Models   │
+    │  VPN / Proxy │     │  Cloud-to-   │     │  Smart Timelines     │
+    │  Cloud (O365)│     │  Cloud       │     │  Risk Engine         │
+    │  EDR / SIEM  │     │              │     │  UEBA Analytics      │
+    └──────────────┘     └──────────────┘     └──────────────────────┘
+</pre></div></div>
+<div class="pg-section"><div class="pg-section-title">KEY CONCEPTS</div><table class="pg-table">
+<tr><th>Concept</th><th>Description</th></tr>
+<tr><td>Smart Timelines</td><td>Auto-generated chronological view of all user/entity activity — logins, file access, process execution, network connections</td></tr>
+<tr><td>Risk Scoring</td><td>Cumulative risk per session. Individual events contribute points; alert triggers when session score exceeds threshold</td></tr>
+<tr><td>Peer Group Analytics</td><td>Compares user behavior against peer group baselines (same department, role, location). Flags outliers</td></tr>
+<tr><td>First-Time Events</td><td>Auto-detects first-time activities: first login from IP, first access to system, first use of application</td></tr>
+<tr><td>Session Stitching</td><td>Combines all events for a user into sessions — login to logoff — for complete activity context</td></tr>
+<tr><td>Correlation Rules</td><td>YAML-based rules with statistical, behavioral, threshold, and sequence-based detection patterns</td></tr>
+<tr><td>Entity Analytics</td><td>Behavioral baselines for non-user entities: servers, applications, network devices, service accounts</td></tr>
+<tr><td>Automated Investigation</td><td>AI-driven investigation that auto-collects evidence, maps kill chain, and suggests response actions</td></tr>
+</table></div>
+<div class="pg-section"><div class="pg-section-title">CORRELATION RULE EXAMPLES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Impossible Travel</h4>
+${pgCode(`- name: impossible_travel
+  type: behavioral
+  conditions:
+    - field: event_type
+      value: authentication_success
+    - field: geo_distance_km
+      operator: ">"
+      value: 500
+    - field: time_between_logins_minutes
+      operator: "<"
+      value: 60
+  risk_score: 75
+  mitre_technique: T1078`, 'yaml')}
+<h4 style="color:var(--accent);margin-top:15px">2. Abnormal Data Access</h4>
+${pgCode(`- name: abnormal_data_access
+  type: statistical
+  conditions:
+    - field: file_access_count
+      operator: ">"
+      value: peer_group_mean + (3 * peer_group_stddev)
+    - field: time_window
+      value: 1h
+  risk_score: 50
+  mitre_technique: T1005`, 'yaml')}
+<h4 style="color:var(--accent);margin-top:15px">3. Privilege Escalation Sequence</h4>
+${pgCode(`- name: priv_escalation_sequence
+  type: sequence
+  sequence:
+    - event: group_membership_change
+      field: target_group
+      value: "*admin*"
+    - event: authentication_success
+      field: target_system
+      value_in: [domain_controller, finance_server]
+      within: 4h
+  risk_score: 90
+  mitre_technique: T1078.002`, 'yaml')}
+<h4 style="color:var(--accent);margin-top:15px">4. Lateral Movement — Multiple RDP Targets</h4>
+${pgCode(`- name: lateral_movement_rdp
+  type: threshold
+  conditions:
+    - field: logon_type
+      value: RemoteInteractive
+    - field: distinct_target_hosts
+      operator: ">"
+      value: 5
+    - field: time_window
+      value: 1h
+  risk_score: 70
+  mitre_technique: T1021.001`, 'yaml')}
+<h4 style="color:var(--accent);margin-top:15px">5. After-Hours VPN + Data Access</h4>
+${pgCode(`- name: after_hours_exfil
+  type: sequence
+  sequence:
+    - event: vpn_login
+      field: login_hour
+      operator: not_between
+      value: [8, 18]
+    - event: file_access
+      field: count
+      operator: ">"
+      value: 100
+      within: 2h
+  risk_score: 80
+  mitre_technique: T1567`, 'yaml')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>Trust the UEBA</h4><p>Don't recreate signature rules. Exabeam's behavioral models detect anomalies you can't write rules for. Focus on tuning baselines, not writing more rules.</p></div>
+<div class="pg-info-card"><h4>Enrich with HR Data</h4><p>Feed HR data (department, manager, role) for accurate peer groups. Better peer groups = fewer false positives in behavioral analytics.</p></div>
+<div class="pg-info-card"><h4>Smart Timelines First</h4><p>Train analysts to start every investigation from the Smart Timeline. It auto-stitches all activity into one chronological view.</p></div>
+<div class="pg-info-card"><h4>Cumulative Risk Scoring</h4><p>Don't set thresholds too low. Let cumulative scoring across a session surface truly suspicious patterns from individually normal events.</p></div>
+<div class="pg-info-card"><h4>Insider Threat Focus</h4><p>Exabeam excels here. Create use cases for: data hoarding, after-hours access, access to unrelated systems, resignation + data download.</p></div>
+<div class="pg-info-card"><h4>Cloud Log Integration</h4><p>Connect O365, Google Workspace, AWS CloudTrail, Azure AD. Cloud activity is critical for detecting account compromise.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console navigation, Smart Timelines, risk score alerts, basic investigation</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>YAML rules, peer group tuning, behavioral model customization, case management</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Custom data parsers, API automation, SOAR integration, threat hunting</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>ML model tuning, custom behavioral models, multi-tenant management</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.logrhythm = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">LOGRHYTHM SIEM</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">SIEM with AI Engine analytics (5 detection types), SmartResponse automation, and embedded Threat Lifecycle Management.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">LogRhythm is a self-hosted SIEM combining log management, security analytics, and SOAR in a single deployment. Its AI Engine uses five detection methods — statistical, behavioral, threshold, trend, and unique value — to detect threats beyond simple signatures. SmartResponse enables automated response actions, and embedded case management provides a complete workflow from detection to resolution.</p></div>
+<div class="pg-section"><div class="pg-section-title">KEY CONCEPTS</div><table class="pg-table">
+<tr><th>Concept</th><th>Description</th></tr>
+<tr><td>AI Engine</td><td>Multi-method analytics: statistical, behavioral, threshold, trend, and unique value detection rules</td></tr>
+<tr><td>SmartResponse</td><td>Automated actions from rules — run scripts, disable accounts, block IPs, create tickets</td></tr>
+<tr><td>Threat Lifecycle Mgmt</td><td>Embedded case management with alarm triage, evidence collection, and collaboration</td></tr>
+<tr><td>MPE Rules</td><td>Message Processing Engine — custom regex parsing for any log format normalization</td></tr>
+<tr><td>LRSQL</td><td>LogRhythm SQL — query language for searching normalized log data</td></tr>
+<tr><td>Lists</td><td>Dynamic/static entity lists (IPs, users, hosts) referenced in AI Engine rules</td></tr>
+</table></div>
+<div class="pg-section"><div class="pg-section-title">AI ENGINE RULES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Brute Force (Threshold)</h4>
+${pgCode(`Type: Threshold | Classification: Auth Failure
+Threshold: count > 10 within 5 minutes | Group By: Origin Host
+SmartResponse: Disable user after 20 failures
+MITRE: T1110`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">2. Encoded PowerShell (Behavioral)</h4>
+${pgCode(`Type: Behavioral | Process: powershell.exe
+Command CONTAINS "-EncodedCommand" | First occurrence for user+host
+SmartResponse: Create Case + Collect forensics
+MITRE: T1059.001`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">3. Anomalous Data Transfer (Statistical)</h4>
+${pgCode(`Type: Statistical | Source: Firewall/Proxy
+Bytes Sent > 3 stddev above host baseline | Direction: Outbound
+Destination NOT IN approved_services list | Window: 1 hour
+MITRE: T1041`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">4. RDP Lateral Movement (Unique Value)</h4>
+${pgCode(`Type: Unique Value | Logon Type: RemoteInteractive
+Unique Impacted Hosts > 5 | Group By: Origin User | Window: 1 hour
+SmartResponse: Alert + Create Case
+MITRE: T1021.001`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">5. Service Installation Rate (Trend)</h4>
+${pgCode(`Type: Trend | Source: Windows System (7045)
+Trend: >200% increase vs 30-day average
+Exclude: Known deployment windows
+MITRE: T1543.003`, 'text')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>Use All AI Engine Types</h4><p>Don't just use threshold rules. Statistical and behavioral rules catch what thresholds miss. Unique value rules are great for lateral movement.</p></div>
+<div class="pg-info-card"><h4>SmartResponse Automation</h4><p>Start with alerting actions. Progress to auto-remediation for high-confidence detections as your team gains confidence.</p></div>
+<div class="pg-info-card"><h4>Custom MPE Rules</h4><p>Write MPE rules for custom log sources. Good parsing is the foundation — all analytics depend on properly normalized data.</p></div>
+<div class="pg-info-card"><h4>Embedded Case Management</h4><p>Use built-in case management for every investigation. Track evidence, collaborate, and measure MTTD/MTTR per case type.</p></div>
+<div class="pg-info-card"><h4>Dynamic Lists</h4><p>Create dynamic lists: VIP users, admin accounts, critical servers. Reference in AI Engine rules for context-aware detection.</p></div>
+<div class="pg-info-card"><h4>Compliance Modules</h4><p>Enable built-in modules for PCI-DSS, HIPAA, SOX, GDPR. Pre-built reports and dashboards save significant effort.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Web Console, alarm triage, case management, basic LRSQL, dashboards</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>AI Engine rules (all 5 types), SmartResponse, custom MPE rules, lists</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Advanced tuning, API automation, compliance module config, custom dashboards</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>HA/DR deployment, architecture design, performance tuning, multi-site</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.securonix = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">SECURONIX</h1><span class="card-tag" style="position:static">SIEM/UEBA</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Cloud UEBA/SIEM with Spotter search, threat models, insider threat analytics, and risk-based prioritization.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">Securonix is a cloud-native SIEM/UEBA built on Hadoop/Spark for scalable analytics. It specializes in insider threat detection, cloud security monitoring, and APT identification through behavioral analytics and peer group comparisons. Spotter provides natural-language-like querying across all data. Threat Models are pre-built JSON detection packages covering specific threat scenarios.</p></div>
+<div class="pg-section"><div class="pg-section-title">SPOTTER SEARCH EXAMPLES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Failed Logins then Success</h4>
+${pgCode(`index = activity AND eventoutcome = "Failure" AND resourcetype = "Authentication"
+| where accountname != "SYSTEM"
+| stats count as fail_count by accountname, sourceaddress
+| where fail_count > 10`, 'spotter')}
+<h4 style="color:var(--accent);margin-top:15px">2. Suspicious PowerShell</h4>
+${pgCode(`index = activity AND resourcetype = "Endpoint"
+AND message CONTAINS "powershell" AND (message CONTAINS "encodedcommand"
+OR message CONTAINS "downloadstring" OR message CONTAINS "invoke-expression")`, 'spotter')}
+<h4 style="color:var(--accent);margin-top:15px">3. Bulk Cloud File Download</h4>
+${pgCode(`index = activity AND resourcetype = "Cloud" AND transactionstring1 = "FileDownloaded"
+| stats count as downloads, dc(resourcename) as unique_files by accountname
+| where downloads > 100 OR unique_files > 50`, 'spotter')}
+<h4 style="color:var(--accent);margin-top:15px">4. Lateral Movement</h4>
+${pgCode(`index = activity AND resourcetype = "Authentication" AND categoryoutcome = "RemoteInteractive"
+| stats dc(destinationhostname) as targets by accountname, sourceaddress
+| where targets > 3`, 'spotter')}
+<h4 style="color:var(--accent);margin-top:15px">5. USB Data Exfiltration</h4>
+${pgCode(`index = activity AND resourcetype = "Endpoint" AND categoryobject = "Removable Device"
+AND categorybehavior = "File Write"
+| stats sum(bytesout) as total_bytes by accountname
+| where total_bytes > 1073741824`, 'spotter')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>Deploy Threat Models</h4><p>Activate pre-built models for insider threat, cloud abuse, APT. They include policies, risk indicators, and response workflows.</p></div>
+<div class="pg-info-card"><h4>Peer Group Accuracy</h4><p>Feed HR data for accurate peer groups. Review auto-generated peer groups quarterly. Better groups = fewer false positives.</p></div>
+<div class="pg-info-card"><h4>Insider Threat Program</h4><p>Securonix's strongest use case. Track data hoarding, after-hours access, privilege abuse, unauthorized cloud usage.</p></div>
+<div class="pg-info-card"><h4>Cloud Security Monitoring</h4><p>Connect O365, AWS, Azure, GCP. Use cloud-specific threat models for credential stuffing, impossible travel, and data exfiltration.</p></div>
+<div class="pg-info-card"><h4>Risk Score Tuning</h4><p>Set meaningful thresholds based on your risk tolerance. Focus on cumulative risk over time, not individual event scores.</p></div>
+<div class="pg-info-card"><h4>Spotter for Hunting</h4><p>Train analysts on Spotter — its natural-language-like syntax has a low learning curve compared to other SIEM query languages.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console, Spotter basics, alert triage, risk score investigation</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Advanced Spotter, threat models, policy creation, peer groups</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Custom threat models, API automation, analytics tuning, SOAR</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>ML customization, multi-tenant deployment, custom connectors</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.mcafee = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">MCAFEE ESM / TRELLIX</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Enterprise SIEM with Advanced Correlation Engine, content packs, ePO integration, and Trellix XDR ecosystem.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">McAfee ESM (now Trellix) uses the Advanced Correlation Engine (ACE) for real-time correlation across data sources. It integrates natively with the Trellix ecosystem — ePO, Endpoint Security, Network Security Platform, and DLP. Correlation rules use XML definitions with watchlists, data enrichment, and automated response. Content packs provide pre-built rules for compliance and threat detection.</p></div>
+<div class="pg-section"><div class="pg-section-title">CORRELATION EXAMPLES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Brute Force</h4>
+${pgCode(`<correlation name="Brute Force" priority="7">
+  <trigger>
+    <match field="Signature ID" value="Authentication Failure" count="10" timeframe="300"/>
+    <group_by field="Source IP"/>
+  </trigger>
+  <action><alert severity="HIGH"/><watchlist name="Suspicious_IPs" field="Source IP"/></action>
+</correlation>`, 'xml')}
+<h4 style="color:var(--accent);margin-top:15px">2. Malware Lateral Spread</h4>
+${pgCode(`<correlation name="Malware Spread" priority="9">
+  <sequence timeframe="3600">
+    <event field="Signature ID" value="Malware Detected" alias="m"/>
+    <event field="Source IP" value="{m.Destination IP}" alias="l"/>
+    <event field="Signature ID" value="Malware Detected" source="{l.Destination IP}"/>
+  </sequence>
+  <action><alert severity="CRITICAL"/><quarantine field="Source IP"/></action>
+</correlation>`, 'xml')}
+<h4 style="color:var(--accent);margin-top:15px">3. Encoded PowerShell</h4>
+${pgCode(`<correlation name="Encoded PowerShell" priority="8">
+  <trigger>
+    <match field="Process Name" value="powershell.exe"/>
+    <match field="Command Line" regex="(?i)(-enc|-encodedcommand)"/>
+    <exclude field="User" watchlist="Approved_Admins"/>
+  </trigger>
+  <action><alert severity="HIGH"/></action>
+</correlation>`, 'xml')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>ePO Integration</h4><p>Connect ePolicy Orchestrator for endpoint context. Enrich alerts with AV status, compliance, and vulnerability data.</p></div>
+<div class="pg-info-card"><h4>Content Packs</h4><p>Deploy Trellix content packs for compliance (PCI, HIPAA) and threat detection. Pre-built rules and dashboards save weeks.</p></div>
+<div class="pg-info-card"><h4>Watchlist-Driven Detection</h4><p>Create dynamic watchlists for suspicious IPs, compromised accounts, known-bad hashes. Reference in correlation rules.</p></div>
+<div class="pg-info-card"><h4>ACE Sequence Rules</h4><p>Use sequence and statistical rules, not just thresholds. Sequences catch multi-stage attacks that single-event rules miss.</p></div>
+<div class="pg-info-card"><h4>Data Source Priority</h4><p>Prioritize: AD logs, firewall, EDR, email gateway. These cover 80% of use cases. Add more as capacity allows.</p></div>
+<div class="pg-info-card"><h4>Trellix XDR Migration</h4><p>Plan migration from legacy ESM to Trellix XDR for cloud-native capabilities and broader ecosystem integration.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console navigation, alarm management, event viewer, basic searches</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>XML correlation rules, watchlists, data sources, custom views</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>ACE advanced patterns, API integration, content pack development</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Multi-ESM architecture, HA deployment, Trellix XDR migration</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.logpoint = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">LOGPOINT SIEM</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">European SIEM with LPQL query language, UEBA module, built-in SOAR, and GDPR-compliant data handling.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">LogPoint is a European SIEM with efficient LPQL query language, GDPR-compliant data handling, and integrated UEBA and SOAR modules. It provides log management, detection, behavior analytics, and automated response in a unified platform without separate licenses for each capability.</p></div>
+<div class="pg-section"><div class="pg-section-title">LPQL EXAMPLES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Brute Force</h4>
+${pgCode(`norm_id=WinServer event_id=4625
+| chart count() as failures by source_address, user
+| search failures > 10`, 'lpql')}
+<h4 style="color:var(--accent);margin-top:15px">2. Suspicious PowerShell</h4>
+${pgCode(`norm_id=WindowsSysmon event_id=1 image="*\\\\powershell.exe"
+command="*-EncodedCommand*" OR command="*downloadstring*"
+| chart count() by host, user, command`, 'lpql')}
+<h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement</h4>
+${pgCode(`norm_id=WinServer event_id=4624 logon_type=10
+| chart count() as conn, distinct(destination) as hosts by source_address, user
+| search hosts > 3`, 'lpql')}
+<h4 style="color:var(--accent);margin-top:15px">4. DNS Tunneling</h4>
+${pgCode(`label=DNS | chart count() as queries, avg(length(query)) as avg_len by source_address
+| search queries > 500 avg_len > 40`, 'lpql')}
+<h4 style="color:var(--accent);margin-top:15px">5. Account Manipulation</h4>
+${pgCode(`norm_id=WinServer (event_id=4720 OR event_id=4728 OR event_id=4732)
+| chart count() as events, distinct(event_id) as types by target_user, user
+| search types > 1`, 'lpql')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>LPQL Efficiency</h4><p>Use norm_id and label filters first. Index-time filtering is 10x faster than search-time. Narrow data before chart/search.</p></div>
+<div class="pg-info-card"><h4>Enable UEBA Module</h4><p>Detects insider threats and compromised accounts through behavioral baselines. No additional licensing in most packages.</p></div>
+<div class="pg-info-card"><h4>Built-in SOAR</h4><p>Use integrated SOAR for playbooks. No separate product needed — response actions are built into the alert workflow.</p></div>
+<div class="pg-info-card"><h4>GDPR Compliance</h4><p>Data anonymization, right-to-be-forgotten, and data residency controls are native features. EU data stays in EU.</p></div>
+<div class="pg-info-card"><h4>Normalization Quality</h4><p>Review log source normalization regularly. Detection quality depends on accurate field mapping (norm_id, label).</p></div>
+<div class="pg-info-card"><h4>Alert Enrichment</h4><p>Use enrichment sources (GeoIP, threat intel, asset inventory) to add context to alerts before analyst review.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>UI navigation, basic LPQL, alert management, pre-built dashboards</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Advanced LPQL, alert rules, UEBA, log source configuration</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>SOAR playbooks, API integration, custom parsers, compliance</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>HA deployment, performance tuning, multi-tenant management</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.insightidr = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">RAPID7 INSIGHTIDR</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Cloud SIEM with LEQL search, Attacker Behavior Analytics, deception technology (honeypots), and Insight Agent EDR.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">InsightIDR is a cloud-native SIEM combining user behavior analytics, attacker behavior analytics (ABA), and deception technology. Built-in honeypots, honey credentials, and honey files provide early warning of attacker activity. The Insight Agent provides endpoint visibility. Integrates with InsightVM (vulnerability), InsightConnect (SOAR), and InsightAppSec.</p></div>
+<div class="pg-section"><div class="pg-section-title">LEQL EXAMPLES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Failed Authentication</h4>
+${pgCode(`where(source_json.EventID = 4625)
+groupby(source_json.TargetUserName, source_json.IpAddress)
+calculate(count) sort(desc)`, 'leql')}
+<h4 style="color:var(--accent);margin-top:15px">2. Encoded PowerShell</h4>
+${pgCode(`where(source_json.EventID = 1 AND
+  source_json.Image ICONTAINS "powershell" AND
+  source_json.CommandLine ICONTAINS "encodedcommand")`, 'leql')}
+<h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement</h4>
+${pgCode(`where(source_json.EventID = 4624 AND source_json.LogonType = 10)
+groupby(source_json.TargetUserName, source_json.IpAddress)
+calculate(unique:source_json.WorkstationName)
+having(unique > 3)`, 'leql')}
+<h4 style="color:var(--accent);margin-top:15px">4. DNS Anomalies</h4>
+${pgCode(`where(source_json.QueryName != null AND length(source_json.QueryName) > 40)
+groupby(source_json.QueryName) calculate(count) sort(desc)`, 'leql')}
+<h4 style="color:var(--accent);margin-top:15px">5. Admin Account Creation</h4>
+${pgCode(`where(source_json.EventID = 4720 OR source_json.EventID = 4728)
+groupby(source_json.SubjectUserName, source_json.TargetUserName)
+calculate(count)`, 'leql')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>Deploy Deception</h4><p>Set up honey credentials, honey files, honeypots. Near-zero false positives — any interaction is suspicious by definition.</p></div>
+<div class="pg-info-card"><h4>Insight Agent Coverage</h4><p>Deploy to all endpoints. It provides EDR-level visibility (processes, network) that enriches SIEM detections significantly.</p></div>
+<div class="pg-info-card"><h4>ABA Detections</h4><p>Enable all Attacker Behavior Analytics. Rapid7-maintained rules covering common techniques. Review and tune monthly.</p></div>
+<div class="pg-info-card"><h4>InsightConnect SOAR</h4><p>Connect for automated playbooks. Pre-built workflows for phishing, malware containment, and account compromise.</p></div>
+<div class="pg-info-card"><h4>LEQL Custom Alerts</h4><p>Write custom LEQL alerts for your specific threats. Start broad, narrow based on false positive rates over time.</p></div>
+<div class="pg-info-card"><h4>InsightVM Integration</h4><p>Add vulnerability context. Prioritize alerts on endpoints with known exploitable vulnerabilities for faster triage.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console, investigation queue, LEQL basics, Insight Agent deployment</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Advanced LEQL, custom alerts, deception, ABA tuning, log sources</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>InsightConnect SOAR, API automation, InsightVM, custom dashboards</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>Advanced hunting, custom data sources, Rapid7 suite orchestration</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.arcsight = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">ARCSIGHT ESM</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Enterprise SIEM with CEF normalization, SmartConnectors for 500+ sources, Active Channels, and complex correlation rules.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">ArcSight ESM (now OpenText) is an established enterprise SIEM with powerful real-time correlation, Common Event Format (CEF) normalization, and SmartConnectors for 500+ data source types. Active Channels provide real-time event monitoring, Active Lists enable dynamic watchlists, and Rules support complex multi-stage correlation. Excels in large-scale environments with compliance-heavy requirements.</p></div>
+<div class="pg-section"><div class="pg-section-title">CORRELATION RULES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Brute Force (Aggregate)</h4>
+${pgCode(`Type: Aggregate
+Conditions: deviceEventClassId = "auth:failure"
+Aggregate: count > 10 per sourceAddress within 300 seconds
+Actions: Add to Active List "Brute_Force_Sources" + Alert (severity 8)`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">2. Encoded PowerShell (Filter)</h4>
+${pgCode(`Type: Filter
+Conditions: deviceProduct = "Sysmon" AND fileName = "powershell.exe"
+  AND deviceCustomString1 MATCHES "(?i).*(-enc|-encodedcommand).*"
+  AND NOT sourceUserName ON Active List "Approved_Admins"
+Actions: Generate Event (severity 7) + Add to "Suspicious_Endpoints"`, 'text')}
+<h4 style="color:var(--accent);margin-top:15px">3. Lateral Movement (Join)</h4>
+${pgCode(`Type: Join
+Event A: deviceEventClassId = "4624" AND logonType = 10 (RDP)
+Event B: deviceEventClassId = "4624" AND logonType = 10 (RDP)
+Join: A.destinationAddress = B.sourceAddress (hop chain)
+Within: 3600 seconds
+Actions: Correlation Event (severity 9)`, 'text')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>Active Lists for Context</h4><p>Maintain lists for admin accounts, critical servers, VPN subnets, known-good hashes. Reference in all correlation rules.</p></div>
+<div class="pg-info-card"><h4>CEF Normalization</h4><p>Ensure all SmartConnectors properly normalize to CEF. Consistent normalization is the foundation for cross-source correlation.</p></div>
+<div class="pg-info-card"><h4>FlexConnector SDK</h4><p>Use FlexConnectors for custom/proprietary log sources. Proper parsing upfront saves investigation time later.</p></div>
+<div class="pg-info-card"><h4>Content Packages</h4><p>Deploy ArcSight content packages for MITRE ATT&CK coverage. Pre-built rules, dashboards, and Active Channels.</p></div>
+<div class="pg-info-card"><h4>Active Channel Monitoring</h4><p>Create Active Channels for real-time monitoring of critical events. Use as live SOC dashboards during shifts.</p></div>
+<div class="pg-info-card"><h4>Performance Tuning</h4><p>Monitor EPS and rule performance. Optimize high-EPS rules with pre-filters. Archive old events to maintain speed.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Console, Active Channels, event investigation, alarm management</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>Correlation rules (filter, aggregate, join), Active Lists, SmartConnectors</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>FlexConnector SDK, advanced correlation, API, content packages</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>HA/DR architecture, performance tuning, multi-site, cloud migration</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+
+richPageContent.fortisiem = `
+${pgBack()}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><h1 style="margin:0;border:none;padding:0">FORTISIEM</h1><span class="card-tag" style="position:static">SIEM</span></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Fortinet SIEM with auto-discovery CMDB, FortiGuard threat intel, and native Fortinet Security Fabric integration.</p>
+<div class="pg-section"><div class="pg-section-title">OVERVIEW</div>
+<p style="color:var(--text-secondary);line-height:1.7;font-size:0.88em">FortiSIEM combines SIEM with IT infrastructure monitoring (CMDB, performance, availability). It auto-discovers and inventories all network devices, applications, and users. Native Fortinet Security Fabric integration (FortiGate, FortiAnalyzer, FortiEDR) enables closed-loop detection and response. Unique dual-use as both security SIEM and IT ops monitoring platform.</p></div>
+<div class="pg-section"><div class="pg-section-title">DETECTION RULES</div>
+<h4 style="color:var(--accent);margin-top:15px">1. Brute Force</h4>
+${pgCode(`<Rule><Name>Multiple Failed Logins</Name>
+  <EventType>Win-Security-4625</EventType>
+  <Pattern>
+    <SingleEvtConstr>eventType = "Win-Security-4625"</SingleEvtConstr>
+    <GroupBy>srcIpAddr, user</GroupBy>
+    <Threshold count="10" window="300"/>
+  </Pattern>
+  <Action><IncidentSeverity>8</IncidentSeverity></Action>
+</Rule>`, 'xml')}
+<h4 style="color:var(--accent);margin-top:15px">2. Encoded PowerShell</h4>
+${pgCode(`<Rule><Name>Encoded PowerShell</Name>
+  <EventType>Win-Sysmon-1</EventType>
+  <Pattern>
+    <SingleEvtConstr>procName CONTAIN "powershell" AND
+      command REGEXP "(?i)(-enc|-encodedcommand)"</SingleEvtConstr>
+  </Pattern>
+  <Action><IncidentSeverity>7</IncidentSeverity>
+    <MITRE_Technique>T1059.001</MITRE_Technique></Action>
+</Rule>`, 'xml')}
+<h4 style="color:var(--accent);margin-top:15px">3. FortiGate IPS + Endpoint Correlation</h4>
+${pgCode(`<Rule><Name>IPS Alert + Malware Detected</Name>
+  <Pattern>
+    <Sequence window="1800">
+      <Event alias="ips">eventType="FortiGate-IPS-Alert" AND severity>=3</Event>
+      <Event alias="mal">eventType REGEXP ".*Malware.*" AND
+        destIpAddr={ips.destIpAddr}</Event>
+    </Sequence>
+  </Pattern>
+  <Action><IncidentSeverity>9</IncidentSeverity>
+    <FortiGate action="quarantine" target="{ips.destIpAddr}"/></Action>
+</Rule>`, 'xml')}
+</div>
+<div class="pg-section"><div class="pg-section-title">BEST PRACTICES</div><div class="pg-grid">
+<div class="pg-info-card"><h4>CMDB Auto-Discovery</h4><p>Let FortiSIEM discover your network. The CMDB provides asset context (OS, services, owner) for every alert — essential for prioritization.</p></div>
+<div class="pg-info-card"><h4>Fabric Integration</h4><p>Connect all Fortinet products. Detect in SIEM, block on FortiGate, remediate on FortiEDR — closed-loop response.</p></div>
+<div class="pg-info-card"><h4>FortiGuard Threat Intel</h4><p>Enable FortiGuard feeds for auto-enrichment with IP reputation, threat context, and malware family classification.</p></div>
+<div class="pg-info-card"><h4>Dual Security + IT Ops</h4><p>Use FortiSIEM for both security and infrastructure monitoring. Single pane for security events and infrastructure health.</p></div>
+<div class="pg-info-card"><h4>Multi-Tenant (MSSP)</h4><p>Full multi-tenancy support. MSSPs manage multiple customers from a single deployment with data isolation.</p></div>
+<div class="pg-info-card"><h4>Custom Parsers</h4><p>Write parsers for non-standard log sources. Good parsing ensures accurate correlation and compliance reporting.</p></div>
+</div></div>
+<div class="pg-section"><div class="pg-section-title">TRAINING ROADMAP</div><table class="pg-table">
+<tr><th>Level</th><th>Topics</th><th>Duration</th></tr>
+<tr><td><span class="pg-badge pg-badge-green">Beginner</span></td><td>Dashboard, CMDB review, incident management, basic event searches</td><td>1-2 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-blue">Intermediate</span></td><td>XML rule creation, FortiGate integration, custom reports, monitoring</td><td>2-4 weeks</td></tr>
+<tr><td><span class="pg-badge pg-badge-orange">Advanced</span></td><td>Advanced correlation, custom parsers, API, FortiGuard integration</td><td>1-2 months</td></tr>
+<tr><td><span class="pg-badge pg-badge-red">Expert</span></td><td>HA architecture, multi-tenant deployment, Fabric orchestration</td><td>3-6 months</td></tr>
+</table></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px"><button class="btn-hack" onclick="goHome()">◂ DASHBOARD</button></div>
+`;
+

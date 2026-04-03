@@ -5,15 +5,18 @@
 // ── Initialize App (no boot sequence) ──
 const app = document.getElementById('app');
 
+let _appInitialized = false;
 function initApp() {
+    if (_appInitialized) return;
+    _appInitialized = true;
     startClock();
     startLiveFeed();
-    animateStats();
+    setTimeout(animateStats, 200);
 }
 
-// Start immediately
+// Start when ready
 document.addEventListener('DOMContentLoaded', initApp);
-setTimeout(initApp, 100);
+setTimeout(initApp, 300);
 
 // ── Mobile Menu ──
 function toggleMobileMenu() {
