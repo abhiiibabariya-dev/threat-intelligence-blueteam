@@ -419,12 +419,56 @@ server.on('request', (req, res) => {
         req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', async () => {
             try {
-                const { ruleName, context, platformFocus } = JSON.parse(body);
+                const { ruleName, context, platformFocus, mode } = JSON.parse(body);
                 if (!ruleName) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'ruleName is required' }));
                     return;
                 }
+
+                // ── SIEM-Only Prompt Template ──────────────────────
+                const SIEM_PROMPT_TEMPLATE = `You are a senior SOC analyst and detection engineer.
+
+Your task is to generate a complete, production-ready SIEM detection rule.
+
+Rule Name: {{RULE_NAME}}
+
+Context (use this knowledge while generating rule):
+{{CONTEXT_DATA}}
+- Windows Event ID 4624 = Successful login
+- Logon Type 10 = Remote Interactive (RDP)
+- Event ID 4625 = Failed login
+- Event ID 4672 = Privileged login
+- Event ID 5140 = SMB share access
+- MITRE ATT&CK T1021 = Remote Services (Lateral Movement)
+- MITRE ATT&CK T1059 = Command Execution (PowerShell etc.)
+
+Instructions:
+- Generate practical SOC-level detection (NOT generic)
+- Use real-world attack patterns
+- Correlate multiple logs if applicable
+- Prefer detection engineering mindset
+
+{{PLATFORM_FOCUS}}
+
+IMPORTANT: Return valid JSON only with these keys:
+{
+  "ruleName": "string",
+  "description": "string",
+  "mitre": [{"id": "string", "name": "string", "tactic": "string"}],
+  "severity": "string",
+  "severityReason": "string",
+  "logSources": [{"source": "string", "eventId": "string", "purpose": "string"}],
+  "detectionLogic": ["string (step-by-step)"],
+  "splunkSPL": "string",
+  "sentinelKQL": "string",
+  "thresholds": {"events": number, "window": "string", "note": "string"},
+  "falsePositives": ["string"],
+  "investigationSteps": ["string"],
+  "responseActions": ["string"],
+  "tuning": ["string"]
+}
+Return ONLY valid JSON. No markdown, no explanation, no code fences.`;
 
                 // Platform-specific context injection
                 function getPlatformContext(platform) {
@@ -621,8 +665,14 @@ Return ONLY valid JSON. No markdown, no explanation, no code fences.`;
 
                 const fullContext = (context || '') + '\n' + baseContext;
 
+                // ── Select Template Based on Mode ───────────────────
+                // mode: "siem" = SIEM-only rule | "full" (default) = Full SIEM+EDR+SOAR+XDR
+                const selectedTemplate = (mode === 'siem')
+                    ? SIEM_PROMPT_TEMPLATE
+                    : MASTER_PROMPT_TEMPLATE;
+
                 // ── Replace Template Placeholders ───────────────────
-                const DETECTION_PROMPT = MASTER_PROMPT_TEMPLATE
+                const DETECTION_PROMPT = selectedTemplate
                     .replace('{{RULE_NAME}}', ruleName)
                     .replace('{{CONTEXT_DATA}}', fullContext.trim())
                     .replace('{{PLATFORM_FOCUS}}', platformCtx);

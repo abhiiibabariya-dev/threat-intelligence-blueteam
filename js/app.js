@@ -571,14 +571,48 @@ function loadRuleBuilder() {
                     </div>
                 </div>
 
-                <div class="rb-code-area">
+                <!-- Multi-Card Output: SIEM / EDR / XDR / SOAR -->
+                <div class="rb-cards-tabs" style="display:flex;gap:2px;margin-bottom:0">
+                    <button class="rb-card-tab rb-card-tab-active" data-card="siem" onclick="rbSwitchCard('siem')" style="flex:1;padding:8px 0;font-size:11px;font-weight:700;font-family:var(--font-sans);background:var(--bg-card);color:var(--accent);border:1px solid var(--accent);border-bottom:2px solid var(--accent);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;letter-spacing:0.5px">&#128202; SIEM</button>
+                    <button class="rb-card-tab" data-card="edr" onclick="rbSwitchCard('edr')" style="flex:1;padding:8px 0;font-size:11px;font-weight:700;font-family:var(--font-sans);background:var(--bg-tertiary);color:var(--text-dim);border:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;letter-spacing:0.5px">&#128187; EDR</button>
+                    <button class="rb-card-tab" data-card="xdr" onclick="rbSwitchCard('xdr')" style="flex:1;padding:8px 0;font-size:11px;font-weight:700;font-family:var(--font-sans);background:var(--bg-tertiary);color:var(--text-dim);border:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;letter-spacing:0.5px">&#128279; XDR</button>
+                    <button class="rb-card-tab" data-card="soar" onclick="rbSwitchCard('soar')" style="flex:1;padding:8px 0;font-size:11px;font-weight:700;font-family:var(--font-sans);background:var(--bg-tertiary);color:var(--text-dim);border:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;letter-spacing:0.5px">&#128680; SOAR</button>
+                </div>
+
+                <!-- SIEM Card -->
+                <div class="rb-card-panel" id="rb-card-siem" style="background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:12px;margin-bottom:8px">
                     <div class="rb-code-header">
-                        <span>Generated Rule</span>
-                        <div class="rb-code-actions">
-                            <button onclick="rbCopyRule()">COPY</button>
-                        </div>
+                        <span>SIEM Detection Query</span>
+                        <div class="rb-code-actions"><button onclick="rbCopyRule()">COPY</button></div>
                     </div>
                     <div class="rb-code-output" id="rb-code-output">// Drop components to generate a detection rule...</div>
+                </div>
+
+                <!-- EDR Card -->
+                <div class="rb-card-panel" id="rb-card-edr" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:12px;margin-bottom:8px">
+                    <div class="rb-code-header">
+                        <span>EDR Detection (CrowdStrike / MDE)</span>
+                        <div class="rb-code-actions"><button onclick="rbCopyCard('edr')">COPY</button></div>
+                    </div>
+                    <div class="rb-code-output" id="rb-edr-output">// Build a SIEM rule first, EDR detection will auto-generate...</div>
+                </div>
+
+                <!-- XDR Card -->
+                <div class="rb-card-panel" id="rb-card-xdr" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:12px;margin-bottom:8px">
+                    <div class="rb-code-header">
+                        <span>XDR Correlation (Cross-Signal)</span>
+                        <div class="rb-code-actions"><button onclick="rbCopyCard('xdr')">COPY</button></div>
+                    </div>
+                    <div class="rb-code-output" id="rb-xdr-output">// Build a SIEM rule first, XDR correlation will auto-generate...</div>
+                </div>
+
+                <!-- SOAR Card -->
+                <div class="rb-card-panel" id="rb-card-soar" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:12px;margin-bottom:8px">
+                    <div class="rb-code-header">
+                        <span>SOAR Playbook (Response Automation)</span>
+                        <div class="rb-code-actions"><button onclick="rbCopyCard('soar')">COPY</button></div>
+                    </div>
+                    <div class="rb-code-output" id="rb-soar-output">// Build a SIEM rule first, SOAR playbook will auto-generate...</div>
                 </div>
 
                 <div class="rb-export-bar">
@@ -733,6 +767,150 @@ function rbAutoPopulate() {
 
 // ── Rule Generation Engine ──
 
+// ── Rule Builder Card Switching ────────────────────────────────────────
+
+function rbSwitchCard(cardId) {
+    document.querySelectorAll('.rb-card-panel').forEach(p => { p.style.display = 'none'; });
+    document.querySelectorAll('.rb-card-tab').forEach(b => {
+        const isActive = b.dataset.card === cardId;
+        b.style.background = isActive ? 'var(--bg-card)' : 'var(--bg-tertiary)';
+        b.style.color = isActive ? 'var(--accent)' : 'var(--text-dim)';
+        b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+        b.style.borderBottomColor = isActive ? 'var(--accent)' : 'var(--border)';
+        b.style.borderBottomWidth = isActive ? '2px' : '1px';
+        b.classList.toggle('rb-card-tab-active', isActive);
+    });
+    const panel = document.getElementById('rb-card-' + cardId);
+    if (panel) panel.style.display = 'block';
+}
+
+function rbCopyCard(cardId) {
+    const el = document.getElementById('rb-' + cardId + '-output');
+    if (el) {
+        navigator.clipboard.writeText(el.textContent).then(() => {
+            const btns = el.parentElement.querySelectorAll('button');
+            const btn = Array.from(btns).find(b => b.textContent === 'COPY');
+            if (btn) { btn.textContent = 'COPIED!'; setTimeout(() => { btn.textContent = 'COPY'; }, 1500); }
+        });
+    }
+}
+
+// ── EDR/XDR/SOAR Auto-Generator from Rule Builder State ──────────────
+
+function rbGenEDR(ruleName, severity, ds, fields, actions, mitreId) {
+    const dsNames = ds.map(d => d.value).join(', ');
+    const fieldNames = fields.map(f => f.value).join(', ');
+    const actionNames = actions.map(a => a.value).join(', ');
+
+    return `/* ═══ EDR Detection: ${ruleName} ═══ */
+/* Severity: ${severity} | MITRE: ${mitreId} */
+
+/* Process Behavior Indicators */
+Monitor: Suspicious process execution matching rule criteria
+Data Sources: ${dsNames || 'Endpoint telemetry'}
+Fields: ${fieldNames || 'Process name, command-line, parent process'}
+
+/* Parent-Child Process Relationships */
+Alert when:
+  - Unusual parent spawns child process (e.g. Office → cmd/powershell)
+  - Process with suspicious command-line flags (-enc, -nop, -w hidden)
+  - Non-standard process accessing sensitive resources (LSASS, SAM)
+
+/* CrowdStrike Falcon IOA */
+IOA Name: ${ruleName}
+Severity: ${severity}
+Action: ${actionNames || 'Detect'}
+Behavior: Monitor for ${fieldNames || 'suspicious endpoint activity'}
+
+/* Microsoft Defender for Endpoint */
+DeviceProcessEvents
+| where FileName in~ ("cmd.exe", "powershell.exe")
+| where ProcessCommandLine has_any ("${fieldNames || 'suspicious_pattern'}")
+| project Timestamp, DeviceName, FileName, ProcessCommandLine, InitiatingProcessFileName`;
+}
+
+function rbGenXDR(ruleName, severity, ds, fields, mitreId) {
+    const fieldNames = fields.map(f => f.value).join(', ');
+
+    return `/* ═══ XDR Correlation: ${ruleName} ═══ */
+/* Severity: ${severity} | MITRE: ${mitreId} */
+
+/* Multi-Source Correlation Logic */
+PHASE 1 - Identity Layer:
+  - Authentication events (4624, 4625, 4672)
+  - Correlate: user, source IP, logon type
+
+PHASE 2 - Endpoint Layer:
+  - Process creation, script execution
+  - Correlate: process tree, command-line, ${fieldNames || 'file indicators'}
+
+PHASE 3 - Network Layer:
+  - Network connections (SMB 445, RDP 3389, HTTP/S)
+  - Correlate: destination, data volume, frequency
+
+/* Correlation Window */
+Alert when 2+ phases match within 30 minutes for same user/host
+
+/* Microsoft 365 Defender Advanced Hunting */
+let identity = IdentityLogonEvents | where Timestamp > ago(30m);
+let endpoint = DeviceProcessEvents | where Timestamp > ago(30m);
+let network = DeviceNetworkEvents | where Timestamp > ago(30m);
+identity
+| join kind=inner endpoint on AccountName
+| join kind=leftouter network on DeviceName
+| project Timestamp, AccountName, DeviceName, ProcessCommandLine, RemoteIP`;
+}
+
+function rbGenSOAR(ruleName, severity, actions, mitreId) {
+    const actionNames = actions.map(a => a.value);
+    const hasIsolate = actionNames.some(a => /isolat/i.test(a));
+    const hasBlock = actionNames.some(a => /block/i.test(a));
+    const hasDisable = actionNames.some(a => /disable/i.test(a));
+    const hasAlert = actionNames.some(a => /alert/i.test(a));
+
+    return `/* ═══ SOAR Playbook: ${ruleName} ═══ */
+/* Severity: ${severity} | MITRE: ${mitreId} */
+
+/* Trigger Condition */
+SIEM alert fires for "${ruleName}" with severity >= ${severity}
+
+/* Playbook Steps */
+STEP 1: ENRICH (Automatic)
+  - Query AD: user group membership, adminCount, lastLogon
+  - Query CMDB: asset tier, owner, business criticality
+  - Query Threat Intel: source IP reputation, geo lookup
+  - Query EDR: running processes, network connections
+
+STEP 2: TRIAGE (Automatic)
+  - Calculate confidence score from enrichment
+  - IF score >= 8 AND tier0_asset → CRITICAL → Step 3a
+  - ELSE → HIGH → Step 3b (analyst approval)
+
+STEP 3a: AUTO-CONTAIN (Critical)
+${hasIsolate ? '  - EDR API: Isolate host (POST /devices/actions/contain)' : '  - EDR API: Isolate host if confirmed malicious'}
+${hasDisable ? '  - AD API: Disable-ADAccount -Identity $user' : '  - AD API: Disable compromised account'}
+${hasBlock ? '  - Firewall: Block source IP at perimeter' : '  - Firewall: Block malicious IPs/domains'}
+  - EDR RTR: Kill suspicious processes
+  - Force logoff active sessions
+
+STEP 3b: APPROVAL REQUIRED (High)
+  - Send approval request to SOC Tier 2
+  - Timeout: 15 min → auto-escalate to 3a
+  - On approval → execute containment
+
+STEP 4: NOTIFY
+  - Create IR ticket (ServiceNow/Jira)
+  - Page SOC on-call via PagerDuty
+  - Post to #soc-alerts Slack channel
+${severity === 'Critical' ? '  - Email CISO + IR Lead' : ''}
+
+STEP 5: COLLECT EVIDENCE
+  - Export EDR timeline (T0 ± 2 hours)
+  - Export SIEM logs for affected user (24 hours)
+  - Snapshot network flow data
+  - Store in case folder: IR-$TICKET_ID/`;
+}
+
 function rbGenerateRule() {
     const platform = document.getElementById('rb-platform')?.value || 'splunk';
     const ruleName = document.getElementById('rb-rule-name')?.value || 'Untitled Rule';
@@ -753,9 +931,16 @@ function rbGenerateRule() {
 
     if (ds.length === 0 && fields.length === 0 && conditions.length === 0) {
         document.getElementById('rb-code-output').textContent = '// Drop components onto the canvas to generate a detection rule...\n// Flow: Data Source -> Conditions/Fields -> Actions';
+        const edr = document.getElementById('rb-edr-output');
+        const xdr = document.getElementById('rb-xdr-output');
+        const soar = document.getElementById('rb-soar-output');
+        if (edr) edr.textContent = '// Build a SIEM rule first — EDR detection auto-generates from your rule components';
+        if (xdr) xdr.textContent = '// Build a SIEM rule first — XDR correlation auto-generates from your rule components';
+        if (soar) soar.textContent = '// Build a SIEM rule first — SOAR playbook auto-generates from your rule components';
         return;
     }
 
+    // Generate SIEM query (existing logic)
     let code = '';
     switch (platform) {
         case 'splunk': code = rbGenSplunk(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
@@ -767,8 +952,18 @@ function rbGenerateRule() {
         case 'sigma': code = rbGenSigma(ruleName, ruleDesc, ds, fields, conditions, actions, severity, mitreId, fpGuidance); break;
     }
 
+    // Populate SIEM card
     const output = document.getElementById('rb-code-output');
     if (output) output.textContent = code;
+
+    // Auto-generate EDR / XDR / SOAR cards
+    const edrOutput = document.getElementById('rb-edr-output');
+    const xdrOutput = document.getElementById('rb-xdr-output');
+    const soarOutput = document.getElementById('rb-soar-output');
+
+    if (edrOutput) edrOutput.textContent = rbGenEDR(ruleName, severity, ds, fields, actions, mitreId);
+    if (xdrOutput) xdrOutput.textContent = rbGenXDR(ruleName, severity, ds, fields, mitreId);
+    if (soarOutput) soarOutput.textContent = rbGenSOAR(ruleName, severity, actions, mitreId);
 }
 
 function rbSlug(name) {
