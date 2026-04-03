@@ -116,6 +116,10 @@ function loadPage(pageId) {
     if (typeof richPageContent !== 'undefined' && richPageContent[pageId]) {
         content.innerHTML = richPageContent[pageId];
         content.scrollTop = 0;
+        // Run post-render initializers (e.g., MITRE heatmap)
+        if (pageId === 'mitre' && typeof initMitreHeatmap === 'function') {
+            initMitreHeatmap();
+        }
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         event?.target?.classList?.add('active');
         return;
