@@ -340,6 +340,7 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+const escapeHTML = escapeHtml;
 
 // ── Live Feed ──
 const feedMessages = [
