@@ -495,16 +495,16 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 4px;
-    max-height: 220px;
+    max-height: 320px;
     overflow-y: auto;
     font-size: 13px;
 }
 .feed-item {
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: 6px;
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: flex-start;
     transition: background 0.15s;
 }
 .feed-item:hover { background: var(--bg-tertiary); }
@@ -524,10 +524,10 @@ body {
     letter-spacing: 0.5px;
 }
 .feed-severity.critical { background: var(--red-dim); color: var(--red); }
-.feed-severity.high { background: var(--yellow-dim); color: var(--yellow); }
+.feed-severity.high { background: var(--orange-dim); color: var(--orange); }
 .feed-severity.medium { background: var(--cyan-dim); color: var(--cyan); }
 .feed-severity.low { background: var(--green-dim); color: var(--green); }
-.feed-msg { color: var(--text-secondary); font-size: 12px; }
+.feed-msg { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 
 /* ═══════════════════════════════════════
    TERMINAL
