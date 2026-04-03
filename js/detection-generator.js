@@ -1,9 +1,48 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BLUESHELL - AI Detection Rule Generator v1.0
+// BLUESHELL - AI Detection Rule Generator v2.0
 // Generates complete SIEM/EDR/SOAR/XDR detection & response solutions
+// Master Prompt: {{RULE_NAME}} + {{CONTEXT_DATA}} → Full Detection Rule
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ── Master Prompt Builder ──────────────────────────────────────────────
+// This builds the prompt that gets sent to Claude API backend.
+// Template uses {{RULE_NAME}} and {{CONTEXT_DATA}} replacement pattern.
+
+function buildDetectionPrompt(ruleName, platformFocus) {
+    const context = getDetectionContext(ruleName);
+    const platformCtx = platformFocus && platformFocus !== 'ALL'
+        ? 'Focus more on: ' + platformFocus
+        : '';
+
+    // Master prompt template — same as server.js MASTER_PROMPT_TEMPLATE
+    const PROMPT_TEMPLATE = `You are a senior SOC analyst, detection engineer, and security automation expert.
+
+Your task is to generate a complete security detection and response solution.
+
+Rule Name: {{RULE_NAME}}
+
+Context:
+{{CONTEXT_DATA}}
+
+Instructions:
+- Think like a real SOC (Detection + Response + Endpoint + Correlation)
+- Cover SIEM, EDR, SOAR, and XDR aspects
+- Use MITRE ATT&CK framework
+- Avoid generic answers
+- Be technical and concise
+
+{{PLATFORM_FOCUS}}
+
+Return output as valid JSON only.`;
+
+    return PROMPT_TEMPLATE
+        .replace('{{RULE_NAME}}', ruleName)
+        .replace('{{CONTEXT_DATA}}', context.trim())
+        .replace('{{PLATFORM_FOCUS}}', platformCtx);
+}
+
 // ── Smart Context Injection Engine ──────────────────────────────────────
+// Automatically injects relevant context based on attack keywords in rule name
 
 function getDetectionContext(ruleName) {
     const r = ruleName.toLowerCase();
@@ -1448,6 +1487,12 @@ function _copyFullDetection() {
 async function generateDetectionViaAPI(ruleName) {
     const context = getDetectionContext(ruleName);
     const platformFocus = document.getElementById('det-gen-platform')?.value || 'ALL';
+
+    // Build the prompt using master template ({{RULE_NAME}} + {{CONTEXT_DATA}} replacement)
+    const prompt = buildDetectionPrompt(ruleName, platformFocus);
+    console.log('[BlueShell] Prompt built for:', ruleName, '| Platform:', platformFocus);
+    console.log('[BlueShell] Context injected:', context.substring(0, 100) + '...');
+
     try {
         const response = await fetch('/api/generate-detection', {
             method: 'POST',

@@ -489,27 +489,143 @@ server.on('request', (req, res) => {
 
                 const platformCtx = getPlatformContext(platformFocus);
 
-                // Build prompt with context injection
-                const DETECTION_PROMPT = `You are a senior SOC analyst, detection engineer, and security automation expert.
-Your task is to generate a complete detection and response solution across SIEM, EDR, SOAR, and XDR platforms.
+                // ── Master Prompt Template ──────────────────────────
+                // {{RULE_NAME}} and {{CONTEXT_DATA}} get replaced at runtime
+                const MASTER_PROMPT_TEMPLATE = `You are a senior SOC analyst, detection engineer, and security automation expert.
 
-Rule Name: ${ruleName}
+Your task is to generate a complete security detection and response solution.
+
+Rule Name: {{RULE_NAME}}
 
 Context:
-${context || ''}
-- Windows Event ID 4624 = Successful login
+{{CONTEXT_DATA}}
+
+Instructions:
+- Think like a real SOC (Detection + Response + Endpoint + Correlation)
+- Cover SIEM, EDR, SOAR, and XDR aspects
+- Use MITRE ATT&CK framework
+- Avoid generic answers
+- Be technical and concise
+- Include real-world attack patterns (NOT generic)
+- Correlate multiple logs where possible
+- Include endpoint behavior (process, command-line, parent-child)
+- Include automation and response actions
+
+{{PLATFORM_FOCUS}}
+
+Output format:
+
+========================
+1. Rule Name
+
+2. Description
+- Clear explanation of attack and detection goal
+
+========================
+3. MITRE ATT&CK Mapping
+- Technique ID
+- Tactic
+
+========================
+4. Severity
+- Low / Medium / High / Critical (with reason)
+
+========================
+5. SIEM Detection
+- Log Sources (Event IDs, firewall, cloud logs, etc.)
+- Detection Logic (step-by-step correlation)
+- Queries:
+   - Splunk SPL
+   - KQL (Microsoft Sentinel)
+
+========================
+6. EDR Detection
+- Process behavior
+- Command-line patterns
+- Parent-child process relationships
+- File/registry/network indicators
+- IOA (behavior-based detection)
+- IOC (IP, domain, hash)
+
+========================
+7. XDR Correlation
+- Multi-source correlation (Endpoint + Network + Identity)
+- Attack chain mapping (initial access → execution → lateral movement)
+- Timeline-based detection
+
+========================
+8. SOAR Playbook (Automation)
+- Trigger condition
+- Automated actions:
+   - Isolate host
+   - Disable user account
+   - Block IP/domain
+   - Kill process
+- Approval steps (if needed)
+
+========================
+9. Detection Conditions
+- Threshold (number of events)
+- Time window
+
+========================
+10. False Positives
+- Realistic scenarios
+
+========================
+11. Investigation Steps
+- What SOC analyst should check step-by-step
+
+========================
+12. Response Actions (Manual + Automated)
+
+========================
+13. Tuning Recommendations
+
+IMPORTANT: Return the output as valid JSON with these keys:
+{
+  "ruleName": "string",
+  "description": "string",
+  "mitre": [{"id": "string", "name": "string", "tactic": "string"}],
+  "severity": "string",
+  "severityReason": "string",
+  "logSources": [{"source": "string", "eventId": "string", "purpose": "string"}],
+  "splunkSPL": "string",
+  "sentinelKQL": "string",
+  "edrProcess": "string",
+  "edrParentChild": "string",
+  "edrCmdIndicators": ["string"],
+  "ioa": ["string"],
+  "falsePositives": ["string"],
+  "soarTrigger": "string",
+  "soarActions": ["string"],
+  "thresholds": {"events": number, "window": "string", "note": "string"},
+  "investigationSteps": ["string"],
+  "tuning": ["string"],
+  "xdrCorrelation": "string",
+  "responseManual": ["string"],
+  "responseAutomated": ["string"]
+}
+Return ONLY valid JSON. No markdown, no explanation, no code fences.`;
+
+                // ── Build Context Data ──────────────────────────────
+                // Combine smart context + base context
+                const baseContext = `- Windows Event ID 4624 = Successful login
 - Logon Type 10 = Remote Interactive (RDP)
 - Event ID 4625 = Failed login
 - Event ID 4672 = Privileged login
 - Event ID 5140 = SMB share access
 - PowerShell Event ID 4104 = Script execution
-- MITRE ATT&CK T1021 = Remote Services
-- MITRE ATT&CK T1059 = Command Execution
+- MITRE ATT&CK T1021 = Remote Services (Lateral Movement)
+- MITRE ATT&CK T1059 = Command Execution`;
 
-${platformCtx}
+                const fullContext = (context || '') + '\n' + baseContext;
 
-Output a complete JSON with these keys: ruleName, description, mitre (array of {id, name, tactic}), severity, severityReason, logSources (array of {source, eventId, purpose}), splunkSPL, sentinelKQL, edrProcess, edrParentChild, edrCmdIndicators (array), ioa (array), falsePositives (array), soarTrigger, soarActions (array), thresholds ({events, window, note}), investigationSteps (array), tuning (array).
-Return ONLY valid JSON. No markdown, no explanation.`;
+                // ── Replace Template Placeholders ───────────────────
+                const DETECTION_PROMPT = MASTER_PROMPT_TEMPLATE
+                    .replace('{{RULE_NAME}}', ruleName)
+                    .replace('{{CONTEXT_DATA}}', fullContext.trim())
+                    .replace('{{PLATFORM_FOCUS}}', platformCtx);
 
                 // Check for ANTHROPIC_API_KEY
                 const apiKey = process.env.ANTHROPIC_API_KEY;
